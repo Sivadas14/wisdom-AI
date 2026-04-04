@@ -37,7 +37,7 @@ jobs:
         run: |
           echo "Building Docker image..."
           docker build \
-            --build-arg VITE_API_BASE_URL=https://arunachalasamudra.co.in/api \
+            --build-arg VITE_API_BASE_URL=/api \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .
           echo "Build complete."
