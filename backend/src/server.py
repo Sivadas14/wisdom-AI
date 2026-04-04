@@ -142,7 +142,10 @@ def get_app() -> FastAPI:
         # Serve index.html for all other routes (SPA routing)
         index_file = os.path.join(ui_path, "index.html")
         if os.path.exists(index_file):
-            return FileResponse(index_file)
+            return FileResponse(
+                index_file,
+                headers={"Cache-Control": "no-store, must-revalidate"},
+            )
         else:
             return {"error": "Frontend not found"}, 404
 
