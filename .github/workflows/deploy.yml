@@ -52,28 +52,55 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}
           echo "Push complete. Image: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
 
-      - name: Deploy to App Runner
+      - name: Update App Runner service image and deploy
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          echo "Triggering App Runner deployment..."
-          aws apprunner start-deployment \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}"
-          echo "Deployment triggered! App Runner is now deploying the new image."
+          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+          echo "Updating App Runner service to use image: $IMAGE_URI"
 
-      - name: Wait for deployment to complete
+          # Update the service to point to the exact new image SHA (avoids stale :latest issues)
+          UPDATE_RESULT=$(aws apprunner update-service \
+            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --source-configuration "{\"ImageRepository\":{\"ImageIdentifier\":\"$IMAGE_URI\",\"ImageRepositoryType\":\"ECR\",\"ImageConfiguration\":{\"Port\":\"8000\"}}}" \
+            --output json 2>&1) || true
+
+          echo "Update result: $UPDATE_RESULT"
+
+          # Give the update a moment to register, then trigger deployment
+          sleep 5
+          echo "Triggering deployment..."
+          DEPLOY_RESULT=$(aws apprunner start-deployment \
+            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --output json)
+
+          OPERATION_ID=$(echo "$DEPLOY_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['OperationId'])")
+          echo "Deployment triggered. Operation ID: $OPERATION_ID"
+          echo "OPERATION_ID=$OPERATION_ID" >> $GITHUB_ENV
+
+      - name: Wait for deployment operation to succeed
         run: |
-          echo "Waiting for App Runner service to reach RUNNING state..."
-          for i in {1..30}; do
-            STATUS=$(aws apprunner describe-service \
+          echo "Waiting for operation $OPERATION_ID to complete..."
+          for i in {1..40}; do
+            OP_STATUS=$(aws apprunner list-operations \
+              --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+              --query "OperationSummaryList[?Id=='$OPERATION_ID'].Status" \
+              --output text 2>/dev/null || echo "UNKNOWN")
+
+            SVC_STATUS=$(aws apprunner describe-service \
               --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
               --query 'Service.Status' --output text)
-            echo "Status: $STATUS (check $i/30)"
-            if [ "$STATUS" = "RUNNING" ]; then
-              echo "✅ Deployment complete! Service is RUNNING."
+
+            echo "Operation: $OP_STATUS | Service: $SVC_STATUS (check $i/40)"
+
+            if [ "$OP_STATUS" = "SUCCEEDED" ]; then
+              echo "✅ Deployment succeeded! Service is live with new image."
               exit 0
-            elif [ "$STATUS" = "CREATE_FAILED" ] || [ "$STATUS" = "UPDATE_FAILED" ] || [ "$STATUS" = "DELETED" ]; then
-              echo "❌ Deployment failed with status: $STATUS"
+            elif [ "$OP_STATUS" = "FAILED" ] || [ "$SVC_STATUS" = "UPDATE_FAILED" ]; then
+              echo "❌ Deployment FAILED. Check App Runner console for logs."
               exit 1
             fi
             sleep 20
           done
-          echo "⚠️ Timed out waiting. Check App Runner console for status."
+          echo "⚠️ Timed out after 13 minutes. Check App Runner console."
+          exit 1
