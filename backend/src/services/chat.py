@@ -6,6 +6,55 @@ import asyncio
 from asyncio import sleep
 from textwrap import dedent
 from supabase import Client
+
+# =============================================================================
+# RAMANA MAHARSHI WISDOM ENGINE — SYSTEM PROMPT
+# This grounds every AI response in authentic Advaita Vedanta teachings.
+# =============================================================================
+RAMANA_SYSTEM_PROMPT = """You are a deeply knowledgeable and compassionate spiritual guide, embodying the wisdom of Bhagavan Sri Ramana Maharshi and the Advaita Vedanta tradition of Arunachala.
+
+Your purpose is to help sincere seekers on the path of Self-enquiry (Atma Vichara) and inner awakening, drawing exclusively from the authentic teachings of Ramana Maharshi, his direct disciples, and the sacred texts he recommended.
+
+## Your Knowledge Sources
+You speak from the wisdom found in:
+- "Who Am I?" (Nan Yar) — Ramana Maharshi's foundational text
+- "Be As You Are" — compiled by David Godman
+- "Talks with Sri Ramana Maharshi" — by Munagala Venkataramaiah
+- "The Collected Works of Sri Ramana Maharshi"
+- "Day by Day with Bhagavan" — by Devaraja Mudaliar
+- "The Spiritual Teaching of Ramana Maharshi"
+- The Ribhu Gita — which Bhagavan called essential reading
+- "Guru Ramana" and "Self-Enquiry" by S.S. Cohen
+- Teachings of Muruganar and Sadhu Om (when relevant)
+
+The current time is {current_time}.
+
+## How You Respond
+
+**Tone:** Warm, gentle, deeply knowing — like a wise elder sitting beside the seeker in the hall of Ramana Maharshi at Tiruvannamalai. Never preachy, never clinical.
+
+**Grounding:** Every answer must be rooted in Ramana Maharshi's actual teachings. When you reference a teaching, mention the source (e.g., "As Bhagavan said in 'Talks', #247..." or "In 'Who Am I?', Bhagavan teaches...").
+
+**Format:** Keep responses clear and breathable:
+- Maximum 3-4 short paragraphs per response
+- Use a blank line between paragraphs
+- If listing practices or steps, use a brief numbered list
+- Never write walls of text — silence speaks more than words
+
+**Core teaching to always reflect:**
+The central teaching is Self-enquiry — turning attention inward to its source by asking "Who am I?" or "To whom does this thought arise?" All suffering arises from mistaken identification with the body-mind. The Self (Atman/Brahman) is pure awareness, ever-present, needing no achievement. The path is not outward effort but inward recognition.
+
+## What You Will and Won't Do
+
+Do: Answer questions about meditation, self-enquiry, surrender, the nature of the Self, the mind, fear, grief, and daily life — through Ramana's lens. Share relevant quotes and stories from Ramana's dialogues. Recommend books from the Wisdom Library for deeper study.
+
+Don't: Give advice outside this tradition without connecting it back to Ramana's actual teachings. Engage with topics unrelated to the spiritual path.
+
+## When Generating Follow-Up Questions
+Generate exactly 3 follow-up questions that naturally arise from this conversation. Make them specific to what was discussed — not generic. Each question should invite the seeker to go deeper into the teaching or apply it to their life.
+
+## When Generating a Conversation Title
+Generate a short, evocative title (4-6 words) that captures the essence of what was explored in this conversation. Use poetic, spiritual language in the style of Ramana's teachings."""
 from sqlalchemy import select, desc, text, and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -245,20 +294,48 @@ async def _llm_chat(
             for _, filename in chunks[:3]
         ]
         ai_message.citations = citations  # Direct assignment
-        
-        # Generate follow-up questions - USE ORIGINAL PYDANTIC MODELS
-        follow_up = w.FollowUpQuestions(
-            questions=[
-                "How can I apply this wisdom in my daily life?",
-                "What are the deeper spiritual implications?",
-                "How can I deepen my understanding of this teaching?",
-            ]
+
+        # Generate follow-up questions dynamically from the LLM
+        follow_up_thread = tt.Thread(
+            tt.system(RAMANA_SYSTEM_PROMPT.format(current_time=tu.SimplerTimes.get_now_human())),
+            tt.human(
+                f"Based on this conversation about: '{user_message}', and the response just given, "
+                f"generate exactly 3 specific follow-up questions a seeker would naturally want to ask next. "
+                f"Return only the 3 questions, one per line, no numbering, no extra text."
+            ),
+            id=f"{conversation_id}_followup",
         )
+        try:
+            follow_up_response = await model.chat_async(follow_up_thread)
+            follow_up_content = follow_up_response.content if hasattr(follow_up_response, 'content') else str(follow_up_response)
+            raw_questions = [q.strip() for q in follow_up_content.strip().split('\n') if q.strip()]
+            questions = raw_questions[:3] if len(raw_questions) >= 3 else raw_questions + [
+                "How can I deepen this practice in daily life?",
+                "What does Ramana say about this in 'Talks with Sri Ramana Maharshi'?",
+                "How does Self-enquiry relate to what we just discussed?",
+            ][:3 - len(raw_questions)]
+        except Exception:
+            questions = [
+                "How can I apply this wisdom in my daily Self-enquiry practice?",
+                "What does Ramana Maharshi say about this in 'Talks' or 'Who Am I?'",
+                "How does this teaching relate to the question 'Who am I?'",
+            ]
+        follow_up = w.FollowUpQuestions(questions=questions)
         ai_message.follow_up_questions = follow_up  # Direct assignment
-        
-        # Generate title if conversation doesn't have one
+
+        # Generate conversation title dynamically if not set
         if not conversation.title:
-            conversation.title = "Spiritual Guidance Session"
+            try:
+                title_thread = tt.Thread(
+                    tt.system("You generate short, evocative spiritual titles in 4-6 words. Return only the title, nothing else."),
+                    tt.human(f"Generate a 4-6 word title for a spiritual conversation about: '{user_message}'"),
+                    id=f"{conversation_id}_title",
+                )
+                title_response = await model.chat_async(title_thread)
+                generated_title = title_response.content if hasattr(title_response, 'content') else str(title_response)
+                conversation.title = generated_title.strip().strip('"').strip("'")
+            except Exception:
+                conversation.title = "A Seeker's Inquiry"
             await session.commit()
         
         op.finish(commits_count=4, citations_count=len(citations))
@@ -459,28 +536,55 @@ async def _llm_chat_streaming_optimized(
         # Add citations - CONVERT TO JSONB
         citations = [
             w.CitationInfo(
-                name=filename, 
+                name=filename,
                 url=generate_citation_url(filename, spb_client)
             )
             for _, filename in chunks[:3]
         ]
         ai_message.citations = citations
-        
-        # Generate follow-up questions - CONVERT TO JSONB
-        follow_up = w.FollowUpQuestions(
-            questions=[
-                "How can I apply this wisdom in my daily life?",
-                "What are the deeper spiritual implications?",
-                "How can I deepen my understanding of this teaching?",
-            ]
+
+        # Generate follow-up questions dynamically from the LLM
+        follow_up_thread = tt.Thread(
+            tt.system(RAMANA_SYSTEM_PROMPT.format(current_time=tu.SimplerTimes.get_now_human())),
+            tt.human(
+                f"Based on this conversation about: '{user_message}', and the response just given, "
+                f"generate exactly 3 specific follow-up questions a seeker would naturally want to ask next. "
+                f"Return only the 3 questions, one per line, no numbering, no extra text."
+            ),
+            id=f"{conversation_id}_followup",
         )
-        
+        try:
+            follow_up_response = await model.chat_async(follow_up_thread)
+            follow_up_content = follow_up_response.content if hasattr(follow_up_response, 'content') else str(follow_up_response)
+            raw_questions = [q.strip() for q in follow_up_content.strip().split('\n') if q.strip()]
+            questions = raw_questions[:3] if len(raw_questions) >= 3 else raw_questions + [
+                "How can I deepen this practice in daily life?",
+                "What does Ramana say about this in 'Talks with Sri Ramana Maharshi'?",
+                "How does Self-enquiry relate to what we just discussed?",
+            ][:3 - len(raw_questions)]
+        except Exception:
+            questions = [
+                "How can I apply this wisdom in my daily Self-enquiry practice?",
+                "What does Ramana Maharshi say about this in 'Talks' or 'Who Am I?'",
+                "How does this teaching relate to the question 'Who am I?'",
+            ]
+        follow_up = w.FollowUpQuestions(questions=questions)
         ai_message.follow_up_questions = follow_up
-        
-        # Generate title if conversation doesn't have one
+
+        # Generate conversation title dynamically if not set
         if not conversation.title:
-            conversation.title = "Spiritual Guidance Session"
-        
+            try:
+                title_thread = tt.Thread(
+                    tt.system("You generate short, evocative spiritual titles in 4-6 words. Return only the title, nothing else."),
+                    tt.human(f"Generate a 4-6 word title for a spiritual conversation about: '{user_message}'"),
+                    id=f"{conversation_id}_title",
+                )
+                title_response = await model.chat_async(title_thread)
+                generated_title = title_response.content if hasattr(title_response, 'content') else str(title_response)
+                conversation.title = generated_title.strip().strip('"').strip("'")
+            except Exception:
+                conversation.title = "A Seeker's Inquiry"
+
         # SINGLE BATCH COMMIT
         session.add(ai_message)
     await session.commit()
@@ -600,7 +704,7 @@ async def chat_completions(
     
     async with profile_operation("thread_creation") as op:
         master_thread = tt.Thread(
-            tt.system(f"The current time is {tu.SimplerTimes.get_now_human()}"),
+            tt.system(RAMANA_SYSTEM_PROMPT.format(current_time=tu.SimplerTimes.get_now_human())),
             id=conversation_id,
         )
         

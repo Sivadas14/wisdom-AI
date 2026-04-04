@@ -83,22 +83,22 @@ const Index = () => {
     }
   };
 
-  // Quick prompt options
+  // Quick prompt options — Ramana Maharshi wisdom tradition
   const quickPrompts = [
     {
       icon: <Heart className="w-4 h-4" />,
-      label: "Today's Meditation",
-      prompt: "What is the importance of self control?"
+      label: "Who Am I?",
+      prompt: "Teach me the practice of Self-enquiry — how do I ask 'Who am I?' and what should I look for?"
     },
     {
       icon: <MessageSquare className="w-4 h-4" />,
-      label: "Share thoughts",
-      prompt: "Share some thoughts of Bhagavan Ramana Maharshi about wisdom."
+      label: "Ramana's Wisdom",
+      prompt: "Share a teaching of Bhagavan Ramana Maharshi that is most relevant for a seeker today."
     },
     {
       icon: <HelpCircle className="w-4 h-4" />,
-      label: "Resolve confusion",
-      prompt: "What are some ways to reduce confusion?"
+      label: "Ease My Mind",
+      prompt: "I am caught in fear and worry. What did Ramana Maharshi teach about overcoming this?"
     },
     {
       icon: <Plus className="w-4 h-4" />,
