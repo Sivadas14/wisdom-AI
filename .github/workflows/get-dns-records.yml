@@ -1,7 +1,7 @@
 name: Get App Runner DNS Records for GoDaddy
 
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
@@ -20,47 +20,52 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Output all DNS records needed for GoDaddy
+      - name: Output DNS records needed for GoDaddy
         run: |
-          echo "======================================"
-          echo "APP RUNNER NATIVE URL"
-          echo "======================================"
           SERVICE_URL=$(aws apprunner describe-service \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
             --query 'Service.ServiceUrl' --output text)
-          echo "Native URL: https://$SERVICE_URL"
-          echo ""
-          echo "======================================"
-          echo "CUSTOM DOMAIN DNS RECORDS"
-          echo "(Add these CNAME records in GoDaddy)"
-          echo "======================================"
+
           aws apprunner describe-custom-domains \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-            --output json | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-domains = data.get('CustomDomains', [])
-if not domains:
-    print('No custom domains configured yet.')
-for d in domains:
-    print(f\"Domain: {d['DomainName']}\")
-    print(f\"Status: {d['Status']}\")
-    print(f\"EnableWWW: {d.get('EnableWWW', False)}\")
-    print()
-    records = d.get('CertificateValidationRecords', [])
-    if records:
-        print('  -- Certificate Validation CNAME records (add in GoDaddy) --')
-        for r in records:
-            name = r['Name'].replace(d['DomainName'], '')
-            print(f\"  Name:  {r['Name']}\")
-            print(f\"  Type:  {r['Type']}\")
-            print(f\"  Value: {r['Value']}\")
-            print()
-    print('  -- Domain Routing CNAME (add in GoDaddy) --')
-    print(f\"  Name:  {d['DomainName']}\")
-    print(f\"  Type:  CNAME\")
-    import subprocess
-    url = subprocess.run(['aws','apprunner','describe-service','--service-arn','${{ env.APP_RUNNER_SERVICE_ARN }}','--query','Service.ServiceUrl','--output','text'], capture_output=True, text=True).stdout.strip()
-    print(f\"  Value: {url}\")
-    print('--------------------------------------')
-"
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --output json > /tmp/domains.json
+
+          echo "================================================"
+          echo " APP RUNNER NATIVE URL (service is live here)"
+          echo "================================================"
+          echo "  https://$SERVICE_URL"
+          echo ""
+
+          echo "================================================"
+          echo " GODADDY DNS CHANGES REQUIRED"
+          echo "================================================"
+          echo ""
+
+          DOMAIN=$(jq -r '.CustomDomains[0].DomainName' /tmp/domains.json)
+          STATUS=$(jq -r '.CustomDomains[0].Status' /tmp/domains.json)
+          echo "Custom domain configured on App Runner: $DOMAIN"
+          echo "Certificate status: $STATUS"
+          echo ""
+
+          echo "--- STEP 1: Add SSL Certificate Validation CNAMEs in GoDaddy ---"
+          echo "(These prove to AWS you own the domain, required for HTTPS)"
+          echo ""
+          jq -r '.CustomDomains[0].CertificateValidationRecords[] |
+            "  Type:  " + .Type + "\n" +
+            "  Name:  " + .Name + "\n" +
+            "  Value: " + .Value + "\n"' /tmp/domains.json || echo "  (No cert records - may already be validated)"
+
+          echo ""
+          echo "--- STEP 2: Change the www CNAME in GoDaddy ---"
+          echo "  Type:  CNAME"
+          echo "  Name:  $DOMAIN"
+          echo "  Value: $SERVICE_URL"
+          echo ""
+
+          echo "--- STEP 3: Forward apex domain in GoDaddy ---"
+          echo "  In GoDaddy: Forwarding -> Forward Domain"
+          echo "  Forward: arunachalasamudra.co.in"
+          echo "  To:      https://www.arunachalasamudra.co.in"
+          echo "  Type:    Permanent (301)"
+          echo ""
+          echo "================================================"
