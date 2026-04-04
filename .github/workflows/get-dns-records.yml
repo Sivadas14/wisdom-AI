@@ -1,0 +1,66 @@
+name: Get App Runner DNS Records for GoDaddy
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+env:
+  AWS_REGION: us-east-1
+  APP_RUNNER_SERVICE_ARN: arn:aws:apprunner:us-east-1:491766120292:service/contemplation-flow/5b294ce6aeb54f53826ce2d6e8e33a17
+
+jobs:
+  get-dns-records:
+    name: Output DNS Records
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Output all DNS records needed for GoDaddy
+        run: |
+          echo "======================================"
+          echo "APP RUNNER NATIVE URL"
+          echo "======================================"
+          SERVICE_URL=$(aws apprunner describe-service \
+            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --query 'Service.ServiceUrl' --output text)
+          echo "Native URL: https://$SERVICE_URL"
+          echo ""
+          echo "======================================"
+          echo "CUSTOM DOMAIN DNS RECORDS"
+          echo "(Add these CNAME records in GoDaddy)"
+          echo "======================================"
+          aws apprunner describe-custom-domains \
+            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --output json | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+domains = data.get('CustomDomains', [])
+if not domains:
+    print('No custom domains configured yet.')
+for d in domains:
+    print(f\"Domain: {d['DomainName']}\")
+    print(f\"Status: {d['Status']}\")
+    print(f\"EnableWWW: {d.get('EnableWWW', False)}\")
+    print()
+    records = d.get('CertificateValidationRecords', [])
+    if records:
+        print('  -- Certificate Validation CNAME records (add in GoDaddy) --')
+        for r in records:
+            name = r['Name'].replace(d['DomainName'], '')
+            print(f\"  Name:  {r['Name']}\")
+            print(f\"  Type:  {r['Type']}\")
+            print(f\"  Value: {r['Value']}\")
+            print()
+    print('  -- Domain Routing CNAME (add in GoDaddy) --')
+    print(f\"  Name:  {d['DomainName']}\")
+    print(f\"  Type:  CNAME\")
+    import subprocess
+    url = subprocess.run(['aws','apprunner','describe-service','--service-arn','${{ env.APP_RUNNER_SERVICE_ARN }}','--query','Service.ServiceUrl','--output','text'], capture_output=True, text=True).stdout.strip()
+    print(f\"  Value: {url}\")
+    print('--------------------------------------')
+"
