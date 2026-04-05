@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
@@ -50,71 +50,94 @@ jobs:
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-          # Capture the exact image digest so App Runner uses the NEW image
           IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $ECR_REGISTRY/$ECR_REPOSITORY:latest)
           echo "Pushed image digest: $IMAGE_DIGEST"
-          echo "image_uri=$IMAGE_DIGEST" >> $GITHUB_OUTPUT
           echo "IMAGE_URI=$IMAGE_DIGEST" >> $GITHUB_ENV
           echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
 
-      - name: Update App Runner service with new image
+      - name: Wait for App Runner to be RUNNING before updating
         run: |
-          echo "Updating App Runner service to use new image: $IMAGE_URI"
-          aws apprunner update-service \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-            --source-configuration "{
-              \"ImageRepository\": {
-                \"ImageIdentifier\": \"$IMAGE_URI\",
-                \"ImageRepositoryType\": \"ECR\",
-                \"ImageConfiguration\": {
-                  \"Port\": \"8000\"
-                }
-              },
-              \"AutoDeploymentsEnabled\": false
-            }" \
-            --output json | python3 -c "import sys,json; d=json.load(sys.stdin); print('Service status:', d['Service']['Status'])"
-          echo "Service updated. Waiting for update to be applied..."
-          sleep 10
-
-      - name: Trigger App Runner deployment
-        run: |
-          echo "Triggering App Runner deployment..."
-          DEPLOY_RESULT=$(aws apprunner start-deployment \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-            --output json)
-
-          OPERATION_ID=$(echo "$DEPLOY_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['OperationId'])")
-          echo "Deployment triggered. Operation ID: $OPERATION_ID"
-          echo "OPERATION_ID=$OPERATION_ID" >> $GITHUB_ENV
-
-      - name: Wait for deployment to complete
-        run: |
-          echo "Waiting for operation $OPERATION_ID to complete..."
-          for i in {1..40}; do
-            SVC_JSON=$(aws apprunner describe-service \
-              --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-              --output json)
-
-            SVC_STATUS=$(echo "$SVC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['Service']['Status'])")
-            echo "Service status: $SVC_STATUS (check $i/40)"
-
-            if [ "$SVC_STATUS" = "RUNNING" ]; then
-              echo "✅ Deployment succeeded! Service is live."
-              exit 0
-            elif [ "$SVC_STATUS" = "UPDATE_FAILED" ] || [ "$SVC_STATUS" = "OPERATION_IN_PROGRESS" ] && [ "$i" -eq 40 ]; then
-              echo "❌ Deployment FAILED. Check App Runner console for logs."
+          echo "Waiting for service to be RUNNING (may be busy from previous deploy)..."
+          for i in $(seq 1 30); do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$APP_RUNNER_SERVICE_ARN" \
+              --query 'Service.Status' --output text)
+            echo "Status: $STATUS (check $i/30)"
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "Service is RUNNING — ready."
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: service not RUNNING after 10 minutes"
               exit 1
             fi
             sleep 20
           done
-          echo "⚠️ Timed out after 13 minutes. Check App Runner console."
+
+      - name: Update App Runner service with new image
+        run: |
+          echo "Reading existing service config..."
+          SVC_JSON=$(aws apprunner describe-service \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --output json)
+
+          ACCESS_ROLE_ARN=$(echo "$SVC_JSON" | jq -r '.Service.SourceConfiguration.AuthenticationConfiguration.AccessRoleArn // empty')
+          echo "Access role ARN: $ACCESS_ROLE_ARN"
+          echo "New image URI:   $IMAGE_URI"
+
+          CONFIG_JSON=$(jq -n \
+            --arg img "$IMAGE_URI" \
+            --arg role "$ACCESS_ROLE_ARN" \
+            '{
+              ImageRepository: {
+                ImageIdentifier: $img,
+                ImageRepositoryType: "ECR",
+                ImageConfiguration: { Port: "8000" }
+              },
+              AutoDeploymentsEnabled: false,
+              AuthenticationConfiguration: { AccessRoleArn: $role }
+            }')
+
+          echo "Source config:"
+          echo "$CONFIG_JSON"
+
+          echo "Calling update-service..."
+          aws apprunner update-service \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --source-configuration "$CONFIG_JSON" \
+            --output json | jq -r '.Service.Status'
+
+      - name: Wait for deployment to complete
+        run: |
+          echo "Waiting for service to reach RUNNING after update..."
+          for i in $(seq 1 45); do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$APP_RUNNER_SERVICE_ARN" \
+              --query 'Service.Status' --output text)
+            echo "Status: $STATUS (check $i/45, ~$((i * 20 / 60))m elapsed)"
+
+            if [ "$STATUS" = "RUNNING" ]; then
+              echo "Deployment succeeded!"
+              exit 0
+            fi
+            if [ "$STATUS" = "UPDATE_FAILED" ]; then
+              echo "ERROR: App Runner reported UPDATE_FAILED. Check App Runner logs."
+              exit 1
+            fi
+            sleep 20
+          done
+          echo "ERROR: Timed out after 15 minutes."
           exit 1
 
-      - name: Verify new image is live
+      - name: Verify deployment
         if: always()
         run: |
           SERVICE_URL=$(aws apprunner describe-service \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
             --query 'Service.ServiceUrl' --output text)
-          echo "🌐 App Runner URL: https://$SERVICE_URL"
-          echo "🔗 Health: $(curl -s https://$SERVICE_URL/health)"
+          STATUS=$(aws apprunner describe-service \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --query 'Service.Status' --output text)
+          echo "App Runner URL: https://$SERVICE_URL"
+          echo "Final status: $STATUS"
+          echo "Health: $(curl -sf https://$SERVICE_URL/health || echo 'health check failed')"

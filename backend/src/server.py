@@ -2,7 +2,7 @@ from tuneapi import tu
 
 import os
 import asyncio
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
@@ -129,7 +129,7 @@ def get_app() -> FastAPI:
 
     # DB diagnostic endpoint — checks connection AND schema columns
     @app.get("/api/health/db")
-    async def db_health_check(request):
+    async def db_health_check(request: Request):
         from sqlalchemy import text
         try:
             session = request.app.state.db_session_factory()
