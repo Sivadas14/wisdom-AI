@@ -122,11 +122,43 @@ def get_app() -> FastAPI:
     app.add_api_route("/api/admin/source-data/list", admin_svc.list_source_data, methods=["GET"], tags=["admin"], dependencies=auth_dependency)
     # fmt: on
 
-    # Health check endpoint for Render.com
+    # Health check endpoint
     @app.get("/health")
     async def health_check():
-        """Health check endpoint for Render.com monitoring"""
         return {"status": "healthy", "timestamp": tu.SimplerTimes.get_now_datetime().isoformat()}
+
+    # DB diagnostic endpoint — checks connection AND schema columns
+    @app.get("/api/health/db")
+    async def db_health_check(request):
+        from sqlalchemy import text
+        try:
+            session = request.app.state.db_session_factory()
+            results = {}
+            async with session:
+                # 1. Basic connectivity
+                await session.execute(text("SELECT 1"))
+                results["connected"] = True
+
+                # 2. Check which auth columns exist in user_profiles
+                col_check = await session.execute(text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'user_profiles' "
+                    "AND column_name IN ('email', 'password_hash', 'phone_number')"
+                ))
+                results["columns"] = [row[0] for row in col_check.fetchall()]
+
+                # 3. Check alembic current revision
+                try:
+                    rev_check = await session.execute(text(
+                        "SELECT version_num FROM alembic_version"
+                    ))
+                    results["alembic_revision"] = rev_check.scalar()
+                except Exception as e:
+                    results["alembic_revision"] = f"error: {e}"
+
+            return {"status": "ok", **results}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
 
     # Catch-all route for SPA (Single Page Application) - must be last
     ui_path = tu.joinp(tu.folder(__file__), "ui")

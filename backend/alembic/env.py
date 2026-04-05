@@ -1,4 +1,5 @@
 import asyncio
+import ssl
 from logging.config import fileConfig
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
@@ -18,13 +19,16 @@ target_metadata = meta
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in 'online' mode using the same SSL config as the main app."""
+    # Build the same SSL context the main app uses so migrations can reach Supabase
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE  # Supabase self-signed cert; disable verification
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
-    connectable = create_async_engine(str(settings.db_url))
+    connectable = create_async_engine(
+        str(settings.db_url),
+        connect_args={"ssl": ssl_context},
+    )
     if isinstance(connectable, AsyncEngine):
         asyncio.run(run_async_migrations(connectable))
     else:
