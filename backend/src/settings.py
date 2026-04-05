@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
 
+    # SMTP email settings
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_sender_email: str = ""
+    smtp_sender_name: str = "Arunachala Samudra"
+    smtp_use_tls: bool = True
+
     # mode
     echo_db: bool = False
 

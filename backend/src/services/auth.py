@@ -3,20 +3,27 @@ from tuneapi import tu
 import hashlib
 import secrets
 import base64
+import datetime
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 import jwt
-import datetime
 
 from src import wire as w
 from src.db import (
     get_db_session_fa,
     UserProfile,
     UserRole,
+    EmailOTP,
+    EmailOTPType,
 )
 from src.dependencies import get_current_user
 from src.settings import settings
+from src.services.email import (
+    generate_otp,
+    send_verification_otp,
+    send_password_reset_otp,
+)
 
 
 # ============================================================================
@@ -78,6 +85,76 @@ def create_jwt_tokens(user_id: str) -> tuple[str, str]:
     )
 
     return access_token, refresh_token
+
+
+# ============================================================================
+# OTP helper — create and store an email OTP
+# ============================================================================
+
+async def _create_email_otp(
+    session: AsyncSession,
+    email: str,
+    otp_type: EmailOTPType,
+) -> str:
+    """Create a new OTP, invalidate old ones, and return the code."""
+    # Mark old unused OTPs for this email+type as used (prevent reuse)
+    old_query = select(EmailOTP).where(
+        and_(
+            EmailOTP.email == email,
+            EmailOTP.otp_type == otp_type,
+            EmailOTP.used == False,
+        )
+    )
+    old_result = await session.execute(old_query)
+    for old_otp in old_result.scalars().all():
+        old_otp.used = True
+
+    otp_code = generate_otp(6)
+    new_otp = EmailOTP(
+        email=email,
+        otp_code=otp_code,
+        otp_type=otp_type,
+        expires_at=tu.SimplerTimes.get_now_datetime() + datetime.timedelta(minutes=10),
+    )
+    session.add(new_otp)
+    await session.flush()  # Ensure it's written but don't commit yet
+    return otp_code
+
+
+async def _verify_email_otp(
+    session: AsyncSession,
+    email: str,
+    otp_code: str,
+    otp_type: EmailOTPType,
+) -> bool:
+    """Verify an OTP code. Returns True if valid, False otherwise."""
+    now = tu.SimplerTimes.get_now_datetime()
+    query = select(EmailOTP).where(
+        and_(
+            EmailOTP.email == email,
+            EmailOTP.otp_type == otp_type,
+            EmailOTP.used == False,
+            EmailOTP.expires_at > now,
+        )
+    ).order_by(EmailOTP.created_at.desc()).limit(1)
+
+    result = await session.execute(query)
+    otp_record = result.scalar_one_or_none()
+
+    if not otp_record:
+        return False
+
+    otp_record.attempts += 1
+
+    if otp_record.attempts > otp_record.max_attempts:
+        otp_record.used = True  # Too many attempts
+        return False
+
+    if secrets.compare_digest(otp_record.otp_code, otp_code):
+        otp_record.used = True  # Mark as consumed
+        return True
+
+    return False
 
 
 # ============================================================================
@@ -189,12 +266,31 @@ async def new_user(
             email=email,
             password_hash=pw_hash,
             name=request.name.strip(),
-            phone_verified=True,  # email accounts are considered verified on registration
+            phone_verified=False,  # Not verified until email OTP is confirmed
             role=UserRole.USER,
         )
 
         session.add(new_user_obj)
+        await session.flush()  # Get the ID without committing
+
+        # Create and send verification OTP
+        otp_code = await _create_email_otp(session, email, EmailOTPType.VERIFICATION)
+        email_sent = send_verification_otp(email, otp_code, request.name.strip())
+
         await session.commit()
+
+        if email_sent:
+            return w.SuccessResponse(
+                success=True,
+                message=f"Account created! A verification code has been sent to {email}. Please check your inbox.",
+            )
+        else:
+            # Account created but email not sent (SMTP not configured)
+            return w.SuccessResponse(
+                success=True,
+                message=f"Account created successfully. You can now sign in with {email}.",
+            )
+
     except Exception as e:
         tu.logger.error(f"Register DB insert failed: {e}")
         raise HTTPException(
@@ -202,11 +298,151 @@ async def new_user(
             detail=f"Failed to create account. Database error: {str(e)[:200]}"
         )
 
-    tu.logger.info(f"New user registered: {email}")
+
+async def verify_email(
+    request: w.VerifyEmailRequest,
+    session: AsyncSession = Depends(get_db_session_fa),
+) -> w.SuccessResponse:
+    """POST /api/auth/verify-email — verify email with OTP."""
+    email = request.email.strip().lower()
+    otp = request.otp.strip()
+
+    if not otp:
+        raise HTTPException(status_code=400, detail="Verification code is required")
+
+    # Find user
+    user_query = select(UserProfile).where(UserProfile.email == email)
+    result = await session.execute(user_query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if user.phone_verified:  # phone_verified is used as email_verified
+        return w.SuccessResponse(success=True, message="Email is already verified")
+
+    # Verify the OTP
+    is_valid = await _verify_email_otp(session, email, otp, EmailOTPType.VERIFICATION)
+
+    if not is_valid:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification code. Please request a new one.")
+
+    user.phone_verified = True  # Mark as verified
+    user.last_active_at = tu.SimplerTimes.get_now_datetime()
+    await session.commit()
+
+    tu.logger.info(f"Email verified for user: {email}")
 
     return w.SuccessResponse(
         success=True,
-        message=f"Account created successfully. You can now sign in with {email}.",
+        message="Email verified successfully! You can now sign in.",
+    )
+
+
+async def resend_verification(
+    request: w.ResendVerificationRequest,
+    session: AsyncSession = Depends(get_db_session_fa),
+) -> w.SuccessResponse:
+    """POST /api/auth/resend-verification — resend verification OTP."""
+    email = request.email.strip().lower()
+
+    user_query = select(UserProfile).where(UserProfile.email == email)
+    result = await session.execute(user_query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Don't reveal whether the email exists
+        return w.SuccessResponse(
+            success=True,
+            message="If an account exists with this email, a new verification code has been sent.",
+        )
+
+    if user.phone_verified:
+        return w.SuccessResponse(success=True, message="Email is already verified")
+
+    otp_code = await _create_email_otp(session, email, EmailOTPType.VERIFICATION)
+    email_sent = send_verification_otp(email, otp_code, user.name or "")
+    await session.commit()
+
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Failed to send verification email. Please try again later.")
+
+    return w.SuccessResponse(
+        success=True,
+        message="A new verification code has been sent to your email.",
+    )
+
+
+async def forgot_password(
+    request: w.ForgotPasswordRequest,
+    session: AsyncSession = Depends(get_db_session_fa),
+) -> w.SuccessResponse:
+    """POST /api/auth/forgot-password — send password reset OTP."""
+    email = request.email.strip().lower()
+
+    user_query = select(UserProfile).where(UserProfile.email == email)
+    result = await session.execute(user_query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Don't reveal whether the email exists (security best practice)
+        return w.SuccessResponse(
+            success=True,
+            message="If an account exists with this email, a password reset code has been sent.",
+        )
+
+    otp_code = await _create_email_otp(session, email, EmailOTPType.PASSWORD_RESET)
+    email_sent = send_password_reset_otp(email, otp_code, user.name or "")
+    await session.commit()
+
+    if not email_sent:
+        raise HTTPException(status_code=500, detail="Failed to send password reset email. Please try again later.")
+
+    return w.SuccessResponse(
+        success=True,
+        message="If an account exists with this email, a password reset code has been sent.",
+    )
+
+
+async def reset_password(
+    request: w.ResetPasswordRequest,
+    session: AsyncSession = Depends(get_db_session_fa),
+) -> w.SuccessResponse:
+    """POST /api/auth/reset-password — reset password using OTP."""
+    email = request.email.strip().lower()
+    otp = request.otp.strip()
+    new_password = request.new_password
+
+    if not otp:
+        raise HTTPException(status_code=400, detail="Reset code is required")
+    if not new_password or len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    # Find user
+    user_query = select(UserProfile).where(UserProfile.email == email)
+    result = await session.execute(user_query)
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Verify the OTP
+    is_valid = await _verify_email_otp(session, email, otp, EmailOTPType.PASSWORD_RESET)
+
+    if not is_valid:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset code. Please request a new one.")
+
+    # Update password
+    user.password_hash = hash_password(new_password)
+    user.is_signed_in = False  # Force re-login with new password
+    user.last_active_at = tu.SimplerTimes.get_now_datetime()
+    await session.commit()
+
+    tu.logger.info(f"Password reset for user: {email}")
+
+    return w.SuccessResponse(
+        success=True,
+        message="Password reset successfully! You can now sign in with your new password.",
     )
 
 

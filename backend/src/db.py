@@ -380,6 +380,36 @@ class OTPSession(Base):
     __table_args__ = ()
 
 
+class EmailOTPType(enum.Enum):
+    VERIFICATION = "verification"
+    PASSWORD_RESET = "password_reset"
+
+
+class EmailOTP(Base):
+    """Stores OTP codes sent via email for verification and password resets."""
+    __tablename__ = "email_otps"
+
+    id: Mapped[pkey_uuid]
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    otp_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    otp_type: Mapped[EmailOTPType] = mapped_column(
+        pg_enum(EmailOTPType, name="email_otp_type_enum", create_type=True),
+        nullable=False,
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    expires_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[default_timestamp]
+
+    __table_args__ = (
+        Index("idx_email_otp_email_type", "email", "otp_type"),
+        Index("idx_email_otp_expires", "expires_at"),
+    )
+
+
 # ============================================================================
 # 2. CHAT & CONVERSATIONS TABLES
 # ============================================================================

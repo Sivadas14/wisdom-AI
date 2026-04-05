@@ -44,10 +44,49 @@ EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;
 
--- Make auth_user_id nullable (legacy Supabase column, no longer used)
+-- Make legacy columns nullable so new inserts don't fail
+-- auth_user_id: old Supabase auth link
 DO $$
 BEGIN
   ALTER TABLE user_profiles ALTER COLUMN auth_user_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+-- email_id: old email field (replaced by 'email' column)
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN email_id DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+-- Set default for is_active if it exists
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN is_active SET DEFAULT TRUE;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+-- Make created_at, updated_at, last_active_at have defaults
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN created_at SET DEFAULT NOW();
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN updated_at SET DEFAULT NOW();
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN last_active_at SET DEFAULT NOW();
 EXCEPTION WHEN OTHERS THEN
   NULL;
 END $$;
@@ -60,8 +99,25 @@ EXCEPTION WHEN duplicate_object THEN
   NULL;
 END $$;
 
--- Add role column if missing
+-- Add role column if missing (use user_role_enum type)
+-- If role column already exists as text, set a default
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS role user_role_enum DEFAULT 'user';
+
+-- Set default on role column regardless of type
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN role SET DEFAULT 'user';
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
+
+-- Make role nullable to prevent insert failures with legacy schema
+DO $$
+BEGIN
+  ALTER TABLE user_profiles ALTER COLUMN role DROP NOT NULL;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END $$;
 
 -- Create indexes idempotently
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_profile_email
@@ -78,6 +134,33 @@ CREATE INDEX IF NOT EXISTS idx_user_profile_last_active
 -- Set defaults for any NULL is_signed_in values
 UPDATE user_profiles SET is_signed_in = FALSE WHERE is_signed_in IS NULL;
 UPDATE user_profiles SET phone_verified = FALSE WHERE phone_verified IS NULL;
+
+-- =====================================================
+-- Ensure email_otps table exists for OTP verification
+-- =====================================================
+DO $$
+BEGIN
+  CREATE TYPE email_otp_type_enum AS ENUM ('verification', 'password_reset');
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS email_otps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR NOT NULL,
+  otp_code VARCHAR(10) NOT NULL,
+  otp_type email_otp_type_enum NOT NULL,
+  attempts INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 5,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_otp_email_type
+  ON email_otps (email, otp_type);
+CREATE INDEX IF NOT EXISTS idx_email_otp_expires
+  ON email_otps (expires_at);
 
 EOSQL
   SQL_EXIT=$?

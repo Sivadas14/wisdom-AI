@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import RegisterModal from "@/components/RegisterModal";
+import ForgotPasswordModal from "@/components/ForgotPasswordModal";
 
 const SignIn = () => {
     const navigate = useNavigate();
@@ -17,6 +18,7 @@ const SignIn = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [showRegisterModal, setShowRegisterModal] = useState(false);
+    const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
     // Get the page user was trying to access before being redirected to sign in
     const from = location.state?.from?.pathname || "/";
@@ -115,9 +117,18 @@ const SignIn = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="password" className="font-body text-brand-heading">
-                                    Password
-                                </Label>
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="password" className="font-body text-brand-heading">
+                                        Password
+                                    </Label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowForgotPasswordModal(true)}
+                                        className="text-sm text-brand-button hover:underline font-body"
+                                    >
+                                        Forgot password?
+                                    </button>
+                                </div>
                                 <Input
                                     id="password"
                                     type="password"
@@ -166,6 +177,13 @@ const SignIn = () => {
                     isOpen={showRegisterModal}
                     onClose={() => setShowRegisterModal(false)}
                     onSuccess={handleRegisterSuccess}
+                />
+
+                {/* Forgot Password Modal */}
+                <ForgotPasswordModal
+                    isOpen={showForgotPasswordModal}
+                    onClose={() => setShowForgotPasswordModal(false)}
+                    initialEmail={email}
                 />
             </div>
         </div>

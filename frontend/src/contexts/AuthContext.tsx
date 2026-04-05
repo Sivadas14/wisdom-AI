@@ -31,6 +31,10 @@ interface AuthContextType {
     logout: () => Promise<void>;
     checkAuth: () => Promise<boolean>;
     refreshToken: () => Promise<boolean>;
+    verifyEmail: (email: string, otp: string) => Promise<SuccessResponse>;
+    resendVerification: (email: string) => Promise<SuccessResponse>;
+    forgotPassword: (email: string) => Promise<SuccessResponse>;
+    resetPassword: (email: string, otp: string, newPassword: string) => Promise<SuccessResponse>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -100,6 +104,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error: any) {
             console.error('Registration error:', error);
             throw new Error(error.response?.data?.detail || 'Registration failed. Please try again.');
+        }
+    };
+
+    const verifyEmail = async (email: string, otp: string): Promise<SuccessResponse> => {
+        try {
+            const response = await apiClient.post<SuccessResponse>('/auth/verify-email', {
+                email: email.trim().toLowerCase(),
+                otp: otp.trim(),
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Verify email error:', error);
+            throw new Error(error.response?.data?.detail || 'Verification failed. Please try again.');
+        }
+    };
+
+    const resendVerification = async (email: string): Promise<SuccessResponse> => {
+        try {
+            const response = await apiClient.post<SuccessResponse>('/auth/resend-verification', {
+                email: email.trim().toLowerCase(),
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Resend verification error:', error);
+            throw new Error(error.response?.data?.detail || 'Failed to resend code. Please try again.');
+        }
+    };
+
+    const forgotPassword = async (email: string): Promise<SuccessResponse> => {
+        try {
+            const response = await apiClient.post<SuccessResponse>('/auth/forgot-password', {
+                email: email.trim().toLowerCase(),
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Forgot password error:', error);
+            throw new Error(error.response?.data?.detail || 'Failed to send reset code. Please try again.');
+        }
+    };
+
+    const resetPassword = async (email: string, otp: string, newPassword: string): Promise<SuccessResponse> => {
+        try {
+            const response = await apiClient.post<SuccessResponse>('/auth/reset-password', {
+                email: email.trim().toLowerCase(),
+                otp: otp.trim(),
+                new_password: newPassword,
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Reset password error:', error);
+            throw new Error(error.response?.data?.detail || 'Password reset failed. Please try again.');
         }
     };
 
@@ -180,6 +235,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout,
         checkAuth,
         refreshToken,
+        verifyEmail,
+        resendVerification,
+        forgotPassword,
+        resetPassword,
     };
 
     return (

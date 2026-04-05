@@ -36,6 +36,27 @@ class RefreshTokenRequest(tt.BM):
     refresh_token: str = tt.F("Refresh token to generate new access token")
 
 
+# Email verification
+class VerifyEmailRequest(tt.BM):
+    email: str = tt.F("Email address to verify")
+    otp: str = tt.F("OTP code from verification email")
+
+
+class ResendVerificationRequest(tt.BM):
+    email: str = tt.F("Email address to resend verification to")
+
+
+# Forgot password flow
+class ForgotPasswordRequest(tt.BM):
+    email: str = tt.F("Email address to send reset code to")
+
+
+class ResetPasswordRequest(tt.BM):
+    email: str = tt.F("Email address of the account")
+    otp: str = tt.F("OTP code from reset email")
+    new_password: str = tt.F("New password (min 8 characters)")
+
+
 # Content Generation Interfaces
 
 

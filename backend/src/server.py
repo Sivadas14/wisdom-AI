@@ -93,6 +93,10 @@ def get_app() -> FastAPI:
     # add paths
     app.add_api_route("/api/auth/register", auth_svc.new_user, methods=["POST"], tags=["auth"])
     app.add_api_route("/api/auth/login", auth_svc.login, methods=["POST"], tags=["auth"])
+    app.add_api_route("/api/auth/verify-email", auth_svc.verify_email, methods=["POST"], tags=["auth"])
+    app.add_api_route("/api/auth/resend-verification", auth_svc.resend_verification, methods=["POST"], tags=["auth"])
+    app.add_api_route("/api/auth/forgot-password", auth_svc.forgot_password, methods=["POST"], tags=["auth"])
+    app.add_api_route("/api/auth/reset-password", auth_svc.reset_password, methods=["POST"], tags=["auth"])
     app.add_api_route("/api/auth/me", auth_svc.get_current_user, methods=["GET"], tags=["auth"], dependencies=auth_dependency)
     app.add_api_route("/api/auth/refresh", auth_svc.refresh_jwt, methods=["POST"], tags=["auth"], dependencies=auth_dependency)
     app.add_api_route("/api/auth/logout", auth_svc.logout, methods=["POST"], tags=["auth"], dependencies=auth_dependency)
