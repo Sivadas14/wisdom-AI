@@ -42,13 +42,39 @@ jobs:
             .
           echo "Build complete."
 
-      - name: Push image to ECR
+      - name: Push image to ECR and capture digest
+        id: push-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           echo "Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "Push complete. Image: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+          # Capture the exact image digest so App Runner uses the NEW image
+          IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $ECR_REGISTRY/$ECR_REPOSITORY:latest)
+          echo "Pushed image digest: $IMAGE_DIGEST"
+          echo "image_uri=$IMAGE_DIGEST" >> $GITHUB_OUTPUT
+          echo "IMAGE_URI=$IMAGE_DIGEST" >> $GITHUB_ENV
+          echo "ECR_REGISTRY=$ECR_REGISTRY" >> $GITHUB_ENV
+
+      - name: Update App Runner service with new image
+        run: |
+          echo "Updating App Runner service to use new image: $IMAGE_URI"
+          aws apprunner update-service \
+            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
+            --source-configuration "{
+              \"ImageRepository\": {
+                \"ImageIdentifier\": \"$IMAGE_URI\",
+                \"ImageRepositoryType\": \"ECR\",
+                \"ImageConfiguration\": {
+                  \"Port\": \"8000\"
+                }
+              },
+              \"AutoDeploymentsEnabled\": false
+            }" \
+            --output json | python3 -c "import sys,json; d=json.load(sys.stdin); print('Service status:', d['Service']['Status'])"
+          echo "Service updated. Waiting for update to be applied..."
+          sleep 10
 
       - name: Trigger App Runner deployment
         run: |
@@ -61,25 +87,21 @@ jobs:
           echo "Deployment triggered. Operation ID: $OPERATION_ID"
           echo "OPERATION_ID=$OPERATION_ID" >> $GITHUB_ENV
 
-      - name: Wait for deployment to succeed
+      - name: Wait for deployment to complete
         run: |
           echo "Waiting for operation $OPERATION_ID to complete..."
           for i in {1..40}; do
-            OP_STATUS=$(aws apprunner list-operations \
+            SVC_JSON=$(aws apprunner describe-service \
               --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-              --query "OperationSummaryList[?Id=='$OPERATION_ID'].Status" \
-              --output text 2>/dev/null || echo "UNKNOWN")
+              --output json)
 
-            SVC_STATUS=$(aws apprunner describe-service \
-              --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-              --query 'Service.Status' --output text)
+            SVC_STATUS=$(echo "$SVC_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['Service']['Status'])")
+            echo "Service status: $SVC_STATUS (check $i/40)"
 
-            echo "Operation: $OP_STATUS | Service: $SVC_STATUS (check $i/40)"
-
-            if [ "$OP_STATUS" = "SUCCEEDED" ]; then
+            if [ "$SVC_STATUS" = "RUNNING" ]; then
               echo "✅ Deployment succeeded! Service is live."
               exit 0
-            elif [ "$OP_STATUS" = "FAILED" ] || [ "$SVC_STATUS" = "UPDATE_FAILED" ]; then
+            elif [ "$SVC_STATUS" = "UPDATE_FAILED" ] || [ "$SVC_STATUS" = "OPERATION_IN_PROGRESS" ] && [ "$i" -eq 40 ]; then
               echo "❌ Deployment FAILED. Check App Runner console for logs."
               exit 1
             fi
@@ -88,15 +110,11 @@ jobs:
           echo "⚠️ Timed out after 13 minutes. Check App Runner console."
           exit 1
 
-      - name: Output App Runner service URL
+      - name: Verify new image is live
         if: always()
         run: |
           SERVICE_URL=$(aws apprunner describe-service \
             --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
             --query 'Service.ServiceUrl' --output text)
-          echo "🌐 App Runner native URL: https://$SERVICE_URL"
-          echo "🔗 Health check: https://$SERVICE_URL/health"
-          CUSTOM_DOMAINS=$(aws apprunner describe-custom-domains \
-            --service-arn "${{ env.APP_RUNNER_SERVICE_ARN }}" \
-            --query 'CustomDomains[*].DomainName' --output text 2>/dev/null || echo "none")
-          echo "🌍 Custom domains configured: $CUSTOM_DOMAINS"
+          echo "🌐 App Runner URL: https://$SERVICE_URL"
+          echo "🔗 Health: $(curl -s https://$SERVICE_URL/health)"
