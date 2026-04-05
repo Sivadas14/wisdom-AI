@@ -14,7 +14,7 @@ RUN npm ci
 COPY frontend/ ./
 
 # Add before RUN npm run build
-ARG VITE_API_BASE_URL=https://arunachalasamudra.co.in/api
+ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 # Build the frontend

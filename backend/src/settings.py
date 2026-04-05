@@ -1,8 +1,7 @@
 from tuneapi import tt, ta
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from supabase import Client
 
 
 class Settings(BaseSettings):
@@ -34,9 +33,10 @@ class Settings(BaseSettings):
     # model settings
     openai_token: str
 
-    # supabase settings
-    supabase_url: str
-    supabase_key: str
+    # supabase settings — kept optional for backward compatibility
+    # No longer required for authentication (moved to email+password)
+    supabase_url: str = ""
+    supabase_key: str = ""
 
     # mode
     echo_db: bool = False
@@ -62,5 +62,9 @@ def get_llm(id: str):
     return ta.Openai(id=id, api_token=settings.openai_token)
 
 
-def get_supabase_client() -> Client:
+def get_supabase_client():
+    """Legacy Supabase client — only used if supabase_url/key are provided."""
+    if not settings.supabase_url or not settings.supabase_key:
+        raise RuntimeError("Supabase is not configured (supabase_url/supabase_key not set)")
+    from supabase import Client
     return Client(settings.supabase_url, settings.supabase_key)

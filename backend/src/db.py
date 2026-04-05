@@ -202,9 +202,10 @@ class PydanticModel(TypeDecorator[tt.BM]):
 
 
 def connect_to_postgres(sync: bool = False) -> AsyncEngine | Engine:
+    import ssl as _ssl
     ssl_context = create_default_context()
     ssl_context.check_hostname = False
-    ssl_context.verify_mode = settings.prod  # Set to True in production
+    ssl_context.verify_mode = _ssl.CERT_NONE  # Supabase uses pooler certs that need this
     
     # Enhanced connection pool settings to prevent leaks
     pool_settings = {

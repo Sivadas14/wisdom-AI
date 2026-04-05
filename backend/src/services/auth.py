@@ -92,9 +92,16 @@ async def login(
     email = request.email.strip().lower()
 
     # Look up user by email
-    user_query = select(UserProfile).where(UserProfile.email == email)
-    result = await session.execute(user_query)
-    user = result.scalar_one_or_none()
+    try:
+        user_query = select(UserProfile).where(UserProfile.email == email)
+        result = await session.execute(user_query)
+        user = result.scalar_one_or_none()
+    except Exception as e:
+        tu.logger.error(f"Login DB query failed (columns may be missing): {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error — the email column may not exist. Run migrations. Detail: {str(e)[:200]}"
+        )
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -160,26 +167,40 @@ async def new_user(
 
     email = request.email.strip().lower()
 
-    # Check if email is already registered
-    existing_query = select(UserProfile).where(UserProfile.email == email)
-    result = await session.execute(existing_query)
-    existing_user = result.scalar_one_or_none()
+    try:
+        # Check if email is already registered
+        existing_query = select(UserProfile).where(UserProfile.email == email)
+        result = await session.execute(existing_query)
+        existing_user = result.scalar_one_or_none()
+    except Exception as e:
+        tu.logger.error(f"Register DB query failed (columns may be missing): {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error — the email column may not exist. Run migrations. Detail: {str(e)[:200]}"
+        )
 
     if existing_user:
         raise HTTPException(status_code=400, detail="An account with this email already exists")
 
     # Create the new user with a hashed password
-    pw_hash = hash_password(request.password)
-    new_user_obj = UserProfile(
-        email=email,
-        password_hash=pw_hash,
-        name=request.name.strip(),
-        phone_verified=True,  # email accounts are considered verified on registration
-        role=UserRole.USER,
-    )
+    try:
+        pw_hash = hash_password(request.password)
+        new_user_obj = UserProfile(
+            email=email,
+            password_hash=pw_hash,
+            name=request.name.strip(),
+            phone_verified=True,  # email accounts are considered verified on registration
+            role=UserRole.USER,
+        )
 
-    session.add(new_user_obj)
-    await session.commit()
+        session.add(new_user_obj)
+        await session.commit()
+    except Exception as e:
+        tu.logger.error(f"Register DB insert failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create account. Database error: {str(e)[:200]}"
+        )
 
     tu.logger.info(f"New user registered: {email}")
 
