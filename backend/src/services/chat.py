@@ -849,7 +849,7 @@ async def chat_completions(
     # Real streaming LLM processing branch
     try:
         async with profile_operation("streaming_llm_processing") as op:
-            model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
+            model = ta.Openai(id="gpt-4-turbo", api_token=settings.openai_token)
             response = StreamingResponse(
                 _llm_chat_streaming_optimized(session, model, master_thread, conversation, spb_client, request.message),
                 media_type="text/plain",

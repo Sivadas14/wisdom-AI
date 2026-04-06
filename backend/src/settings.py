@@ -93,7 +93,7 @@ def get_llm(model_name: str = "gpt-4o"):
     """Create a TuneAPI model instance with the configured OpenAI token."""
    
     settings_instance = get_settings()
-    return  ta.Openai(id="gpt-4o", api_token=settings_instance.openai_token)
+    return  ta.Openai(id="gpt-4-turbo", api_token=settings_instance.openai_token)
 
 
 
