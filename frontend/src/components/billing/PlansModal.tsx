@@ -389,6 +389,17 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSucce
                 </Button>
             </div>
 
+            {/* Back to chat link — top left */}
+            <div className="absolute top-4 left-4 z-10">
+                <button
+                    onClick={onClose}
+                    className="flex items-center gap-1 text-sm text-[#472b20]/60 hover:text-[#472b20] transition-colors"
+                >
+                    <X className="w-4 h-4" />
+                    Back to chat
+                </button>
+            </div>
+
             {/* Content */}
             <div className="h-full overflow-y-auto p-6 pt-8">
                 {loading ? (

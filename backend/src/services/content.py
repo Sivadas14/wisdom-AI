@@ -16,6 +16,7 @@ from src.db import (
 )
 from src.dependencies import get_current_user
 from src.settings import get_supabase_client, get_supabase_admin_client
+from src.services.usage import get_usage
 from src.content.video import generate_video_content
 from src.content.audio import generate_audio_content
 from src.content.image import generate_image_content
@@ -56,8 +57,49 @@ async def create_content(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db_session_fa),
     spb_client: Client = Depends(get_supabase_admin_client),
+    current_user: UserProfile = Depends(get_current_user),
 ) -> w.ContentGenerationResponse:
     """POST /api/meditation/create - Generate meditation content"""
+
+    # Backend quota enforcement — check limits before generating any content
+    try:
+        usage = await get_usage(current_user=current_user, session=session)
+
+        if request.mode == "image":
+            # Check contemplation card (image) quota
+            cards_remaining = usage.image_cards.remaining
+            addon_remaining = getattr(usage.addon_cards, 'remaining', 0) or 0
+            if isinstance(cards_remaining, int) and cards_remaining <= 0 and addon_remaining <= 0:
+                raise HTTPException(
+                    status_code=429,
+                    detail="You have reached your contemplation card limit. Please upgrade your plan to generate more."
+                )
+
+        elif request.mode in ("audio", "video"):
+            # Check meditation (audio/video) quota
+            if request.mode == "audio" and not usage.audio_enabled:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Audio meditation is not enabled in your plan. Please upgrade to access this feature."
+                )
+            if request.mode == "video" and not usage.video_enabled:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Video meditation is not enabled in your plan. Please upgrade to access this feature."
+                )
+            minutes_remaining = usage.meditation_duration.remaining
+            addon_minutes = getattr(usage.addon_minutes, 'remaining', 0) or 0
+            if isinstance(minutes_remaining, int) and minutes_remaining <= 0 and addon_minutes <= 0:
+                raise HTTPException(
+                    status_code=429,
+                    detail="You have reached your free meditation limit. Please upgrade your plan for more."
+                )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If quota check fails for any reason, log and allow (don't block on system errors)
+        print(f"Warning: Could not check quota before creating content: {e}")
 
     content_id = "<failed>"
     match request.mode:

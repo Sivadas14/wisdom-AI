@@ -129,7 +129,7 @@ export const BillingPage: React.FC = () => {
         if (currentView === 'history') {
             setCurrentView('billing');
         } else {
-            navigate("/");
+            navigate(-1);
         }
     };
 
