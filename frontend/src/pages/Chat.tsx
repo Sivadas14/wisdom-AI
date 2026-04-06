@@ -34,7 +34,7 @@ const Chat = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { conversationId } = useParams<{ conversationId: string }>();
-  const { usage, refreshUsage, checkQuota } = useUsage();
+  const { usage, refreshUsage, checkQuota, setShowPlansModal } = useUsage();
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -552,7 +552,10 @@ const Chat = () => {
         let errorMessage = "Sorry, I encountered an error while processing your message. Please try again.";
 
         if (error instanceof Error) {
-          if (error.message.includes('Network')) {
+          if (error.message === 'QUOTA_EXCEEDED') {
+            errorMessage = "You've reached your plan limit. Please upgrade to continue chatting.";
+            setShowPlansModal(true);
+          } else if (error.message.includes('Network')) {
             errorMessage = "Network error. Please check your connection and try again.";
           } else if (error.message.includes('401')) {
             errorMessage = "Authentication error. Please sign in again.";

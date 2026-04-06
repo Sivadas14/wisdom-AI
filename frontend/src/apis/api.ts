@@ -113,7 +113,14 @@ export const chatAPI = {
                     localStorage.removeItem('userProfile');
                     window.location.href = '/signin?error=deactivated';
                 }
+                if (response.status === 429 || response.status === 402) {
+                    throw new Error('QUOTA_EXCEEDED');
+                }
                 const errorText = await response.text();
+                // Also detect quota errors embedded in 500 error bodies
+                if (errorText.includes('quota') || errorText.includes('limit') || errorText.includes('exceeded')) {
+                    throw new Error('QUOTA_EXCEEDED');
+                }
                 throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
 
