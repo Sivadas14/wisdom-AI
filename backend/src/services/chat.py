@@ -17,6 +17,7 @@ from src import wire as w, db
 from src.settings import get_supabase_client, Settings,get_settings
 from src.db import get_db_session_fa
 from src.dependencies import get_current_user
+from src.services.usage import get_usage
 from src.db import OptimizedQueries
 from src.utils.profiler import profile_operation, get_profiler, print_profiler_summary
 from src.db import DocumentChunk, SourceDocument
@@ -868,6 +869,23 @@ async def create_conversation(
     session: AsyncSession = Depends(get_db_session_fa),
 ) -> w.Conversation:
     """POST /api/chat - Create a new conversation"""
+
+    # Backend quota enforcement — check conversation limit before creating
+    try:
+        usage = await get_usage(current_user=user, session=session)
+        conversations_remaining = usage.conversations.remaining
+        # Block if remaining is a number and is 0 or below (not "Unlimited")
+        if isinstance(conversations_remaining, int) and conversations_remaining <= 0:
+            raise HTTPException(
+                status_code=429,
+                detail="You have reached your conversation limit. Please upgrade your plan to continue."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If usage check fails for any reason, log and allow (don't block users on system errors)
+        print(f"Warning: Could not check quota before creating conversation: {e}")
+
     try:
         # print("CREATE CONVERSTATION")
         conversation = db.Conversation(
@@ -878,7 +896,7 @@ async def create_conversation(
         await session.commit()
         await session.refresh(conversation)
         return await conversation.to_bm()
-    
+
     except Exception as e:
         await session.rollback()
         print("Error creating conversation:", e)
