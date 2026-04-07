@@ -564,9 +564,7 @@ export const ramanaImagesAPI = {
         const form = new FormData();
         files.forEach(f => form.append('files', f));
         if (description) form.append('description', description);
-        const res = await apiClient.post('/admin/ramana-images', form, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const res = await apiClient.post('/admin/ramana-images', form);
         return res.data;
     },
     toggle: async (id: string): Promise<{ id: string; active: boolean }> => {
