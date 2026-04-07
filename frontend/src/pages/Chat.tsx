@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Pencil, Save, Volume2, Mic, ArrowRight, ArrowLeft, Image as ImageIcon, Music, Video, Download, Loader2, Sparkles, Brain, Timer, BookOpen, PlayIcon, MusicIcon } from "lucide-react";
+import { Pencil, Save, Volume2, Mic, ArrowRight, ArrowLeft, Image as ImageIcon, Music, Video, Download, Loader2, Sparkles, Brain, Timer, BookOpen, PlayIcon, MusicIcon, LayoutGrid, X } from "lucide-react";
 import { teachingTopics, personalTopics } from "@/data/chatTopics";
 import ChatMessage from "@/components/ChatMessage";
 import ExploreMore from "@/components/ExploreMore";
@@ -50,6 +50,7 @@ const Chat = () => {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [hasProcessedInitialQuery, setHasProcessedInitialQuery] = useState(false);
   const [topicTab, setTopicTab] = useState<"teachings" | "personal">("teachings");
+  const [showTopicPicker, setShowTopicPicker] = useState(false);
 
   // Inline image generation states
   const [generatingImageForMessage, setGeneratingImageForMessage] = useState<string | null>(null);
@@ -1162,9 +1163,66 @@ const Chat = () => {
           <div className="max-w-[816px] mx-auto">
 
 
+            {/* Topic picker panel — slides in above input when toggled */}
+            {messages.length > 0 && showTopicPicker && (
+              <div className="mb-3 bg-white border border-orange-100 rounded-xl shadow-md overflow-hidden">
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
+                  <div className="flex gap-0">
+                    <button
+                      onClick={() => setTopicTab("teachings")}
+                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                        topicTab === "teachings"
+                          ? "bg-orange-100 text-orange-700"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Ramana's Teachings
+                    </button>
+                    <button
+                      onClick={() => setTopicTab("personal")}
+                      className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+                        topicTab === "personal"
+                          ? "bg-orange-100 text-orange-700"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      What I'm Facing
+                    </button>
+                  </div>
+                  <button onClick={() => setShowTopicPicker(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                {/* Chips */}
+                <div className="px-3 pb-3 max-h-40 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {(topicTab === "teachings" ? teachingTopics : personalTopics).map((topic, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { handleSendMessage(topic.question); setShowTopicPicker(false); }}
+                        className="px-2.5 py-1 text-xs rounded-full border border-orange-200 bg-orange-50 text-orange-800 hover:bg-orange-100 hover:border-orange-400 transition-all duration-150"
+                      >
+                        {topic.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons - Only show when there are messages */}
             {messages.length > 0 && (
               <div className="flex flex-nowrap md:flex-wrap gap-2 mb-3 md:mb-4 justify-start md:justify-center overflow-x-auto pb-2 md:pb-0 scrollbar-hide no-scrollbar">
+                <Button
+                  onClick={() => setShowTopicPicker(v => !v)}
+                  variant="outline"
+                  size="sm"
+                  className={`rounded-full h-8 md:h-9 whitespace-nowrap px-3 text-xs md:text-sm ${showTopicPicker ? "bg-orange-50 border-orange-300 text-orange-700" : ""}`}
+                >
+                  <LayoutGrid className="w-3 md:w-3.5 h-3 md:h-3.5 mr-1 md:mr-1.5" />
+                  Topics
+                </Button>
                 <Button
                   onClick={handleExploreMore}
                   disabled={isBusy}
