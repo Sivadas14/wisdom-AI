@@ -51,7 +51,13 @@ export default function ImageLibrary() {
             setDescription("");
             await loadImages();
         } catch (err: any) {
-            const msg = err?.response?.data?.detail || "Upload failed — please try again";
+            // FastAPI 422 detail is an array of objects; always coerce to a string
+            const raw = err?.response?.data?.detail;
+            const msg = typeof raw === "string"
+                ? raw
+                : Array.isArray(raw)
+                    ? (raw[0]?.msg || "Validation error — check file type/size")
+                    : "Upload failed — please try again";
             showToast("error", msg);
         } finally {
             setUploading(false);

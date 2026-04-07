@@ -564,7 +564,11 @@ export const ramanaImagesAPI = {
         const form = new FormData();
         files.forEach(f => form.append('files', f));
         if (description) form.append('description', description);
-        const res = await apiClient.post('/admin/ramana-images', form);
+        // Setting Content-Type to undefined removes the default 'application/json' so the
+        // browser can set multipart/form-data with the correct boundary automatically.
+        const res = await apiClient.post('/admin/ramana-images', form, {
+            headers: { 'Content-Type': undefined },
+        });
         return res.data;
     },
     toggle: async (id: string): Promise<{ id: string; active: boolean }> => {
