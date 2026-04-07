@@ -513,6 +513,7 @@ class UserProfile(Base):
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="true")
+    onboarding_seen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
     customer_token: Mapped[str | None] = mapped_column(String, nullable=True)
     token_exp: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -542,6 +543,7 @@ class UserProfile(Base):
             created_at=self.created_at,
             last_active=self.last_active_at,
             is_active=self.is_active,
+            onboarding_seen=self.onboarding_seen,
         )
 
     
