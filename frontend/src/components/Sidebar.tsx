@@ -20,8 +20,15 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, userProfile, logout } = useAuth();
-    const { usage } = useUsage();
+    const { usage, checkQuota, setShowPlansModal } = useUsage();
     const isFree = usage?.plan_type === 'FREE';
+
+    // True when the user has exhausted their chat quota
+    const chatExhausted = (() => {
+        if (!usage) return false;
+        const rem = usage.conversations.remaining;
+        return typeof rem === "number" && rem <= 0;
+    })();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [planName, setPlanName] = useState<string | null>(null);
@@ -92,6 +99,10 @@ const Sidebar = () => {
     }, {} as Record<string, Conversation[]>);
 
     const handleNewChat = () => {
+        if (chatExhausted) {
+            setShowPlansModal(true);
+            return;
+        }
         navigate("/");
     };
 
@@ -138,13 +149,20 @@ const Sidebar = () => {
             <div className="px-3 pb-4">
                 <Button
                     onClick={handleNewChat}
-                    className="w-full justify-start gap-2 h-10 px-2 bg-transparent hover:bg-[#E5DED6] text-gray-700 shadow-none"
+                    title={chatExhausted ? "Chat limit reached — upgrade to continue" : undefined}
+                    className={`w-full justify-start gap-2 h-10 px-2 bg-transparent shadow-none ${
+                        chatExhausted
+                            ? "opacity-50 cursor-not-allowed hover:bg-transparent"
+                            : "hover:bg-[#E5DED6] text-gray-700"
+                    }`}
                     variant="ghost"
                 >
-                    <div className="bg-[#472B20] text-white rounded-full p-1">
+                    <div className={`${chatExhausted ? "bg-gray-400" : "bg-[#472B20]"} text-white rounded-full p-1`}>
                         <Plus className="h-4 w-4" />
                     </div>
-                    <span className="font-medium text-gray-900">New chat</span>
+                    <span className={`font-medium ${chatExhausted ? "text-gray-400" : "text-gray-900"}`}>
+                        {chatExhausted ? "Chat limit reached" : "New chat"}
+                    </span>
                 </Button>
             </div>
 

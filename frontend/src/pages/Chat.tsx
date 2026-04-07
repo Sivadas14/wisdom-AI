@@ -1186,40 +1186,56 @@ const Chat = () => {
               </div>
             )}
 
-            {/* Input with mic button */}
-            <div className="relative max-w-2xl mx-auto">
-              <Input
-                ref={inputRef}
-                value={currentInput}
-                onChange={(e) => setCurrentInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage(currentInput)}
-                placeholder="Ask anything"
-                className="flex-1 bg-white border-0 h-12 md:h-11 text-sm md:text-base rounded-[10px] md:rounded-[12px] px-4 md:px-6 focus-visible:ring-brand-button focus-visible:ring-1"
-                disabled={isBusy}
-              />
-              <div className="absolute right-1.5 md:right-2 top-1/2 transform -translate-y-1/2 flex gap-1.5 md:gap-2">
-                {/* <Button
-                onClick={handleMicClick}
-                variant="ghost"
-                size="icon"
-                className={`rounded-full w-10 h-10 ${isRecording ? 'bg-red-100 text-red-600' : 'text-gray-500'}`}
-              >
-                <Mic className="w-5 h-5" />
-              </Button> */}
-                <Button
-                  onClick={() => handleSendMessage(currentInput)}
-                  disabled={!currentInput.trim() || isBusy}
-                  className={`rounded-full w-8 h-8 md:w-10 md:h-10 ${isBusy ? 'bg-gray-300' : 'bg-brand-button hover:bg-brand-button/90'} text-white transition-colors p-0`}
-                >
-                  <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Helper text */}
-            <p className="text-center text-[10px] md:text-xs text-gray-500 mt-2 md:mt-3">
-              Mindful AI can make mistakes. Consider checking important information.
-            </p>
+            {/* Input with mic button — or upgrade CTA when quota exhausted */}
+            {(() => {
+              const chatRemaining = usage?.conversations?.remaining;
+              const chatExhausted = typeof chatRemaining === 'number' && chatRemaining <= 0;
+              if (chatExhausted) {
+                return (
+                  <div className="max-w-2xl mx-auto w-full">
+                    <div className="flex flex-col items-center gap-3 py-4 px-5 rounded-xl bg-[#FDF4EF] border border-[#ECE5DF]">
+                      <p className="text-sm text-[#472b20]/70 text-center">
+                        You've used all <span className="font-semibold text-[#472b20]">3 free conversations</span>. Upgrade to keep the inquiry going.
+                      </p>
+                      <button
+                        onClick={() => setShowPlansModal(true)}
+                        className="px-5 py-2 rounded-full bg-[#D05E2D] hover:bg-[#B84E20] text-white text-sm font-semibold transition-colors"
+                      >
+                        Upgrade plan →
+                      </button>
+                    </div>
+                    <p className="text-center text-[10px] md:text-xs text-gray-400 mt-2 md:mt-3">
+                      Mindful AI can make mistakes. Consider checking important information.
+                    </p>
+                  </div>
+                );
+              }
+              return (
+                <div className="relative max-w-2xl mx-auto">
+                  <Input
+                    ref={inputRef}
+                    value={currentInput}
+                    onChange={(e) => setCurrentInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendMessage(currentInput)}
+                    placeholder="Ask anything"
+                    className="flex-1 bg-white border-0 h-12 md:h-11 text-sm md:text-base rounded-[10px] md:rounded-[12px] px-4 md:px-6 focus-visible:ring-brand-button focus-visible:ring-1"
+                    disabled={isBusy}
+                  />
+                  <div className="absolute right-1.5 md:right-2 top-1/2 transform -translate-y-1/2 flex gap-1.5 md:gap-2">
+                    <Button
+                      onClick={() => handleSendMessage(currentInput)}
+                      disabled={!currentInput.trim() || isBusy}
+                      className={`rounded-full w-8 h-8 md:w-10 md:h-10 ${isBusy ? 'bg-gray-300' : 'bg-brand-button hover:bg-brand-button/90'} text-white transition-colors p-0`}
+                    >
+                      <ArrowRight className="w-4 h-4 md:w-5 md:h-5" />
+                    </Button>
+                  </div>
+                  <p className="text-center text-[10px] md:text-xs text-gray-500 mt-2 md:mt-3">
+                    Mindful AI can make mistakes. Consider checking important information.
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
