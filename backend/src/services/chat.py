@@ -717,9 +717,12 @@ async def _embedding_search_optimized(
     async with profile_operation("vector_search") as op:
         # SIMILARITY THRESHOLD: max_inner_product returns negative inner product.
         # For normalised OpenAI embeddings, cosine similarity = inner product.
-        # Filtering <= -0.50 means only chunks with cosine similarity >= 0.50 pass through.
-        # This ensures only genuinely relevant Ramana library content is returned.
-        SIMILARITY_THRESHOLD = 0.50
+        # Filtering <= -0.35 means only chunks with cosine similarity >= 0.35 pass through.
+        # 0.35 is calibrated for text-embedding-3-small: short queries like "Who am I?"
+        # produce lower scores than long passages even when perfectly relevant, so 0.50
+        # was too aggressive. Off-topic content (sports, food, news) scores < 0.20 and
+        # is still filtered out. Ramana-topic queries consistently score 0.35-0.70.
+        SIMILARITY_THRESHOLD = 0.35
         query = (
             select(db.DocumentChunk.content, db.SourceDocument.filename)
             .join(db.SourceDocument)

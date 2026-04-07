@@ -403,13 +403,15 @@ async def _get_last_user_message(
 async def _generate_image_prompt_from_question(user_question: str) -> str:
     """Generate a Ramana/Arunachala-themed image prompt from the user's question topic.
 
+    Uses the established get_llm + chat_async pattern (async, non-blocking).
     Only generates the image prompt — the quote is always sourced separately from
     authentic Ramana library chunks, never from general LLM knowledge.
     """
-    settings = get_settings()
-    client = OpenAI(api_key=settings.openai_token)
+    model = get_llm("gpt-4o")
 
     prompt = dedent(f"""
+    You generate concise image prompts for Ramana Maharshi contemplation cards.
+
     Based on this spiritual question: "{user_question}"
 
     Generate a single evocative image prompt (1 sentence, under 25 words) for a
@@ -422,16 +424,8 @@ async def _generate_image_prompt_from_question(user_question: str) -> str:
     """)
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You generate concise image prompts for Ramana Maharshi contemplation cards."},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.7,
-            max_tokens=60,
-        )
-        return response.choices[0].message.content.strip()
+        response = await model.chat_async(prompt)
+        return response.strip()
     except Exception as e:
         logger.error(f"Image prompt generation failed: {e}")
         raise
