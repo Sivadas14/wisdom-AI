@@ -1,0 +1,69 @@
+"""
+One-time startup migrations.
+Each function is idempotent — safe to run on every restart.
+Add new migrations as new async functions and call them from run_migrations().
+"""
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.db import Plan, PlanType
+
+
+# ---------------------------------------------------------------------------
+# Target limits for the FREE plan
+# ---------------------------------------------------------------------------
+FREE_CHAT_LIMIT    = "3"   # 3 conversations (stored as string per existing schema)
+FREE_CARD_LIMIT    = 3     # 3 contemplation cards (images)
+FREE_MEDITATION    = 15    # 15 minutes = ~3 standard 5-min meditation sessions
+
+
+async def _set_free_plan_limits(session: AsyncSession) -> None:
+    """
+    Ensure the FREE plan's limits match the configured values.
+    Only writes to the DB if a value actually needs changing.
+    """
+    result = await session.execute(
+        select(Plan).where(Plan.plan_type == PlanType.FREE)
+    )
+    free_plans = result.scalars().all()
+
+    if not free_plans:
+        print("[MIGRATION] No FREE plan found — skipping limit migration.")
+        return
+
+    for plan in free_plans:
+        changed = False
+
+        if str(plan.chat_limit) != FREE_CHAT_LIMIT:
+            print(f"[MIGRATION] {plan.name}: chat_limit {plan.chat_limit!r} → {FREE_CHAT_LIMIT!r}")
+            plan.chat_limit = FREE_CHAT_LIMIT
+            changed = True
+
+        if plan.card_limit != FREE_CARD_LIMIT:
+            print(f"[MIGRATION] {plan.name}: card_limit {plan.card_limit} → {FREE_CARD_LIMIT}")
+            plan.card_limit = FREE_CARD_LIMIT
+            changed = True
+
+        if plan.max_meditation_duration != FREE_MEDITATION:
+            print(f"[MIGRATION] {plan.name}: max_meditation_duration {plan.max_meditation_duration} → {FREE_MEDITATION}")
+            plan.max_meditation_duration = FREE_MEDITATION
+            changed = True
+
+        if changed:
+            session.add(plan)
+
+    await session.commit()
+    print("[MIGRATION] Free plan limits verified/updated.")
+
+
+async def run_migrations(session_factory) -> None:
+    """
+    Entry point called from server lifespan.
+    Runs all migrations in sequence; errors are logged but do NOT crash startup.
+    """
+    async with session_factory() as session:
+        try:
+            await _set_free_plan_limits(session)
+        except Exception as e:
+            print(f"[MIGRATION] ERROR in _set_free_plan_limits: {e}")
