@@ -55,16 +55,16 @@ def _remove_transcript_artifacts(text: str) -> str:
     text = text.replace('close parenthesis', '').replace('open parenthesis', '')
     return text
 
-async def generate_meditation_transcript_optimized(source_text: str) -> str:
+async def generate_meditation_transcript_optimized(source_text: str, length: str = None) -> str:
     """Generate meditation transcript with caching and optimized prompt"""
-    
+
     # Check cache first
     cache_key = _get_cache_key(source_text, length)
     if cache_key in _transcript_cache:
         tu.logger.info("Using cached transcript")
         return _transcript_cache[cache_key]
     
-    model = get_llm("gpt-5.1-chat-latest")
+    model = get_llm("gpt-4o")
     
     # Parse length to approximate word count
     target_words = "400-500"
@@ -165,24 +165,23 @@ async def generate_meditation_transcript_optimized(source_text: str) -> str:
     
     return response_content
 
-async def generate_audio_from_transcript_optimized(transcript: str) -> bytes:
-    """Generate audio with optimized TTS settings and chunking for long transcripts"""
-    
-    model = get_llm("gpt-5.1-chat-latest")
+MAX_CHARS = 4000  # OpenAI TTS API limit is 4096 chars per request; 4000 gives safe headroom
 
-    
-    # Optimize transcript for faster TTS - remove transcript artifacts
+async def generate_audio_from_transcript_optimized(transcript: str) -> bytes:
+    """Generate audio with optimized TTS settings and chunking for long transcripts.
+
+    Splits the transcript into <=MAX_CHARS chunks and concatenates the resulting
+    audio. The previous version made a redundant full-transcript TTS call first
+    (result was never used) — that wasted call has been removed.
+    """
+
+    model = get_llm("gpt-4o")
+
+    # Clean transcript for TTS
     optimized_transcript = transcript.replace('[pause]', '...').replace('[breathing]', '...')
     optimized_transcript = _remove_transcript_artifacts(optimized_transcript)
-    
-    audio_bytes = await model.text_to_speech_async(
-        prompt=optimized_transcript,
-        voice="shimmer",
-        model="gpt-4o-mini-tts",  # Use faster model
-        instructions="Speak in a calm, soothing voice with natural pacing.",
-    )
-    
-    # Split transcript into chunks
+
+    # Split into chunks that fit within the TTS API character limit
     chunks = []
     text = optimized_transcript
     while text:
@@ -190,23 +189,26 @@ async def generate_audio_from_transcript_optimized(transcript: str) -> bytes:
             chunks.append(text)
             break
         split_idx = text.rfind('\n', 0, MAX_CHARS)
-        if split_idx == -1: split_idx = text.rfind('. ', 0, MAX_CHARS)
-        if split_idx == -1: split_idx = MAX_CHARS
+        if split_idx == -1:
+            split_idx = text.rfind('. ', 0, MAX_CHARS)
+        if split_idx == -1:
+            split_idx = MAX_CHARS
         chunks.append(text[:split_idx].strip())
         text = text[split_idx:].strip()
 
-    tu.logger.info(f"Generating {len(chunks)} audio chunks for long meditation...")
+    tu.logger.info(f"Generating {len(chunks)} audio chunk(s) for meditation...")
     audio_chunks = []
     for i, chunk in enumerate(chunks):
-        if not chunk: continue
+        if not chunk:
+            continue
         audio_chunk = await model.text_to_speech_async(
             prompt=chunk,
             voice="shimmer",
             model="gpt-4o-mini-tts",
-            instructions="Speak in a calm, soothing voice. Maintain consistent tone.",
+            instructions="Speak in a calm, soothing voice with natural pacing. Maintain consistent tone.",
         )
         audio_chunks.append(audio_chunk)
-    
+
     return await _concatenate_audio_chunks(audio_chunks)
 
 async def _concatenate_audio_chunks(audio_chunks: list[bytes]) -> bytes:
@@ -537,7 +539,7 @@ async def collect_source_content(
 async def generate_meditation_transcript(source_text: str) -> str:
     """Generate meditation transcript from source content"""
 
-    model = get_llm("gpt-5.1-chat-latest")
+    model = get_llm("gpt-4o")
 
     transcript_prompt = dedent(
         f"""
@@ -577,7 +579,7 @@ async def generate_meditation_transcript(source_text: str) -> str:
 async def generate_audio_from_transcript(transcript: str) -> bytes:
     """Generate audio from transcript using OpenAI TTS"""
     
-    model = get_llm("gpt-5.1-chat-latest")
+    model = get_llm("gpt-4o")
 
     # Remove transcript artifacts
     cleaned_transcript = _remove_transcript_artifacts(transcript)
