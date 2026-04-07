@@ -513,23 +513,30 @@ async def _llm_chat_streaming_optimized(
     async with profile_operation("thread_preparation") as op:
         # Check if chunks were found
         if not chunks or len(chunks) == 0:
-            tu.logger.warning(f"No chunks found for query: {user_message}")
-            # Instead of returning early, add context for the LLM to handle gracefully
+            tu.logger.warning(f"No sufficiently relevant chunks found for query: {user_message}")
+            # No relevant Ramana library content found — return a firm, on-brand refusal
+            # rather than allowing the LLM to draw on general knowledge.
             master_thread.append(
                 tt.human(
                     dedent(
                         f"""
-                        CONTEXT: No relevant documents were found in the knowledge base for this query.
-                        
+                        CONTEXT: No sufficiently relevant passages were found in the Ramana Maharshi
+                        library for this query (similarity threshold not met).
+
                         INSTRUCTIONS:
-                        - If this is a greeting (hi, hello, hey, etc.), respond naturally and warmly
-                        - If this is a question about who you are or what you do, explain that you're an AI assistant with access to spiritual and meditation teachings
-                        - If this is a factual question, politely explain that you don't have information about that topic in your knowledge base
-                        - Be honest and helpful
-                        
+                        - If this is a simple greeting (hi, hello, namaste, etc.), respond briefly
+                          and warmly in the spirit of Ramana's silence, but do NOT introduce
+                          unrelated spiritual content.
+                        - For all other questions or topics, you MUST respond with a polite,
+                          compassionate refusal that stays true to your role as a Ramana library
+                          guide. Explain that you can only draw from Sri Ramana Maharshi's
+                          authenticated teachings and that no relevant passage was found for this
+                          particular question. Encourage the seeker to rephrase or explore the
+                          library directly at Ramanasramam.org.
+                        - You MUST NOT answer using general knowledge, general Advaita teaching,
+                          or any content outside the Ramana library.
+
                         User's message: {user_message}
-                        
-                        Generate an appropriate response.
                         """
                     )
                 )
@@ -708,10 +715,16 @@ async def _embedding_search_optimized(
         op.finish(embedding_dimensions=len(embedding))
     
     async with profile_operation("vector_search") as op:
+        # SIMILARITY THRESHOLD: max_inner_product returns negative inner product.
+        # For normalised OpenAI embeddings, cosine similarity = inner product.
+        # Filtering <= -0.50 means only chunks with cosine similarity >= 0.50 pass through.
+        # This ensures only genuinely relevant Ramana library content is returned.
+        SIMILARITY_THRESHOLD = 0.50
         query = (
             select(db.DocumentChunk.content, db.SourceDocument.filename)
             .join(db.SourceDocument)
             .where(db.SourceDocument.active == True)
+            .where(db.DocumentChunk.embedding.max_inner_product(embedding) <= -SIMILARITY_THRESHOLD)
             .order_by(db.DocumentChunk.embedding.max_inner_product(embedding))
             .limit(10)
         )
@@ -804,11 +817,24 @@ async def chat_completions(
                     dedent(
                         f"""
                         The current time is {tu.SimplerTimes.get_now_human()}
-                        
-                        IMPORTANT: You are a knowledge assistant that ONLY uses information from the provided document chunks.
-                        You MUST NOT use any general knowledge, training data, or information from outside the provided chunks.
-                        If the chunks do not contain enough information to answer a question, you must say so explicitly.
-                        NEVER make up information or use knowledge from your training data.
+
+                        You are a wisdom guide rooted exclusively in the authenticated teachings of Sri Ramana Maharshi.
+                        Your sole source of knowledge is the Ramana Maharshi library — texts such as
+                        "Who Am I?", "Talks with Sri Ramana Maharshi", "Letters from Sri Ramanasramam",
+                        "Day by Day with Bhagavan", "Guru Vachaka Kovai", and related works preserved at
+                        Sri Ramanasramam, Tiruvannamalai.
+
+                        STRICT GUARDRAILS — follow these without exception:
+                        1. You MUST answer ONLY from the document chunks provided in the conversation.
+                        2. You MUST NOT draw on general knowledge, your training data, other spiritual traditions,
+                           or any source outside the provided chunks.
+                        3. When you quote or paraphrase, always cite the source filename given in the chunk.
+                        4. If the provided chunks do not contain enough information to answer the question,
+                           say so clearly and suggest the seeker explore the Ramana library directly.
+                        5. NEVER speculate, NEVER hallucinate, NEVER present general Advaita or Neo-Advaita
+                           content unless it is directly present in the retrieved chunks.
+                        6. You may respond warmly to greetings, but keep even conversational replies
+                           anchored to Ramana's spirit of silence, self-inquiry, and surrender.
                         """
                     ).strip()
                 ),
