@@ -497,7 +497,7 @@ async def _generate_image(prompt: str) -> Image.Image:
 def add_caption_to_image(
     image: Image.Image,
     caption_text: str,
-    font_size=204,
+    font_size=136,
     padding=48,
     max_width_ratio=0.88,
 ):
@@ -509,7 +509,7 @@ def add_caption_to_image(
         caption_text: String for the caption (can be multi-line)
         font_size: Font size for the caption
         padding: Padding around the caption text
-        max_width_ratio: Maximum width ratio for text wrapping (0.9 = 90% of image width)
+        max_width_ratio: Maximum width ratio for text wrapping (0.88 = 88% of image width)
 
     Returns:
         PIL Image with caption added below
@@ -518,22 +518,34 @@ def add_caption_to_image(
     # Get original image dimensions
     orig_width, orig_height = image.size
 
-    # Try to load a font, fall back to default if not available
-    try:
-        # Try to find the font file
+    # Load font — try custom first, then common system fonts, never fall back to
+    # ImageFont.load_default() which is a ~10px bitmap with no size support.
+    def _load_font(size: int) -> ImageFont.FreeTypeFont:
+        candidates = []
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        font_path = os.path.join(current_dir, "DM_Serif_Text", "DMSerifText-Regular.ttf")
-        
-        if os.path.exists(font_path):
-            font = ImageFont.truetype(font_path, font_size)
-            logger.info(f"Loaded font from {font_path}")
-        else:
-            # Fallback to default font
-            font = ImageFont.load_default()
-            logger.warning(f"Font not found at {font_path}, using default font")
-    except Exception as e:
-        logger.warning(f"Failed to load custom font: {e}, using default font")
-        font = ImageFont.load_default()
+        candidates.append(os.path.join(current_dir, "DM_Serif_Text", "DMSerifText-Regular.ttf"))
+        # Common system font paths (Linux/Docker)
+        candidates += [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+            "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+        ]
+        for path in candidates:
+            if os.path.exists(path):
+                try:
+                    f = ImageFont.truetype(path, size)
+                    logger.info(f"Loaded font: {path}")
+                    return f
+                except Exception:
+                    continue
+        # Last resort: load_default with size (Pillow ≥10 supports size kwarg)
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:
+            return ImageFont.load_default()
+
+    font = _load_font(font_size)
 
     # Create a temporary draw object to measure text
     temp_img = Image.new("RGB", (1, 1))
@@ -566,26 +578,26 @@ def add_caption_to_image(
     if current_line:
         wrapped_lines.append(current_line)
 
-    # Limit to 3 lines
+    # Limit to 3 lines — add ellipsis to the LAST line if truncated
     if len(wrapped_lines) > 3:
         wrapped_lines = wrapped_lines[:3]
-        # Add ellipsis to the second line if text was truncated
-        last_line = wrapped_lines[1]
+        last_line = wrapped_lines[2]
         while True:
-            test_line = last_line + "..."
+            test_line = last_line + "…"
             bbox = temp_draw.textbbox((0, 0), test_line, font=font)
             text_width = bbox[2] - bbox[0]
             if text_width <= max_text_width:
-                wrapped_lines[1] = test_line
+                wrapped_lines[2] = test_line
                 break
             # Remove last word and try again
             words_in_line = last_line.split()
             if len(words_in_line) <= 1:
+                wrapped_lines[2] = last_line + "…"
                 break
             last_line = " ".join(words_in_line[:-1])
 
     # Calculate text dimensions
-    line_height = font_size + 14  # Add generous line spacing for readability
+    line_height = font_size + 20  # Add generous line spacing for readability
     total_text_height = len(wrapped_lines) * line_height
 
     # Calculate caption area height
