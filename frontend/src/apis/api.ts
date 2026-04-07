@@ -482,7 +482,19 @@ export const dashboardAPI = {
     getRecentUsers: async (limit = 10, days = 7): Promise<RecentUserItem[]> => {
         const response = await apiClient.get(`/dashboard/recent_users?limit=${limit}&days=${days}`);
         return response.data;
-    }
+    },
+    getRecentTransactions: async (limit = 10, days = 7): Promise<any[]> => {
+        const response = await apiClient.get(`/dashboard/recent_transactions?limit=${limit}&days=${days}`);
+        return response.data;
+    },
+    getUsersAtLimit: async (): Promise<{ users_at_limit: number; total_free_users: number; pct: number; chat_limit: number }> => {
+        const response = await apiClient.get('/dashboard/users_at_limit');
+        return response.data;
+    },
+    getSignupsTrend: async (days = 30): Promise<{ date: string; signups: number }[]> => {
+        const response = await apiClient.get(`/dashboard/signups_trend?days=${days}`);
+        return response.data;
+    },
 };
 
 // Plan APIs

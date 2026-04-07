@@ -8,6 +8,9 @@ from src.db import (
     UserProfile,
     Subscription,
     SubscriptionStatus,
+    Plan,
+    PlanType,
+    Conversation,
 )
 from src.db import UserRole, Transaction
 from src.polarservice.polar_client import get_polar_client
@@ -375,5 +378,85 @@ async def dashboard_recent_transactions(limit: int = 10, days: int = 7, db: Asyn
                 })
             return out
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/users_at_limit")
+async def dashboard_users_at_limit(db: AsyncSession = Depends(get_db_session)):
+    """
+    Returns the number of FREE users who have used all their chat quota.
+    Counts distinct users who have >= chat_limit conversations.
+    """
+    try:
+        # Get the free plan's chat_limit
+        plan_result = await db.execute(
+            select(Plan.chat_limit).where(Plan.plan_type == PlanType.FREE).limit(1)
+        )
+        chat_limit_str = plan_result.scalar_one_or_none()
+        try:
+            chat_limit = int(chat_limit_str) if chat_limit_str else 3
+        except (ValueError, TypeError):
+            chat_limit = 3
+
+        # Count FREE users whose non-deleted conversation count >= chat_limit
+        subq = (
+            select(Conversation.user_id, func.count().label("conv_count"))
+            .where(Conversation.deleted_at.is_(None))
+            .group_by(Conversation.user_id)
+            .subquery()
+        )
+        result = await db.execute(
+            select(func.count())
+            .select_from(UserProfile)
+            .join(subq, subq.c.user_id == UserProfile.id)
+            .where(
+                UserProfile.plan_type == PlanType.FREE,
+                UserProfile.role == UserRole.USER,
+                subq.c.conv_count >= chat_limit,
+            )
+        )
+        users_at_limit = int(result.scalar_one() or 0)
+
+        # Total FREE users for percentage
+        total_free_result = await db.execute(
+            select(func.count()).select_from(UserProfile).where(
+                UserProfile.plan_type == PlanType.FREE,
+                UserProfile.role == UserRole.USER,
+            )
+        )
+        total_free_count = int(total_free_result.scalar_one() or 0)
+        pct = round(100.0 * users_at_limit / total_free_count, 1) if total_free_count else 0.0
+
+        return {
+            "users_at_limit": users_at_limit,
+            "total_free_users": total_free_count,
+            "pct": pct,
+            "chat_limit": chat_limit,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/signups_trend")
+async def dashboard_signups_trend(days: int = 30, db: AsyncSession = Depends(get_db_session)):
+    """
+    Returns daily new user signup counts for the last `days` days.
+    """
+    try:
+        stmt = text(
+            "SELECT DATE(created_at AT TIME ZONE 'UTC') AS day, COUNT(*) AS signups "
+            "FROM user_profiles "
+            "WHERE role = 'user' "
+            f"AND created_at >= CURRENT_TIMESTAMP - INTERVAL '{int(days)} days' "
+            "GROUP BY day ORDER BY day ASC"
+        )
+        result = await db.execute(stmt)
+        rows = result.all()
+        return [
+            {"date": str(row.day), "signups": int(row.signups)}
+            for row in rows
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
