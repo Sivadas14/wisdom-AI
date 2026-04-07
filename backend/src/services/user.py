@@ -9,14 +9,17 @@ from datetime import datetime
 from uuid import uuid4
 
 from src.db import (
-    get_db_session, 
-    UserProfile, 
-    Plan, 
-    PlanType, 
-    Subscription, 
+    get_db_session,
+    get_db_session_fa,
+    UserProfile,
+    Plan,
+    PlanType,
+    Subscription,
     SubscriptionStatus
 )
 from src.wire import UserProfileIn
+from src.dependencies import get_current_user
+
 router = APIRouter(prefix="/api/profiles", tags=["User Profiles"])
 @router.post("/")
 async def create_user_profile(data: UserProfileIn, session: AsyncSession = Depends(get_db_session)):
@@ -105,3 +108,16 @@ async def delete_user(user_id: str, session: AsyncSession = Depends(get_db_sessi
     await session.delete(user)
     await session.commit()
     return {"status": "User deleted"}
+
+
+# MARK ONBOARDING SEEN
+@router.patch("/me/onboarding-seen")
+async def mark_onboarding_seen(
+    current_user: UserProfile = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """Mark the onboarding modal as seen for the authenticated user."""
+    current_user.onboarding_seen = True
+    session.add(current_user)
+    await session.commit()
+    return {"onboarding_seen": True}

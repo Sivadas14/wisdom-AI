@@ -527,6 +527,12 @@ export const ordersAPI = {
     }
 };
 
+export const profileAPI = {
+    markOnboardingSeen: async (): Promise<void> => {
+        await apiClient.patch('/profiles/me/onboarding-seen');
+    },
+};
+
 // Export all APIs
 export default {
     auth: authAPI,

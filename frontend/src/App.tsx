@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
+import OnboardingModal from "@/components/OnboardingModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 import Chat from "./pages/Chat";
 import ChatsPage from "./pages/ChatsPage";
@@ -38,6 +40,17 @@ import NotificationManagement from "./pages/admin/NotificationManagement";
 
 const queryClient = new QueryClient();
 
+/**
+ * Shows the one-time onboarding modal to first-time authenticated users.
+ * Must be rendered inside AuthProvider so it can read userProfile.
+ */
+const OnboardingGate = () => {
+    const { userProfile, isAuthenticated, markOnboardingSeen } = useAuth();
+    const shouldShow = isAuthenticated && userProfile !== null && userProfile.onboarding_seen === false;
+    if (!shouldShow) return null;
+    return <OnboardingModal onClose={markOnboardingSeen} />;
+};
+
 const App = () => {
     // Initialize API client
     useEffect(() => {
@@ -53,6 +66,7 @@ const App = () => {
                         <Toaster />
                         <Sonner />
                         <BrowserRouter>
+                            <OnboardingGate />
                             <div className="h-full flex flex-col overflow-hidden">
                                 <AnnouncementBanner />
                                 <div className="flex-1 min-h-0 overflow-hidden">

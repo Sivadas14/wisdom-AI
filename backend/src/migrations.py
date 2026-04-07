@@ -4,7 +4,7 @@ Each function is idempotent — safe to run on every restart.
 Add new migrations as new async functions and call them from run_migrations().
 """
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db import Plan, PlanType
@@ -57,6 +57,19 @@ async def _set_free_plan_limits(session: AsyncSession) -> None:
     print("[MIGRATION] Free plan limits verified/updated.")
 
 
+async def _add_onboarding_seen_column(session: AsyncSession) -> None:
+    """
+    Idempotently add onboarding_seen column to user_profiles table.
+    Uses IF NOT EXISTS so it is safe to run on every restart.
+    """
+    await session.execute(text(
+        "ALTER TABLE user_profiles "
+        "ADD COLUMN IF NOT EXISTS onboarding_seen BOOLEAN NOT NULL DEFAULT FALSE"
+    ))
+    await session.commit()
+    print("[MIGRATION] onboarding_seen column verified/added.")
+
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -67,3 +80,8 @@ async def run_migrations(session_factory) -> None:
             await _set_free_plan_limits(session)
         except Exception as e:
             print(f"[MIGRATION] ERROR in _set_free_plan_limits: {e}")
+
+        try:
+            await _add_onboarding_seen_column(session)
+        except Exception as e:
+            print(f"[MIGRATION] ERROR in _add_onboarding_seen_column: {e}")

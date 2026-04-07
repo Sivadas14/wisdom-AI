@@ -20,6 +20,7 @@ export interface UserProfile {
     meditations: number;
   };
   role?: 'USER' | 'ADMIN';
+  onboarding_seen?: boolean;
 }
 
 // Backend API Profile Interface
@@ -31,6 +32,7 @@ export interface BackendUserProfile {
   name: string;
   role: 'USER' | 'ADMIN';
   country_code?: string | null;
+  onboarding_seen?: boolean;
 }
 
 // Helper to safely store tokens
@@ -65,6 +67,7 @@ interface AuthContextType {
   createUserProfileWithoutSession: (user: User) => Promise<{ success: boolean; error?: string; profile?: UserProfile }>;
   getUserProfile: (userId: string) => Promise<UserProfile | null>;
   ensureUserProfile: (user: User, session?: Session | null) => Promise<UserProfile | null>;
+  markOnboardingSeen: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -157,7 +160,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           subscription: 'free',
           has_used_free_trial: false,
           usage: { cards: 0, meditations: 0 },
-          quota: { cards: 5, meditations: 2 }
+          quota: { cards: 5, meditations: 2 },
+          onboarding_seen: profileData.onboarding_seen ?? false,
         };
 
         setUserProfile(userProfile);
@@ -985,6 +989,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
   }, []);
 
+  const markOnboardingSeen = () => {
+    setUserProfile(prev => prev ? { ...prev, onboarding_seen: true } : prev);
+  };
+
   const value: AuthContextType = {
     user,
     userProfile,
@@ -1002,7 +1010,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     createUserProfileWithoutSession,
     getUserProfile,
     ensureUserProfile,
-
+    markOnboardingSeen,
   };
 
   return (

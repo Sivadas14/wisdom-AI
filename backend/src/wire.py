@@ -123,6 +123,7 @@ class User(tt.BM):
     created_at: datetime.datetime = tt.F("ISO timestamp of account creation")
     last_active: datetime.datetime = tt.F("ISO timestamp of last active")
     is_active: bool = tt.F("Whether user account is active", True)
+    onboarding_seen: bool = tt.F("Whether user has seen the onboarding modal", False)
 
 
 class NewUserRequest(tt.BM):
