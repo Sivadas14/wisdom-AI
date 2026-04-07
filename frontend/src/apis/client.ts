@@ -159,6 +159,9 @@ apiClient.interceptors.response.use(
                         window.location.href = '/signin?error=deactivated';
                     }
                     break;
+                case 429:
+                    // Quota exceeded - return a standardised error so all callers can detect it
+                    return Promise.reject(new Error('QUOTA_EXCEEDED'));
                 case 404:
                     // Not found
                     console.error('Resource not found');

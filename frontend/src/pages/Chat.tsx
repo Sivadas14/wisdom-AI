@@ -690,7 +690,12 @@ const Chat = () => {
       // Polling will start automatically via the useEffect hook
     } catch (error) {
       console.error("Failed to initiate image generation:", error);
-      setImageGenerationError(error instanceof Error ? error.message : "Failed to start image generation");
+      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
+        setImageGenerationError("You've reached your contemplation card limit. Please upgrade your plan.");
+        setShowPlansModal(true);
+      } else {
+        setImageGenerationError(error instanceof Error ? error.message : "Failed to start image generation");
+      }
       setGeneratingImageForMessage(null);
     }
   };
@@ -744,7 +749,12 @@ const Chat = () => {
       refreshUsage();
     } catch (error) {
       console.error("Failed to initiate audio generation:", error);
-      setAudioGenerationError(error instanceof Error ? error.message : "Failed to start audio generation");
+      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
+        setAudioGenerationError("You've reached your free meditation limit. Please upgrade your plan.");
+        setShowPlansModal(true);
+      } else {
+        setAudioGenerationError(error instanceof Error ? error.message : "Failed to start audio generation");
+      }
       setGeneratingAudioForMessage(null);
     }
   };
@@ -798,7 +808,12 @@ const Chat = () => {
       refreshUsage();
     } catch (error) {
       console.error("Failed to initiate video generation:", error);
-      setVideoGenerationError(error instanceof Error ? error.message : "Failed to start video generation");
+      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
+        setVideoGenerationError("You've reached your free meditation limit. Please upgrade your plan.");
+        setShowPlansModal(true);
+      } else {
+        setVideoGenerationError(error instanceof Error ? error.message : "Failed to start video generation");
+      }
       setGeneratingVideoForMessage(null);
     }
   };
