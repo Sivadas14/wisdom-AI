@@ -247,7 +247,7 @@ const Sidebar = () => {
                         { label: "Cards", used: usage.image_cards.used, limit: usage.image_cards.limit },
                         { label: "Meditation", used: usage.meditation_duration.used, limit: usage.meditation_duration.limit, unit: "min" },
                     ].map(({ label, used, limit, unit }) => {
-                        const limitNum = typeof limit === "number" ? limit : 0;
+                        const limitNum = typeof limit === "number" ? limit : (parseInt(String(limit), 10) || 0);
                         const pct = limitNum > 0 ? Math.min(100, Math.round((used / limitNum) * 100)) : 0;
                         const remaining = limitNum - used;
                         const almostOut = pct >= 67;
