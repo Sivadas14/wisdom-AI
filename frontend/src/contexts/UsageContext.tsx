@@ -117,6 +117,24 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         }
     }, [user, userProfile]);
 
+    // Proactive nudge: if a FREE user has exhausted their chat quota when the app
+    // loads, automatically open the Plans modal. Fires at most once per browser session.
+    useEffect(() => {
+        if (!usage || loading) return;
+        if (usage.plan_type !== 'FREE') return;
+
+        const nudgeKey = 'quota_nudge_shown';
+        if (sessionStorage.getItem(nudgeKey)) return;
+
+        const chatRemaining = usage.conversations.remaining;
+        const chatExhausted = typeof chatRemaining === 'number' && chatRemaining <= 0;
+        if (chatExhausted) {
+            sessionStorage.setItem(nudgeKey, '1');
+            // Small delay so the page has time to render before the modal appears
+            setTimeout(() => setShowPlansModal(true), 800);
+        }
+    }, [usage, loading]);
+
     const refreshUsage = async () => {
         // Just fetch without setting loading to true to avoid UI flickering if not needed
         // but keeping it for consistency if requested
