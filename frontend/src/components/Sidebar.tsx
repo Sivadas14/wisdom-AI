@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUsage } from "@/contexts/UsageContext";
 import { chatAPI, paymentAPI } from "@/apis/api";
 import { type Conversation } from "@/apis/wire";
 import {
@@ -19,6 +20,8 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, userProfile, logout } = useAuth();
+    const { usage } = useUsage();
+    const isFree = usage?.plan_type === 'FREE';
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [planName, setPlanName] = useState<string | null>(null);
@@ -213,6 +216,43 @@ const Sidebar = () => {
                     </div>
                 </div>
             </ScrollArea>
+
+            {/* Usage strip — free plan only */}
+            {isFree && usage && (
+                <div
+                    className="mx-3 mb-2 p-3 rounded-lg bg-[#FDF4EF] border border-[#ECE5DF] cursor-pointer hover:bg-[#F5E6DC] transition-colors"
+                    onClick={() => navigate("/billing")}
+                >
+                    <p className="text-[10px] font-semibold text-[#472b20]/50 uppercase tracking-wider mb-2">Free plan usage</p>
+                    {[
+                        { label: "Chats", used: usage.conversations.used, limit: usage.conversations.limit },
+                        { label: "Cards", used: usage.image_cards.used, limit: usage.image_cards.limit },
+                        { label: "Meditation", used: usage.meditation_duration.used, limit: usage.meditation_duration.limit, unit: "min" },
+                    ].map(({ label, used, limit, unit }) => {
+                        const limitNum = typeof limit === "number" ? limit : 0;
+                        const pct = limitNum > 0 ? Math.min(100, Math.round((used / limitNum) * 100)) : 0;
+                        const remaining = limitNum - used;
+                        const almostOut = pct >= 67;
+                        return (
+                            <div key={label} className="mb-1.5 last:mb-0">
+                                <div className="flex justify-between items-center mb-0.5">
+                                    <span className="text-[11px] text-[#472b20]/70">{label}</span>
+                                    <span className={`text-[11px] font-medium ${remaining <= 0 ? "text-red-500" : almostOut ? "text-orange-500" : "text-[#472b20]/60"}`}>
+                                        {remaining <= 0 ? "limit reached" : `${remaining}${unit ? ` ${unit}` : ""} left`}
+                                    </span>
+                                </div>
+                                <div className="h-1 rounded-full bg-[#ECE5DF] overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all ${remaining <= 0 ? "bg-red-400" : almostOut ? "bg-orange-400" : "bg-[#D05E2D]"}`}
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <p className="text-[10px] text-[#D05E2D] mt-2 font-medium">Upgrade for more →</p>
+                </div>
+            )}
 
             <div className="p-3 border-t border-[#ECE5DF] shrink-0">
                 <DropdownMenu>
