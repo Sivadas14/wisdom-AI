@@ -35,45 +35,26 @@ from src.wire import ContemplationCardContent
 logger = logging.getLogger(__name__)
 
 CONTEMPLATION_PROMPTS = [
-    "Soft morning light filtering through bamboo leaves",
-    "A single white lotus floating on still water",
-    "Gentle waves lapping at a pebble beach at dawn",
-    "Misty mountains reflected in a calm lake",
-    "A sleeping cat curled up in a sunny window",
-    "Dewdrops on grass blades in early morning",
-    "A wooden dock extending into a serene pond",
-    "Soft candlelight flickering in a quiet room",
-    "Cherry blossoms drifting down like snow",
-    "A peaceful garden path lined with lavender",
-    "Moonlight streaming through white curtains",
-    "A single bird perched on a bare branch",
-    "Smooth river stones stacked in meditation",
-    "Soft clouds drifting across a pastel sky",
-    "A cozy reading nook with warm blankets",
-    "Sunbeams piercing through forest canopy",
-    "A field of tall grass swaying in gentle breeze",
-    "Ripples spreading across a mountain lake",
-    "A butterfly resting on a wildflower",
-    "Soft fog rolling over rolling hills",
-    "A peaceful zen garden with raked sand",
-    "Warm golden hour light in an empty meadow",
-    "A single feather floating on calm water",
-    "Gentle rain drops on a peaceful pond",
-    "A hammock swaying between two old trees",
-    "Soft pastel sunset colors over wheat fields",
-    "A quiet forest clearing with dappled sunlight",
-    "Calm ocean waves under a star-filled sky",
-    "A single candle flame in complete darkness",
-    "Morning mist rising from a tranquil valley",
-    "Peaceful zen garden with flowing water and soft sunlight",
-    "Serene mountain lake at sunset with gentle ripples",
-    "Tranquil forest clearing with dappled morning light",
-    "Misty mountains with flowing clouds at dawn",
-    "Peaceful bamboo grove with soft filtered light",
-    "Quiet temple garden with stone lanterns and cherry blossoms",
-    "Serene pond with lotus flowers and reflections",
-    "Calm desert dunes under a twilight sky",
-    "Peaceful meadow with wildflowers and gentle breeze",
+    "Arunachala hill at golden sunrise, soft mist rising, warm ochre light, devotional atmosphere",
+    "Interior of Sri Ramanasramam hall, oil lamp flame, worn stone floor, profound stillness",
+    "Arunachala at dusk, deep violet sky, single bright star, timeless silence",
+    "Ancient banyan tree at Tiruvannamalai, roots spreading, soft dawn light, sacred atmosphere",
+    "Meditation cave on Arunachala hillside, simple oil lamp, stone walls, serene solitude",
+    "Arunachala reflected in the still waters of the ashram tank at dawn",
+    "Ramana's simple wooden couch in the Old Hall, golden afternoon light, sacred quietude",
+    "Pradakshina path around Arunachala, bare feet on red earth, pilgrims at sunrise",
+    "Oil lamp and incense before a simple altar, soft diffused light, devotional stillness",
+    "Arunachala peak emerging from morning clouds, sacred summit, luminous sky",
+    "Ancient gopuram of Arunachaleswarar temple at dawn, bells, sacred mist",
+    "A single deepam flame on Arunachala summit against a vast starlit sky",
+    "Peaceful ashram courtyard, a lone seeker seated in meditation under a large tree",
+    "The heart of inquiry — a still pool reflecting boundless sky, symbol of pure awareness",
+    "Sunrise over Tiruvannamalai plains, Arunachala casting long warm shadows, sacred hush",
+    "A small reading lamp illuminating a worn copy of Talks with Sri Ramana Maharshi",
+    "Silence rendered as light — warm golden glow dissolving into open space",
+    "Arunachala at full moon, silver light bathing red hillside, absolute stillness",
+    "Stone path winding up the holy hill, footprints, solitude, turning inward",
+    "Early morning meditation beside the ashram well, soft mist, birds, profound peace",
 ]
 
 
@@ -138,27 +119,25 @@ async def generate_contemplation_card_sync(
 ) -> tuple[str, str]:
     """Generate contemplation card synchronously and return content_path and cc_text"""
 
-    # Try to use user's question, fallback to existing behavior
+    # IMAGE PROMPT: generated from the user's question topic (fine to be creative)
     user_question = await _get_last_user_message(session, conversation_id)
-    
-    if user_question and len(user_question) > 10:  # Minimum length check
+    if user_question and len(user_question) > 10:
         try:
-            prompt, quote = await _generate_prompt_and_quote_from_question(user_question)
-            logger.info(f"Generated card from user question: {user_question[:50]}...")
+            prompt = await _generate_image_prompt_from_question(user_question)
+            logger.info(f"Generated image prompt from user question: {user_question[:50]}...")
         except Exception as e:
-            logger.warning(f"Question-based generation failed, using fallback: {e}")
-            # Fallback to existing behavior
+            logger.warning(f"Question-based image prompt failed, using fallback: {e}")
             prompt = random.choice(CONTEMPLATION_PROMPTS)
-            quote = await _get_quote_from_citations_or_random(
-                session, conversation_id, message_id
-            )
     else:
-        # No question or too short, use existing behavior
-        logger.info("No valid user question found, using standard prompts")
+        logger.info("No valid user question found, using standard Ramana image prompts")
         prompt = random.choice(CONTEMPLATION_PROMPTS)
-        quote = await _get_quote_from_citations_or_random(
-            session, conversation_id, message_id
-        )
+
+    # QUOTE: ALWAYS sourced from actual Ramana library chunks — never GPT fabrication.
+    # _get_quote_from_citations_or_random pulls from citations on the assistant message first,
+    # then conversation citations, then a random authentic Ramana chunk as last resort.
+    quote = await _get_quote_from_citations_or_random(
+        session, conversation_id, message_id
+    )
 
     # Get the conversation to get the user_id
     query = select(Conversation).where(Conversation.id == conversation_id)
@@ -336,15 +315,24 @@ async def _get_quote_from_citations_or_random(
             logger.info("No citations found, using random source file")
             source_text = await _get_random_chunks_text(session)
 
-    # Generate a quote using LLM
+    # Extract a genuine quote from the Ramana source text.
+    # Crucially: we ask the LLM to EXTRACT or closely paraphrase from the provided text,
+    # never to invent or draw on general knowledge.
     quote_prompt = dedent(
         f"""
-    Based on the following spiritual/contemplative text, create a short, meaningful quote (1-2 sentences max) that captures the essence of the wisdom or insight. The quote should be inspiring, peaceful, and suitable for contemplation.
+    You are given passages from Sri Ramana Maharshi's authenticated teachings.
+    Your task is to select and return the single most profound or meaningful sentence
+    (or at most two short sentences) from the provided text below.
 
-    Source text:
+    Rules:
+    - You MUST quote or very closely paraphrase the actual text provided. Do NOT invent.
+    - Do NOT draw on any knowledge outside the provided passages.
+    - Choose the sentence that best stands alone as a contemplative insight.
+    - End your response with a source attribution in the form: — [source filename without extension]
+    - Return only the chosen sentence(s) plus the attribution. Nothing else.
+
+    Source passages:
     {source_text}
-
-    Generate only the quote, without quotation marks or attribution.
     """
     )
 
@@ -412,62 +400,51 @@ async def _get_last_user_message(
         return None
 
 
-async def _generate_prompt_and_quote_from_question(
-    user_question: str
-) -> tuple[str, str]:
-    """Generate image prompt and quote from user question using OpenAI structured output."""
-    
+async def _generate_image_prompt_from_question(user_question: str) -> str:
+    """Generate a Ramana/Arunachala-themed image prompt from the user's question topic.
+
+    Only generates the image prompt — the quote is always sourced separately from
+    authentic Ramana library chunks, never from general LLM knowledge.
+    """
     settings = get_settings()
     client = OpenAI(api_key=settings.openai_token)
-    
-    # Get JSON schema from Pydantic model and ensure additionalProperties is false for strict mode
-    json_schema = ContemplationCardContent.model_json_schema()
-    # OpenAI requires additionalProperties: false for strict mode
-    json_schema["additionalProperties"] = False
-    
+
     prompt = dedent(f"""
     Based on this spiritual question: "{user_question}"
-    
-    Generate:
-    1. An image_prompt: A peaceful, contemplative image prompt (1 sentence) that visually represents this question
-    2. A quote: A short, meaningful contemplative quote (1-2 sentences) inspired by this question
+
+    Generate a single evocative image prompt (1 sentence, under 25 words) for a
+    peaceful contemplation card. The imagery should be rooted in the world of
+    Sri Ramana Maharshi — Arunachala hill, the ashram at Tiruvannamalai, oil lamps,
+    silence, sacred stillness, Tamil sacred landscape, or the pure light of
+    Self-awareness. No generic nature scenes.
+
+    Return only the image prompt sentence. Nothing else.
     """)
-    
+
     try:
-        # Use OpenAI's structured output with JSON schema
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You generate structured JSON responses for spiritual contemplation content."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You generate concise image prompts for Ramana Maharshi contemplation cards."},
+                {"role": "user", "content": prompt},
             ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "contemplation_card_content",
-                    "strict": True,
-                    "schema": json_schema,
-                    "description": "Structured response for contemplation card generation"
-                }
-            },
             temperature=0.7,
+            max_tokens=60,
         )
-        
-        # Parse response directly into Pydantic model
-        response_text = response.choices[0].message.content
-        parsed = ContemplationCardContent.model_validate_json(response_text)
-        
-        return parsed.image_prompt, parsed.quote
-        
-    except ValidationError as e:
-        logger.error(f"Pydantic validation error: {e}")
-        raise
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error: {e}")
-        raise
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.error(f"OpenAI API error: {e}")
+        logger.error(f"Image prompt generation failed: {e}")
         raise
+
+
+async def _generate_prompt_and_quote_from_question(
+    user_question: str
+) -> tuple[str, str]:
+    """Deprecated: use _generate_image_prompt_from_question + _get_quote_from_citations_or_random.
+    Kept for backward compatibility only — do not call for new card generation."""
+    image_prompt = await _generate_image_prompt_from_question(user_question)
+    # Return a placeholder quote; callers should use _get_quote_from_citations_or_random
+    return image_prompt, ""
 
 
 async def _generate_image(prompt: str) -> Image.Image:
