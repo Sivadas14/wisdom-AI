@@ -33,7 +33,7 @@ export const SUBSCRIPTION_PLANS: LocalPlan[] = [
     "description": "Start your journey with basic access",
     "active": true,
     "is_recommended": false,
-    "chat_limit": "3",
+    "chat_limit": "10",
     "card_limit": 5,
     "max_meditation_duration": 10,
     "prices": [

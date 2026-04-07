@@ -9,7 +9,7 @@ interface OnboardingModalProps {
 const FEATURES = [
     {
         icon: <MessageCircle className="w-5 h-5 text-[#D05E2D]" />,
-        title: "3 guided conversations",
+        title: "10 guided conversations",
         description: "Ask Ramana Maharshi-inspired questions and receive wisdom tailored to your inquiry.",
     },
     {

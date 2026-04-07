@@ -1195,7 +1195,7 @@ const Chat = () => {
                   <div className="max-w-2xl mx-auto w-full">
                     <div className="flex flex-col items-center gap-3 py-4 px-5 rounded-xl bg-[#FDF4EF] border border-[#ECE5DF]">
                       <p className="text-sm text-[#472b20]/70 text-center">
-                        You've used all <span className="font-semibold text-[#472b20]">3 free conversations</span>. Upgrade to keep the inquiry going.
+                        You've used all <span className="font-semibold text-[#472b20]">10 free conversations</span>. Upgrade to keep the inquiry going.
                       </p>
                       <button
                         onClick={() => setShowPlansModal(true)}

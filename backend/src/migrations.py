@@ -13,7 +13,7 @@ from src.db import Plan, PlanType
 # ---------------------------------------------------------------------------
 # Target limits for the FREE plan
 # ---------------------------------------------------------------------------
-FREE_CHAT_LIMIT    = "3"   # 3 conversations (stored as string per existing schema)
+FREE_CHAT_LIMIT    = "10"  # 10 conversations (stored as string per existing schema)
 FREE_CARD_LIMIT    = 3     # 3 contemplation cards (images)
 FREE_MEDITATION    = 15    # 15 minutes = ~3 standard 5-min meditation sessions
 
