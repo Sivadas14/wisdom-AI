@@ -52,6 +52,7 @@ from src.content.parallel_video import pre_generate_common_images
 
 from src.services.user import router as user_profile_router
 from src.services.dashboard import router as dashboard_router
+from src.migrations import run_migrations
 
 async def _setup_db(app: FastAPI):
     print("[TRACE] _setup_db() start")
@@ -94,6 +95,10 @@ async def lifespan(app: FastAPI):
         # Setup
         await _setup_db(app)
         tu.logger.info("Database setup successfully.")
+
+        # Run startup migrations (idempotent — safe on every restart)
+        await run_migrations(app.state.db_session_factory)
+        tu.logger.info("Startup migrations complete.")
         
         # Start background pre-generation after server is up
         print("[TRACE] scheduling background_image_pregeneration")
