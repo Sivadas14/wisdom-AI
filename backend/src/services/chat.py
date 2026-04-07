@@ -503,10 +503,30 @@ async def _llm_chat_streaming_optimized(
     user_message: str,
 ):
     """Real LLM chat with TRUE STREAMING and parallel processing"""
-    
-    # Get chunks from database FIRST (this is critical - chunks must be added to thread before LLM call)
+
+    # ------------------------------------------------------------------ #
+    # STEP 1: Intent pre-classification — fast gate before any vector work #
+    # ------------------------------------------------------------------ #
+    async with profile_operation("intent_classification") as op:
+        is_on_topic = await _classify_intent(model, user_message)
+        op.finish(on_topic=is_on_topic)
+
+    # ------------------------------------------------------------------ #
+    # STEP 2: Conversation-aware query + vector search                    #
+    # ------------------------------------------------------------------ #
     async with profile_operation("embedding_search") as op:
-        chunks = await _embedding_search_optimized(session, model, user_message)
+        if not is_on_topic:
+            # Skip vector search entirely for off-topic queries.
+            # The no-chunk fallback below will return a polite refusal.
+            tu.logger.info(f"[INTENT] Off-topic query bypasses vector search: {user_message[:60]!r}")
+            chunks = []
+        else:
+            # Build a context-enriched query so follow-up questions like
+            # "What did he say about the mind?" resolve correctly.
+            contextual_query = await _build_contextual_query(
+                session, str(conversation.id), user_message
+            )
+            chunks = await _embedding_search_optimized(session, model, contextual_query)
         op.finish(chunks_count=len(chunks))
     
     # Add chunks to thread BEFORE calling LLM
@@ -698,6 +718,112 @@ async def _llm_chat_streaming_optimized(
     yield "[DONE]\n\n"
     
     print_profiler_summary()
+
+
+async def _build_contextual_query(
+    session: AsyncSession,
+    conversation_id: str,
+    user_message: str,
+) -> str:
+    """Enrich the embedding query with recent conversation context.
+
+    Fetches the last two assistant messages from the conversation and prepends
+    a short snippet of each to the current user message.  This resolves
+    follow-up references like "What else did he say?" or "Can you expand on
+    that?" so the vector search retrieves the right Ramana passages instead of
+    interpreting the message in isolation.
+
+    Falls back silently to the raw user_message on any error.
+    """
+    try:
+        recent_query = (
+            select(db.Message)
+            .where(
+                db.Message.conversation_id == conversation_id,
+                db.Message.role == db.MessageRole.ASSISTANT,
+            )
+            .order_by(db.Message.created_at.desc())
+            .limit(2)
+        )
+        result = await session.execute(recent_query)
+        recent_msgs = result.scalars().all()
+
+        if not recent_msgs:
+            return user_message  # First turn — no prior context
+
+        # Oldest first; take first 300 chars of each to keep the embedding
+        # focused rather than diluted by a full response
+        snippets = []
+        for msg in reversed(recent_msgs):
+            if msg.content:
+                snippets.append(msg.content[:300].strip())
+
+        if not snippets:
+            return user_message
+
+        context = "\n".join(snippets)
+        return f"Context from prior exchanges:\n{context}\n\nCurrent question: {user_message}"
+    except Exception as e:
+        tu.logger.warning(f"[CONTEXT_BUILD] Failed, using raw query: {e}")
+        return user_message
+
+
+async def _classify_intent(
+    model: tt.ModelInterface,
+    user_message: str,
+) -> bool:
+    """Pre-classify whether a query is Ramana-topic or clearly off-topic.
+
+    Returns True  → proceed to vector search and LLM response.
+    Returns False → short-circuit with the no-chunk refusal path.
+
+    Simple greetings and very short messages always pass (True) without calling
+    the model, to avoid unnecessary latency on common openers.
+
+    Defaults to True on any classification error so genuine queries are never
+    silently dropped.
+    """
+    stripped = user_message.strip().lower()
+
+    # Fast path: greetings / very short messages pass without an API call
+    INSTANT_PASS = {
+        "hi", "hello", "hey", "namaste", "om", "om namah shivaya",
+        "good morning", "good evening", "good afternoon",
+        "thank you", "thanks", "ok", "okay", "yes", "no", "sure",
+    }
+    if stripped in INSTANT_PASS or len(stripped) <= 4:
+        return True
+
+    classification_prompt = dedent(
+        f"""
+        You are a classifier for a Sri Ramana Maharshi wisdom application.
+        Decide whether the message below should be answered from the Ramana Maharshi library.
+
+        Reply YES if the message is:
+        - A greeting or conversational opener
+        - Related to Sri Ramana Maharshi, self-enquiry, "Who Am I?", Advaita Vedanta,
+          the Self, consciousness, meditation, silence, surrender, Arunachala,
+          Tiruvannamalai, spiritual liberation, or contemplative practice
+
+        Reply NO if the message is clearly about an unrelated topic such as:
+        - Sports, entertainment, politics, food, technology, geography, general science,
+          history unrelated to Indian spiritual traditions, or other worldly subjects
+
+        Message: "{user_message}"
+
+        Reply with only YES or NO.
+        """
+    ).strip()
+
+    try:
+        response = await model.chat_async(classification_prompt)
+        answer = (response.content if hasattr(response, "content") else str(response)).strip().upper()
+        is_relevant = answer.startswith("YES")
+        tu.logger.info(f"[INTENT] {'PASS' if is_relevant else 'BLOCK'} — {user_message[:60]!r}")
+        return is_relevant
+    except Exception as e:
+        tu.logger.warning(f"[INTENT] Classification failed, defaulting to PASS: {e}")
+        return True  # Fail open — never silently drop a genuine question
 
 
 async def _embedding_search_optimized(
