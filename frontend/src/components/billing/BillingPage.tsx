@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, Heart, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Loader2, MessageSquare, Image as ImageIcon, Heart, AlertTriangle, Volume2, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -356,8 +356,13 @@ export const BillingPage: React.FC = () => {
                                         />
 
                                         <UsageMetric
-                                            icon={<Heart className="w-4 h-4 text-[#d05e2d]" />}
-                                            label="Guided Meditation (minutes)"
+                                            icon={
+                                                <span className="flex items-center gap-0.5">
+                                                    <Volume2 className="w-4 h-4 text-[#d05e2d]" />
+                                                    <Video className="w-3.5 h-3.5 text-[#d05e2d]" />
+                                                </span>
+                                            }
+                                            label="Audio & Video (minutes)"
                                             used={usageData?.meditation_duration.used || 0}
                                             limit={usageData?.meditation_duration.limit || 0}
                                             colorClass="bg-green-500"
