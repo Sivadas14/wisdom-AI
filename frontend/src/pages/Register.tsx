@@ -9,7 +9,7 @@ import { Mail, Smartphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Register: React.FC = () => {
-  const { register, signInWithGoogle, verifyOtp, resendOtp } = useAuth();
+  const { register, signInWithGoogle, signInWithOtp, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<'form' | 'otp'>('form');
@@ -80,10 +80,17 @@ const Register: React.FC = () => {
 
       if (response.success) {
         if (response.requiresEmailConfirmation) {
-          // Email confirmation required - show OTP step
+          // Account created. signUp() sends a magic link, NOT a 6-digit code.
+          // We immediately call signInWithOtp() to send a proper 6-digit OTP
+          // so the user can verify with the code input shown below.
           setPendingUser(response.user);
+          const otpResponse = await signInWithOtp(email);
+          if (!otpResponse.success) {
+            setError(otpResponse.message || "Account created but could not send verification code. Please use Sign In → OTP to verify.");
+            return;
+          }
           setStep('otp');
-          setSuccess("Registration successful! Please check your email for the verification code. Your profile has been created.");
+          setSuccess("Account created! Please check your email for a 6-digit verification code.");
         } else {
           // No email confirmation required - redirect to home
           setSuccess("Registration successful! Redirecting...");
