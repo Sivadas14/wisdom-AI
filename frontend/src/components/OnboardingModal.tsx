@@ -9,18 +9,18 @@ interface OnboardingModalProps {
 const FEATURES = [
     {
         icon: <MessageCircle className="w-5 h-5 text-[#D05E2D]" />,
-        title: "10 guided conversations",
+        title: "20 guided conversations",
         description: "Ask Ramana Maharshi-inspired questions and receive wisdom tailored to your inquiry.",
     },
     {
         icon: <Image className="w-5 h-5 text-[#D05E2D]" />,
-        title: "3 contemplation cards",
+        title: "5 contemplation cards",
         description: "Generate a beautiful image-based card to anchor your daily reflection practice.",
     },
     {
         icon: <Headphones className="w-5 h-5 text-[#D05E2D]" />,
-        title: "15 min of audio meditation",
-        description: "Receive a guided audio session — roughly three 5-minute meditations.",
+        title: "5 min of guided meditation",
+        description: "Try a guided audio or video meditation to experience the practice.",
     },
 ];
 

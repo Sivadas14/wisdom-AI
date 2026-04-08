@@ -285,6 +285,102 @@ async def _create_razorpay_plans(session: AsyncSession) -> None:
     print("[MIGRATION] Razorpay plans verified/created.")
 
 
+async def _force_plan_limits_raw_sql(session: AsyncSession) -> None:
+    """
+    BULLETPROOF: forcibly UPDATE every plan's limits using raw SQL.
+
+    This bypasses the SQLAlchemy ORM entirely so it cannot be broken by:
+      - missing columns referenced by the model
+      - aborted transactions
+      - lazy-loading errors
+      - silent ORM no-ops
+
+    After running, prints the actual DB state for every plan so we can
+    verify in Render logs that the right values are landing.
+
+    Idempotent: same UPDATE on every startup is a no-op when values match.
+    """
+    # 1. FREE / Explore: 20 chats lifetime / 5 cards / 5 min meditation
+    await session.execute(text("""
+        UPDATE plans
+           SET name = 'Explore',
+               chat_limit = '20',
+               card_limit = 5,
+               max_meditation_duration = 5,
+               is_audio = TRUE,
+               is_video = TRUE
+         WHERE plan_type = 'FREE'
+    """))
+
+    # 2. SEEKER MONTHLY (BASIC monthly): 150 chats / unlimited cards / 60 min
+    await session.execute(text("""
+        UPDATE plans
+           SET name = 'Seeker',
+               chat_limit = '150',
+               card_limit = 9999,
+               max_meditation_duration = 60,
+               is_audio = TRUE,
+               is_video = TRUE
+         WHERE plan_type = 'BASIC' AND billing_cycle = 'MONTHLY'
+    """))
+
+    # 3. SEEKER YEARLY: 1800 chats / unlimited cards / 720 min
+    await session.execute(text("""
+        UPDATE plans
+           SET name = 'Seeker (Yearly)',
+               chat_limit = '1800',
+               card_limit = 9999,
+               max_meditation_duration = 720,
+               is_audio = TRUE,
+               is_video = TRUE
+         WHERE plan_type = 'BASIC' AND billing_cycle = 'YEARLY'
+    """))
+
+    # 4. DEVOTEE MONTHLY (PRO monthly): Unlimited chats / unlimited cards / 200 min
+    await session.execute(text("""
+        UPDATE plans
+           SET name = 'Devotee',
+               chat_limit = 'Unlimited',
+               card_limit = 9999,
+               max_meditation_duration = 200,
+               is_audio = TRUE,
+               is_video = TRUE
+         WHERE plan_type = 'PRO' AND billing_cycle = 'MONTHLY'
+    """))
+
+    # 5. DEVOTEE YEARLY: Unlimited chats / unlimited cards / 2400 min
+    await session.execute(text("""
+        UPDATE plans
+           SET name = 'Devotee (Yearly)',
+               chat_limit = 'Unlimited',
+               card_limit = 9999,
+               max_meditation_duration = 2400,
+               is_audio = TRUE,
+               is_video = TRUE
+         WHERE plan_type = 'PRO' AND billing_cycle = 'YEARLY'
+    """))
+
+    await session.commit()
+
+    # 6. Verification: read back EVERY plan with raw SQL and log it
+    result = await session.execute(text("""
+        SELECT id, plan_type, billing_cycle, name,
+               chat_limit, card_limit, max_meditation_duration,
+               is_audio, is_video
+          FROM plans
+         ORDER BY plan_type, billing_cycle
+    """))
+    rows = result.fetchall()
+    print("[MIGRATION] === PLAN LIMITS AFTER FORCEFUL UPDATE ===")
+    for r in rows:
+        print(
+            f"[MIGRATION]   id={r.id} {r.plan_type}/{r.billing_cycle} "
+            f"name={r.name!r} chats={r.chat_limit!r} cards={r.card_limit} "
+            f"med={r.max_meditation_duration} audio={r.is_audio} video={r.is_video}"
+        )
+    print("[MIGRATION] === END PLAN LIMITS ===")
+
+
 async def _safe_migration(session: AsyncSession, name: str, func) -> None:
     """
     Run a migration and roll back the session on failure.
@@ -322,3 +418,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_update_paid_plan_limits", _update_paid_plan_limits)
         await _safe_migration(session, "_update_polar_plan_prices", _update_polar_plan_prices)
         await _safe_migration(session, "_create_razorpay_plans", _create_razorpay_plans)
+
+        # ── BULLETPROOF FINAL PASS: raw SQL forces correct limits regardless
+        # of any prior failure. Always runs LAST so it has the last word.
+        await _safe_migration(session, "_force_plan_limits_raw_sql", _force_plan_limits_raw_sql)
