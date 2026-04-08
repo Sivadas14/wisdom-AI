@@ -12,12 +12,14 @@ from tuneapi import tu
 from src.db import (
     ContentGeneration,
     Conversation,
+    get_background_session,
 )
+from src.settings import get_llm, get_supabase_admin_client, get_settings
 from src.content.image import _generate_image, CONTEMPLATION_PROMPTS
 from src.content.audio import (
-    collect_source_content_optimized,  # ✅ Changed to optimized version
+    collect_source_content_optimized,
     generate_meditation_transcript,
-    generate_meditation_transcript_optimized, # Import optimized version
+    generate_meditation_transcript_optimized,
     generate_audio_from_transcript,
 )
 from src.content.parallel_video import parallel_generator
