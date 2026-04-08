@@ -9,6 +9,7 @@ import { UpgradePreviewModal } from '../subscription/UpgradePreviewModal';
 import { DowngradePreviewModal } from '../subscription/DowngradePreviewModal';
 import { UpgradePreview, DowngradePreview } from '@/apis/wire';
 import { useUsageQuery, usePlansQuery, UsageData } from '@/hooks/useBillingData';
+import { isIndianUser, setCurrencyOverride, INR_PRICES } from '../subscription/plansData';
 
 interface LocalPlan {
     id: string | number;
@@ -206,6 +207,11 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSucce
     };
 
     const getPlanPrice = (plan: LocalPlan) => {
+        if (indiaUser) {
+            const inrKey = `${plan.name}-${plan.billing_cycle}`;
+            const inrPrice = INR_PRICES[inrKey]?.price;
+            if (inrPrice !== undefined) return inrPrice;
+        }
         const priceObj = plan.prices.find(p => p.currency === 'USD');
         return priceObj ? priceObj.price : 0;
     };
@@ -270,14 +276,31 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSucce
                 return;
             }
 
-            if (!plan.polar_plan_id) {
-                toast.error("This plan is not available for subscription");
-                return;
-            }
-
             const userId = userProfile?.id;
             if (!userId) {
                 toast.error("Unable to identify user");
+                return;
+            }
+
+            // Indian users → Razorpay checkout
+            if (indiaUser && !plan.is_free) {
+                const successUrl = window.location.href;
+                const response = await paymentAPI.createRazorpayCheckoutSession(
+                    Number(plan.id),
+                    userId,
+                    successUrl,
+                );
+                const checkoutUrl = response?.data?.checkout_url || response?.checkout_url;
+                if (checkoutUrl) {
+                    window.location.href = checkoutUrl;
+                } else {
+                    toast.error("Failed to start Razorpay payment session");
+                }
+                return;
+            }
+
+            if (!plan.polar_plan_id) {
+                toast.error("This plan is not available for subscription");
                 return;
             }
 
@@ -371,7 +394,10 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSucce
 
     const currentPlanDetails = getCurrentPlanDetails();
     const { freePlan, paidPlans } = getFilteredPlans();
-    const currencySymbol = '$';
+
+    // India detection — checks localStorage override first, then browser timezone/locale
+    const indiaUser = isIndianUser(userProfile?.country_code, userProfile?.phone_number);
+    const currencySymbol = indiaUser ? '₹' : '$';
 
     if (!isOpen) return null;
 
@@ -415,6 +441,30 @@ export const PlansModal: React.FC<PlansModalProps> = ({ isOpen, onClose, onSucce
                             <p className="text-[#472b20]/60 max-w-xl mx-auto font-light">
                                 Subscriptions reset monthly. Prices are indicative.
                             </p>
+
+                            {/* Currency selector — always visible */}
+                            <div className="mt-5 inline-flex flex-col items-center gap-2">
+                                <p className="text-sm font-semibold text-[#472b20]">Choose your currency:</p>
+                                <div className="flex items-center gap-3 bg-white border-2 border-[#ECE5DF] rounded-2xl px-5 py-3 shadow-sm">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCurrencyOverride('USD'); window.location.reload(); }}
+                                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${!indiaUser ? 'bg-[#472b20] text-white shadow' : 'text-[#472b20]/60 hover:bg-[#ECE5DF]'}`}
+                                    >
+                                        $ USD
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCurrencyOverride('INR'); window.location.reload(); }}
+                                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${indiaUser ? 'bg-[#472b20] text-white shadow' : 'text-[#472b20]/60 hover:bg-[#ECE5DF]'}`}
+                                    >
+                                        ₹ INR
+                                    </button>
+                                </div>
+                                {indiaUser && (
+                                    <p className="text-xs text-orange-600 font-medium">🇮🇳 India pricing — 20% discount applied via Razorpay</p>
+                                )}
+                            </div>
                         </div>
 
                         {/* Billing Toggle (Pill) */}
