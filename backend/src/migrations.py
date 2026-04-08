@@ -15,7 +15,7 @@ from src.db import Plan, PlanType
 # ---------------------------------------------------------------------------
 FREE_CHAT_LIMIT    = "10"  # 10 conversations (stored as string per existing schema)
 FREE_CARD_LIMIT    = 3     # 3 contemplation cards (images)
-FREE_MEDITATION    = 15    # 15 minutes = ~3 standard 5-min meditation sessions
+FREE_MEDITATION    = 5     # 5 minutes = 1 free 5-min audio + 1 free 5-min video
 
 
 async def _set_free_plan_limits(session: AsyncSession) -> None:

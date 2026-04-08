@@ -433,34 +433,41 @@ const InlineMeditationCreator = ({
             </div>
           </div>
 
-          <div className="mb-6">
-            <p className="text-brand-body mb-4">Choose the format that you want</p>
-            <div className="grid grid-cols-2 items-center gap-3">
-              {formats.map((format) => {
-                const enabled = isFormatEnabled(format);
-                return (
-                  <Button
-                    key={format}
-                    onClick={() => enabled && setSelectedFormat(format)}
-                    disabled={!enabled}
-                    variant={selectedFormat === format ? "default" : "outline"}
-                    className={`rounded-full ${selectedFormat === format
-                      ? "bg-brand-button hover:bg-brand-button/90 text-white"
-                      : "border-orange-200 hover:border-brand-button"
-                      } ${!enabled ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-gray-500 hover:border-gray-200" : ""}`}
-                  >
-                    {format === "Audio" && <Volume2 className="w-3.5 h-3.5 mr-1.5" />}
-                    {format === "Video" && <Video className="w-3.5 h-3.5 mr-1.5" />}
-                    {format} {!enabled && "(Upgrade Plan)"}
-                  </Button>
-                );
-              })}
+          {/* Format picker — hidden when the user clicked a specific Audio/Video button */}
+          {!initialMode && (
+            <div className="mb-6">
+              <p className="text-brand-body mb-4">Choose the format that you want</p>
+              <div className="grid grid-cols-2 items-center gap-3">
+                {formats.map((format) => {
+                  const enabled = isFormatEnabled(format);
+                  return (
+                    <Button
+                      key={format}
+                      onClick={() => enabled && setSelectedFormat(format)}
+                      disabled={!enabled}
+                      variant={selectedFormat === format ? "default" : "outline"}
+                      className={`rounded-full ${selectedFormat === format
+                        ? "bg-brand-button hover:bg-brand-button/90 text-white"
+                        : "border-orange-200 hover:border-brand-button"
+                        } ${!enabled ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-gray-500 hover:border-gray-200" : ""}`}
+                    >
+                      {format === "Audio" && <Volume2 className="w-3.5 h-3.5 mr-1.5" />}
+                      {format === "Video" && <Video className="w-3.5 h-3.5 mr-1.5" />}
+                      {format} {!enabled && "(Upgrade Plan)"}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="mb-6">
             <p className="text-brand-body text-sm">
-              Create a personalized meditation guide based on your conversation. This will generate a {selectedFormat.toLowerCase()} session that you can save and use for your practice.
+              {initialMode === 'audio'
+                ? "Create a personalized guided audio meditation based on your conversation."
+                : initialMode === 'video'
+                ? "Create a personalized meditation video with Ramana imagery based on your conversation."
+                : `Create a personalized meditation guide based on your conversation. This will generate a ${selectedFormat.toLowerCase()} session that you can save and use for your practice.`}
             </p>
           </div>
 
@@ -470,7 +477,13 @@ const InlineMeditationCreator = ({
               disabled={!conversationId || !messageId}
               className="bg-brand-button hover:bg-brand-button/90 text-white px-8 py-3 rounded-full text-lg font-medium"
             >
-              Generate New Meditation Guide
+              {initialMode === 'audio' && <Volume2 className="w-4 h-4 mr-2" />}
+              {initialMode === 'video' && <Video className="w-4 h-4 mr-2" />}
+              {initialMode === 'audio'
+                ? "Generate Audio Guide"
+                : initialMode === 'video'
+                ? "Generate Video"
+                : "Generate New Meditation Guide"}
             </Button>
 
             {!conversationId || !messageId ? (
@@ -492,7 +505,7 @@ const InlineMeditationCreator = ({
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Create Meditation Guide"
+      title={initialMode === 'audio' ? "Create Audio Guide" : initialMode === 'video' ? "Create Meditation Video" : "Create Meditation Guide"}
     >
       {modalContent}
     </BaseModal>
