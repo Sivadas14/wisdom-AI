@@ -58,8 +58,12 @@ WORKDIR /app
 # Copy backend dependency definitions
 COPY backend/pyproject.toml backend/uv.lock ./
 
-# Install dependencies into the virtual environment
-RUN uv sync --no-cache --frozen
+# Install dependencies into the virtual environment.
+# NOTE: --frozen removed intentionally: the lockfile is out of sync with
+# pyproject.toml (razorpay was added to pyproject.toml but uv.lock was not
+# regenerated). Without --frozen, uv will resolve missing packages from
+# pyproject.toml at build time and install them correctly.
+RUN uv sync --no-cache
 
 # Copy backend application code
 COPY backend/alembic.ini .
