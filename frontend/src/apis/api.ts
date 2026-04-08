@@ -384,6 +384,20 @@ export const paymentAPI = {
         return response.data;
     },
 
+    createRazorpayCheckoutSession: async (
+        planId: number,
+        userId: string,
+        redirect_url?: string,
+    ) => {
+        // Calls /api/subscriptions/razorpay-checkout?plan_id=...&user_id=...
+        let url = `/subscriptions/razorpay-checkout?plan_id=${planId}&user_id=${userId}`;
+        if (redirect_url) {
+            url += `&redirect_url=${encodeURIComponent(redirect_url)}`;
+        }
+        const response = await apiClient.post(url);
+        return response.data;
+    },
+
     syncSubscription: async (userId: string): Promise<any> => {
         // Matches CURL: GET /api/subscriptions/sync?user_id=...
         const response = await apiClient.get(`/subscriptions/sync?user_id=${encodeURIComponent(userId)}`);

@@ -388,6 +388,7 @@ class Plan(Base):
     is_audio: Mapped[bool] = mapped_column(Boolean, default=False)
     is_video: Mapped[bool] = mapped_column(Boolean, default=False)
     polar_plan_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
+    razorpay_plan_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
 
     plan_type: Mapped[PlanType] = mapped_column(
         pg_enum(PlanType, name="plan_type_enum", create_type=True),

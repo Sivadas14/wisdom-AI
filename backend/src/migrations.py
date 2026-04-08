@@ -226,6 +226,65 @@ async def _create_ramana_images_table(session: AsyncSession) -> None:
     print("[MIGRATION] ramana_images table verified/created.")
 
 
+async def _add_razorpay_columns(session: AsyncSession) -> None:
+    """
+    Idempotently add razorpay_plan_id column to plans table.
+    This column stores the Razorpay Plan ID (plan_xxx) for INR billing.
+    """
+    await session.execute(text(
+        "ALTER TABLE plans "
+        "ADD COLUMN IF NOT EXISTS razorpay_plan_id VARCHAR UNIQUE"
+    ))
+    await session.commit()
+    print("[MIGRATION] razorpay_plan_id column verified/added to plans.")
+
+
+async def _create_razorpay_plans(session: AsyncSession) -> None:
+    """
+    Idempotently create Razorpay plans for paid tiers if:
+      1. Razorpay credentials are configured (ASAM_RAZORPAY_KEY_ID is set).
+      2. The plan does not already have a razorpay_plan_id.
+
+    Plans created:
+      Seeker Monthly  → ₹299/mo
+      Seeker Yearly   → ₹2,699/yr
+      Devotee Monthly → ₹699/mo
+      Devotee Yearly  → ₹5,399/yr
+    """
+    import asyncio
+    from src.settings import get_settings
+    from src.razorpayservice.razorpay_client import is_razorpay_enabled
+    from src.razorpayservice.razorpay_service import create_razorpay_plan
+
+    settings = get_settings()
+    if not is_razorpay_enabled():
+        print("[MIGRATION] Razorpay not configured — skipping plan creation.")
+        return
+
+    result = await session.execute(select(Plan))
+    all_plans = result.scalars().all()
+
+    for plan in all_plans:
+        if plan.plan_type == PlanType.FREE:
+            continue
+        if plan.razorpay_plan_id:
+            print(f"[MIGRATION] Razorpay plan already exists for {plan.name}: {plan.razorpay_plan_id}")
+            continue
+
+        try:
+            rzp_plan_id = await asyncio.to_thread(
+                create_razorpay_plan, plan.plan_type, plan.billing_cycle
+            )
+            plan.razorpay_plan_id = rzp_plan_id
+            session.add(plan)
+            print(f"[MIGRATION] Razorpay plan created for {plan.name} → {rzp_plan_id}")
+        except Exception as e:
+            print(f"[MIGRATION] Razorpay plan creation FAILED for {plan.name}: {e}")
+
+    await session.commit()
+    print("[MIGRATION] Razorpay plans verified/created.")
+
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -256,3 +315,13 @@ async def run_migrations(session_factory) -> None:
             await _create_ramana_images_table(session)
         except Exception as e:
             print(f"[MIGRATION] ERROR in _create_ramana_images_table: {e}")
+
+        try:
+            await _add_razorpay_columns(session)
+        except Exception as e:
+            print(f"[MIGRATION] ERROR in _add_razorpay_columns: {e}")
+
+        try:
+            await _create_razorpay_plans(session)
+        except Exception as e:
+            print(f"[MIGRATION] ERROR in _create_razorpay_plans: {e}")

@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     polar_base_api: str | None = None
     polar_organization_id: str | None = None
 
+    # Razorpay (Indian payment gateway)
+    razorpay_key_id: str | None = None
+    razorpay_key_secret: str | None = None
+    razorpay_webhook_secret: str | None = None
+
     # performance settings
     echo_db: bool = False
     content_generation_timeout: int = 300

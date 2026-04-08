@@ -1870,10 +1870,122 @@ async def revoke_subscription(
         User request: "Inactive the curuent plant"
         """
         # Reuse cancel logic but maybe ensuring it's immediate revocation
-        # Polar 'cancel' usually just stops renewal. 'revoke' might be distinct in some APIs, 
+        # Polar 'cancel' usually just stops renewal. 'revoke' might be distinct in some APIs,
         # but Polar Python SDK mainly has 'cancel'.
         # We will treat this as immediate hard cancellation.
         return await SubscriptionServiceV1.cancel_subscription(session, user_id)
+
+
+# ============================================================================
+# RAZORPAY ENDPOINTS  (Indian payment gateway)
+# ============================================================================
+
+@router.post("/razorpay-checkout")
+async def create_razorpay_checkout(
+    plan_id: int = Query(..., description="Internal DB plan ID"),
+    user_id: str = Query(..., description="User UUID"),
+    redirect_url: str = Query(None, description="URL to redirect after payment"),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """
+    Create a Razorpay subscription checkout for Indian users.
+    Returns {"checkout_url": "https://rzp.io/..."} — redirect the user there.
+    """
+    from src.razorpayservice.razorpay_client import is_razorpay_enabled
+    from src.razorpayservice.razorpay_service import create_razorpay_subscription
+    from fastapi.concurrency import run_in_threadpool
+
+    if not is_razorpay_enabled():
+        raise HTTPException(status_code=503, detail="Razorpay is not configured on this server.")
+
+    # Load plan
+    plan_result = await session.execute(select(Plan).where(Plan.id == plan_id))
+    plan = plan_result.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    if not plan.razorpay_plan_id:
+        raise HTTPException(
+            status_code=400,
+            detail="This plan does not have a Razorpay plan configured. Please contact support."
+        )
+
+    # Load user
+    user_result = await session.execute(
+        select(UserProfile).where(UserProfile.id == user_id)
+    )
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if not user.email_id:
+        raise HTTPException(status_code=400, detail="User email not found")
+
+    settings = get_settings()
+    success_url = redirect_url or f"{settings.frontend_url}/subscription?upgrade=success"
+
+    try:
+        result = await run_in_threadpool(
+            create_razorpay_subscription,
+            plan.razorpay_plan_id,
+            str(user.id),
+            user.email_id,
+            plan.plan_type,
+            plan.billing_cycle,
+            success_url,
+        )
+        return SuccessResponse(
+            message="Razorpay checkout created",
+            data={"checkout_url": result["short_url"]}
+        )
+    except Exception as e:
+        logger.error(f"Razorpay checkout error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/razorpay-webhook")
+async def razorpay_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """
+    Receive and verify Razorpay webhook events.
+    Handles subscription.activated, subscription.charged, subscription.cancelled.
+    """
+    from src.razorpayservice.razorpay_service import (
+        verify_razorpay_webhook_signature,
+        handle_razorpay_webhook_event,
+    )
+
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature", "")
+
+    print(f"🔔 Razorpay webhook received, event signature present: {bool(signature)}")
+
+    # Verify signature
+    if not verify_razorpay_webhook_signature(body, signature):
+        print("❌ Razorpay webhook signature verification failed")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    try:
+        payload = json.loads(body)
+    except Exception as e:
+        print(f"❌ Failed to parse Razorpay webhook JSON: {e}")
+        return {"status": "invalid_json"}
+
+    event = payload.get("event", "")
+    event_payload = payload.get("payload", {})
+
+    print(f"📌 Razorpay Event: {event}")
+    print(f"📦 Payload keys: {list(event_payload.keys())}")
+
+    try:
+        status = await handle_razorpay_webhook_event(session, event, event_payload)
+        print(f"✅ Razorpay webhook handled: {status}")
+        return {"status": status}
+    except Exception as e:
+        print(f"❌ Razorpay webhook handler error: {e}")
+        traceback.print_exc()
+        return {"status": "handler_error", "error": str(e)}
 
 
 

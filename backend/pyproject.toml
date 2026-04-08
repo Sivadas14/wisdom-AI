@@ -38,6 +38,7 @@ dependencies = [
     "python-docx>=1.2.0",
     "polar-sdk>=0.1.0",
     "pyjwt[crypto]>=2.10.1",
+    "razorpay>=1.4.2",
 ]
 
 # [tool.uv.source]

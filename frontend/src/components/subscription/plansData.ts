@@ -25,6 +25,22 @@ export interface LocalPlan {
     id: number;
   }[];
   polar_plan_id?: string;
+  razorpay_plan_id?: string;
+}
+
+// INR prices (20% discount on USD at ₹84/USD)
+export const INR_PRICES: Record<string, { price: number; display: string; perMonth?: string }> = {
+  "Seeker-MONTHLY":       { price: 299,   display: "₹299",   perMonth: "₹299/mo"  },
+  "Seeker (Yearly)-YEARLY": { price: 2699, display: "₹2,699", perMonth: "₹225/mo" },
+  "Devotee-MONTHLY":      { price: 699,   display: "₹699",   perMonth: "₹699/mo"  },
+  "Devotee (Yearly)-YEARLY":{ price: 5399, display: "₹5,399", perMonth: "₹450/mo" },
+};
+
+/** Returns true when the user's phone/country indicates India. */
+export function isIndianUser(countryCode?: string | null, phoneNumber?: string | null): boolean {
+  if (countryCode === "+91") return true;
+  if (phoneNumber && phoneNumber.startsWith("+91")) return true;
+  return false;
 }
 
 export const SUBSCRIPTION_PLANS: LocalPlan[] = [

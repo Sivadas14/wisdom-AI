@@ -22,6 +22,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { INR_PRICES, isIndianUser } from './plansData';
 
 interface UsageData {
     plan_name: string;
@@ -296,12 +297,39 @@ export const SubscriptionScreen: React.FC = () => {
     const { freePlan, paidPlans } = getFilteredPlans();
     const currentPlanId = currentPlanDetails?.id;
 
-    const currencySymbol = '$';
+    // Detect Indian users by country code or phone number prefix
+    const indiaUser = isIndianUser(userProfile?.country_code, userProfile?.phone_number);
+    const currencySymbol = indiaUser ? '₹' : '$';
 
     // Helper to get price for current currency
-    const getPlanPrice = (plan: LocalPlan) => {
+    const getPlanPrice = (plan: LocalPlan): number => {
+        if (indiaUser) {
+            const inrKey = `${plan.name}-${plan.billing_cycle}`;
+            return INR_PRICES[inrKey]?.price ?? 0;
+        }
         const priceObj = plan.prices.find(p => p.currency === 'USD');
         return priceObj ? priceObj.price : 0;
+    };
+
+    // Helper to get formatted price display (e.g. "₹2,699" or "$39.99")
+    const getPlanPriceDisplay = (plan: LocalPlan): string => {
+        if (indiaUser) {
+            const inrKey = `${plan.name}-${plan.billing_cycle}`;
+            return INR_PRICES[inrKey]?.display ?? '—';
+        }
+        const priceObj = plan.prices.find(p => p.currency === 'USD');
+        return priceObj ? `$${priceObj.price}` : '—';
+    };
+
+    // For yearly plans, per-month equivalent label
+    const getPerMonthLabel = (plan: LocalPlan): string | null => {
+        if (plan.billing_cycle !== 'YEARLY') return null;
+        if (indiaUser) {
+            const inrKey = `${plan.name}-${plan.billing_cycle}`;
+            return INR_PRICES[inrKey]?.perMonth ?? null;
+        }
+        const priceObj = plan.prices.find(p => p.currency === 'USD');
+        return priceObj ? `$${(priceObj.price / 12).toFixed(2)}/mo` : null;
     };
 
     // Add-on pricing logic
@@ -385,14 +413,32 @@ export const SubscriptionScreen: React.FC = () => {
                 return;
             }
 
-            if (!plan.polar_plan_id) {
-                toast.error("This plan is not available for subscription");
-                return;
-            }
-
             const userId = userProfile?.id;
             if (!userId) {
                 toast.error("Unable to identify user");
+                return;
+            }
+
+            // ── Indian users → Razorpay ──────────────────────────────────────
+            if (indiaUser && !plan.is_free) {
+                const successUrl = window.location.href;
+                const response = await paymentAPI.createRazorpayCheckoutSession(
+                    Number(plan.id),
+                    userId,
+                    successUrl,
+                );
+                const checkoutUrl = response?.data?.checkout_url || response?.checkout_url;
+                if (checkoutUrl) {
+                    window.location.href = checkoutUrl;
+                } else {
+                    toast.error("Failed to start Razorpay payment session");
+                }
+                return;
+            }
+            // ── Global users → Polar ─────────────────────────────────────────
+
+            if (!plan.polar_plan_id) {
+                toast.error("This plan is not available for subscription");
                 return;
             }
             console.log("fsfsd", actionType);
@@ -776,6 +822,11 @@ export const SubscriptionScreen: React.FC = () => {
                             <p className="text-[#472b20]/60 mt-2 max-w-xl mx-auto font-light">
                                 Subscriptions reset monthly. Prices are indicative.
                             </p>
+                            {indiaUser && (
+                                <div className="mt-3 inline-flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 text-sm font-medium px-4 py-1.5 rounded-full">
+                                    🇮🇳 Prices shown in INR — 20% India discount applied
+                                </div>
+                            )}
                         </div>
 
                         {/* Billing Toggle (Pill) */}
@@ -867,11 +918,16 @@ export const SubscriptionScreen: React.FC = () => {
                                         <h2 className="text-2xl font-heading font-bold text-[#472b20] mb-2">{plan.name}</h2>
                                         <div className="my-2">
                                             <span className="text-5xl font-heading font-bold text-[#472b20]">
-                                                {currencySymbol}{price.toLocaleString()}
+                                                {getPlanPriceDisplay(plan)}
                                             </span>
                                             <span className="text-[#472b20]/60 font-light">
                                                 /{plan.billing_cycle.toLowerCase() === 'monthly' ? 'month' : 'year'}
                                             </span>
+                                            {getPerMonthLabel(plan) && (
+                                                <p className="text-xs text-[#472b20]/50 mt-1 font-light">
+                                                    ≈ {getPerMonthLabel(plan)} billed annually
+                                                </p>
+                                            )}
                                         </div>
                                         <ul className="space-y-4 mb-8 flex-grow">
                                             {plan.features.map((feature, index) => (
