@@ -822,29 +822,29 @@ export const SubscriptionScreen: React.FC = () => {
                             <p className="text-[#472b20]/60 mt-2 max-w-xl mx-auto font-light">
                                 Subscriptions reset monthly. Prices are indicative.
                             </p>
-                            {indiaUser && (
-                                <div className="mt-3 inline-flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 text-sm font-medium px-4 py-1.5 rounded-full">
-                                    🇮🇳 Prices shown in INR — 20% India discount applied
-                                </div>
-                            )}
 
-                            {/* Manual currency toggle — works for everyone */}
-                            <div className="mt-3 inline-flex items-center gap-3 text-xs text-[#472b20]/60">
-                                <span>Pay in:</span>
-                                <button
-                                    type="button"
-                                    onClick={() => { setCurrencyOverride('USD'); window.location.reload(); }}
-                                    className={`px-3 py-1 rounded-full border ${!indiaUser ? 'bg-[#472b20] text-white border-[#472b20]' : 'bg-white text-[#472b20] border-[#ECE5DF] hover:border-[#472b20]/40'}`}
-                                >
-                                    USD ($)
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setCurrencyOverride('INR'); window.location.reload(); }}
-                                    className={`px-3 py-1 rounded-full border ${indiaUser ? 'bg-[#472b20] text-white border-[#472b20]' : 'bg-white text-[#472b20] border-[#ECE5DF] hover:border-[#472b20]/40'}`}
-                                >
-                                    INR (₹)
-                                </button>
+                            {/* Currency selector — always visible, prominent */}
+                            <div className="mt-5 inline-flex flex-col items-center gap-2">
+                                <p className="text-sm font-semibold text-[#472b20]">Choose your currency:</p>
+                                <div className="flex items-center gap-3 bg-white border-2 border-[#ECE5DF] rounded-2xl px-5 py-3 shadow-sm">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCurrencyOverride('USD'); window.location.reload(); }}
+                                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${!indiaUser ? 'bg-[#472b20] text-white shadow' : 'text-[#472b20]/60 hover:bg-[#ECE5DF]'}`}
+                                    >
+                                        $ USD
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setCurrencyOverride('INR'); window.location.reload(); }}
+                                        className={`px-5 py-2 rounded-xl text-sm font-bold transition-all duration-200 ${indiaUser ? 'bg-[#472b20] text-white shadow' : 'text-[#472b20]/60 hover:bg-[#ECE5DF]'}`}
+                                    >
+                                        ₹ INR
+                                    </button>
+                                </div>
+                                {indiaUser && (
+                                    <p className="text-xs text-orange-600 font-medium">🇮🇳 India pricing — 20% discount applied via Razorpay</p>
+                                )}
                             </div>
                         </div>
 
