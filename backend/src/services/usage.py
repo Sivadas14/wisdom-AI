@@ -278,30 +278,33 @@ async def get_usage(
             addon_minutes_limit += ua.limit_value
 
     # Plan Limits
-    plan_card_limit = plan.card_limit if plan.card_limit is not None else 0
+    # card_limit >= 9999 is treated as "Unlimited" (used for Seeker/Devotee plans)
+    UNLIMITED_THRESHOLD = 9999
+    plan_card_limit_raw = plan.card_limit if plan.card_limit is not None else 0
+    cards_unlimited = plan_card_limit_raw >= UNLIMITED_THRESHOLD
+    plan_card_limit = plan_card_limit_raw  # numeric, used for arithmetic
     plan_meditation_limit = plan.max_meditation_duration if plan.max_meditation_duration is not None else 0
-    
-    
+
     # Dynamic Usage Calculation (Plan First, then Addon) - REQUESTED BY USER
-    
+
     # 1. Cards (Images)
-    # Priority: Plan -> Addon
-    
-    # Plan Usage
-    plan_cards_used = min(image_used, plan_card_limit)
-    remaining_image_usage = max(0, image_used - plan_card_limit)
-    
+    if cards_unlimited:
+        plan_cards_used = image_used
+        remaining_image_usage = 0
+    else:
+        plan_cards_used = min(image_used, plan_card_limit)
+        remaining_image_usage = max(0, image_used - plan_card_limit)
+
     # Addon Usage
     addon_cards_used = min(remaining_image_usage, addon_cards_limit)
-    
+
     # 2. Minutes (Meditation)
-    # Plan Usage
     plan_meditation_used = min(meditation_used, plan_meditation_limit)
     remaining_meditation_usage = max(0, meditation_used - plan_meditation_limit)
-    
+
     # Addon Usage
     addon_minutes_used = min(remaining_meditation_usage, addon_minutes_limit)
-    
+
     # Build response
     return w.UserUsageResponse(
         plan_name=plan.name,
@@ -310,7 +313,7 @@ async def get_usage(
             limit=plan.chat_limit if plan.chat_limit else 0,
             used=conversation_used,
             remaining=calculate_remaining(
-                plan.chat_limit if plan.chat_limit else 0, 
+                plan.chat_limit if plan.chat_limit else 0,
                 conversation_used
             )
         ),
@@ -320,9 +323,9 @@ async def get_usage(
             remaining=calculate_remaining(plan.chat_limit, chat_used)
         ),
         image_cards=w.UsageLimit(
-            limit=plan_card_limit,
+            limit="Unlimited" if cards_unlimited else plan_card_limit,
             used=plan_cards_used,
-            remaining=max(0, plan_card_limit - plan_cards_used)
+            remaining="Unlimited" if cards_unlimited else max(0, plan_card_limit - plan_cards_used)
         ),
         meditation_duration=w.UsageLimit(
             limit=plan_meditation_limit,

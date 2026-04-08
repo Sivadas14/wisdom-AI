@@ -28,254 +28,130 @@ export interface LocalPlan {
 }
 
 export const SUBSCRIPTION_PLANS: LocalPlan[] = [
+  // ── FREE / EXPLORE ─────────────────────────────────────────────────────────
   {
-    "name": "Free Plan",
-    "description": "Start your journey with basic access",
-    "active": true,
-    "is_recommended": false,
-    "chat_limit": "10",
-    "card_limit": 5,
-    "max_meditation_duration": 10,
-    "prices": [
-      {
-        "currency": "USD",
-        "price": 0,
-        "plan_id": 101,
-        "id": 201
-      }
-    ],
+    "id": 101,
     "plan_type": "FREE",
+    "name": "Explore",
+    "description": "Taste everything — no credit card needed",
+    "active": true,
     "is_free": true,
-    "is_audio": true,
-    "is_video": false,
+    "is_recommended": false,
     "billing_cycle": "FREE",
-    "features": [
-      {
-        "feature_text": "3 chat sessions per month",
-        "plan_id": 101,
-        "id": 301
-      },
-      {
-        "feature_text": "5 personalized cards",
-        "plan_id": 101,
-        "id": 302
-      },
-      {
-        "feature_text": "Audio meditations only",
-        "plan_id": 101,
-        "id": 303
-      },
-      {
-        "feature_text": "10 minutes max meditation",
-        "plan_id": 101,
-        "id": 304
-      }
-    ],
-    "polar_plan_id": "prod_free_111111",
-    "id": 101
-  },
-  {
-    "name": "Basic Plan",
-    "description": "Perfect for getting started with essential features",
-    "active": true,
-    "is_recommended": false,
-    "chat_limit": "50",
-    "card_limit": 50,
-    "max_meditation_duration": 15,
-    "prices": [
-      {
-        "currency": "USD",
-        "price": 4.99,
-        "plan_id": 102,
-        "id": 202
-      }
-    ],
-    "plan_type": "BASIC",
-    "is_free": false,
-    "is_audio": true,
-    "is_video": false,
-    "billing_cycle": "MONTHLY",
-    "features": [
-      {
-        "feature_text": "50 chat sessions per month",
-        "plan_id": 102,
-        "id": 305
-      },
-      {
-        "feature_text": "50 personalized cards",
-        "plan_id": 102,
-        "id": 306
-      },
-      {
-        "feature_text": "Audio meditations only",
-        "plan_id": 102,
-        "id": 307
-      },
-      {
-        "feature_text": "15 minutes max meditation",
-        "plan_id": 102,
-        "id": 308
-      }
-    ],
-    "polar_plan_id": "d7e5a376-1f44-4c07-aaf9-6122e79de1ac",
-    "id": 102
-  },
-  {
-    "name": "Basic Plan (Yearly)",
-    "description": "Best value with yearly savings",
-    "active": true,
-    "is_recommended": true,
-    "chat_limit": "600",
-    "card_limit": 600,
-    "max_meditation_duration": 15,
-    "prices": [
-      {
-        "currency": "USD",
-        "price": 49.99,
-        "plan_id": 103,
-        "id": 203
-      }
-    ],
-    "plan_type": "BASIC",
-    "is_free": false,
-    "is_audio": true,
-    "is_video": false,
-    "billing_cycle": "YEARLY",
-    "features": [
-      {
-        "feature_text": "600 chat sessions per year",
-        "plan_id": 103,
-        "id": 309
-      },
-      {
-        "feature_text": "600 personalized cards",
-        "plan_id": 103,
-        "id": 310
-      },
-      {
-        "feature_text": "Audio meditations only",
-        "plan_id": 103,
-        "id": 311
-      },
-      {
-        "feature_text": "15 minutes max meditation",
-        "plan_id": 103,
-        "id": 312
-      },
-      {
-        "feature_text": "Save 17% with yearly billing",
-        "plan_id": 103,
-        "id": 313
-      }
-    ],
-    "polar_plan_id": "prod_basic_yearly_222222",
-    "id": 103
-  },
-  {
-    "name": "Pro Plan",
-    "description": "Advanced features for daily users",
-    "active": true,
-    "is_recommended": false,
-    "chat_limit": "Unlimited",
-    "card_limit": 100,
-    "max_meditation_duration": 60,
-    "prices": [
-      {
-        "currency": "USD",
-        "price": 12.99,
-        "plan_id": 104,
-        "id": 204
-      }
-    ],
-    "plan_type": "PRO",
-    "is_free": false,
+    "chat_limit": "20",
+    "card_limit": 5,
+    "max_meditation_duration": 5,
     "is_audio": true,
     "is_video": true,
-    "billing_cycle": "MONTHLY",
+    "prices": [{ "currency": "USD", "price": 0, "plan_id": 101, "id": 201 }],
     "features": [
-      {
-        "feature_text": "Unlimited chat sessions",
-        "plan_id": 104,
-        "id": 314
-      },
-      {
-        "feature_text": "100 personalized cards",
-        "plan_id": 104,
-        "id": 315
-      },
-      {
-        "feature_text": "Audio & Video meditations",
-        "plan_id": 104,
-        "id": 316
-      },
-      {
-        "feature_text": "60 minutes max meditation",
-        "plan_id": 104,
-        "id": 317
-      },
-      {
-        "feature_text": "Priority support",
-        "plan_id": 104,
-        "id": 318
-      }
+      { "feature_text": "20 conversations (lifetime)", "plan_id": 101, "id": 301 },
+      { "feature_text": "5 contemplation cards",       "plan_id": 101, "id": 302 },
+      { "feature_text": "1 audio meditation (5 min)",  "plan_id": 101, "id": 303 },
+      { "feature_text": "1 video meditation (5 min)",  "plan_id": 101, "id": 304 }
     ],
-    "polar_plan_id": "prod_pro_monthly_333333",
-    "id": 104
+    "polar_plan_id": "prod_free_111111"
   },
+
+  // ── SEEKER MONTHLY ─────────────────────────────────────────────────────────
   {
-    "name": "Pro Plan (Yearly)",
-    "description": "Maximum savings for power users",
+    "id": 102,
+    "plan_type": "BASIC",
+    "name": "Seeker",
+    "description": "Daily practice — audio & video, generous limits",
     "active": true,
-    "is_recommended": true,
-    "chat_limit": "Unlimited",
-    "card_limit": 1200,
-    "max_meditation_duration": 60,
-    "prices": [
-      {
-        "currency": "USD",
-        "price": 129.99,
-        "plan_id": 105,
-        "id": 205
-      }
-    ],
-    "plan_type": "PRO",
     "is_free": false,
+    "is_recommended": false,
+    "billing_cycle": "MONTHLY",
+    "chat_limit": "150",
+    "card_limit": 9999,
+    "max_meditation_duration": 60,
     "is_audio": true,
     "is_video": true,
-    "billing_cycle": "YEARLY",
+    "prices": [{ "currency": "USD", "price": 4.99, "plan_id": 102, "id": 202 }],
     "features": [
-      {
-        "feature_text": "Unlimited chat sessions",
-        "plan_id": 105,
-        "id": 319
-      },
-      {
-        "feature_text": "1200 personalized cards",
-        "plan_id": 105,
-        "id": 320
-      },
-      {
-        "feature_text": "Audio & Video meditations",
-        "plan_id": 105,
-        "id": 321
-      },
-      {
-        "feature_text": "60 minutes max meditation",
-        "plan_id": 105,
-        "id": 322
-      },
-      {
-        "feature_text": "Priority support",
-        "plan_id": 105,
-        "id": 323
-      },
-      {
-        "feature_text": "Save 17% with yearly billing",
-        "plan_id": 105,
-        "id": 324
-      }
+      { "feature_text": "150 conversations / month",           "plan_id": 102, "id": 305 },
+      { "feature_text": "Unlimited contemplation cards",       "plan_id": 102, "id": 306 },
+      { "feature_text": "60 min audio + video / month",        "plan_id": 102, "id": 307 },
+      { "feature_text": "Resets every month",                  "plan_id": 102, "id": 308 }
     ],
-    "polar_plan_id": "d7e5a376-1f44-4c07-aaf9-6122e79de1ac",
-    "id": 105
+    "polar_plan_id": "d7e5a376-1f44-4c07-aaf9-6122e79de1ac"
+  },
+
+  // ── SEEKER YEARLY ──────────────────────────────────────────────────────────
+  {
+    "id": 103,
+    "plan_type": "BASIC",
+    "name": "Seeker (Yearly)",
+    "description": "Same as monthly — save 33% with annual billing",
+    "active": true,
+    "is_free": false,
+    "is_recommended": true,
+    "billing_cycle": "YEARLY",
+    "chat_limit": "1800",
+    "card_limit": 9999,
+    "max_meditation_duration": 720,
+    "is_audio": true,
+    "is_video": true,
+    "prices": [{ "currency": "USD", "price": 39.99, "plan_id": 103, "id": 203 }],
+    "features": [
+      { "feature_text": "150 conversations / month (1 800/yr)", "plan_id": 103, "id": 309 },
+      { "feature_text": "Unlimited contemplation cards",         "plan_id": 103, "id": 310 },
+      { "feature_text": "60 min audio + video / month",          "plan_id": 103, "id": 311 },
+      { "feature_text": "Save 33% vs monthly billing",           "plan_id": 103, "id": 312 }
+    ],
+    "polar_plan_id": "prod_basic_yearly_222222"
+  },
+
+  // ── DEVOTEE MONTHLY ────────────────────────────────────────────────────────
+  {
+    "id": 104,
+    "plan_type": "PRO",
+    "name": "Devotee",
+    "description": "Unlimited practice — everything, no limits",
+    "active": true,
+    "is_free": false,
+    "is_recommended": false,
+    "billing_cycle": "MONTHLY",
+    "chat_limit": "Unlimited",
+    "card_limit": 9999,
+    "max_meditation_duration": 200,
+    "is_audio": true,
+    "is_video": true,
+    "prices": [{ "currency": "USD", "price": 9.99, "plan_id": 104, "id": 204 }],
+    "features": [
+      { "feature_text": "Unlimited conversations",         "plan_id": 104, "id": 313 },
+      { "feature_text": "Unlimited contemplation cards",   "plan_id": 104, "id": 314 },
+      { "feature_text": "200 min audio + video / month",   "plan_id": 104, "id": 315 },
+      { "feature_text": "Resets every month",              "plan_id": 104, "id": 316 },
+      { "feature_text": "Priority support",                "plan_id": 104, "id": 317 }
+    ],
+    "polar_plan_id": "prod_pro_monthly_333333"
+  },
+
+  // ── DEVOTEE YEARLY ─────────────────────────────────────────────────────────
+  {
+    "id": 105,
+    "plan_type": "PRO",
+    "name": "Devotee (Yearly)",
+    "description": "Maximum value — save 33% with annual billing",
+    "active": true,
+    "is_free": false,
+    "is_recommended": true,
+    "billing_cycle": "YEARLY",
+    "chat_limit": "Unlimited",
+    "card_limit": 9999,
+    "max_meditation_duration": 2400,
+    "is_audio": true,
+    "is_video": true,
+    "prices": [{ "currency": "USD", "price": 79.99, "plan_id": 105, "id": 205 }],
+    "features": [
+      { "feature_text": "Unlimited conversations",             "plan_id": 105, "id": 318 },
+      { "feature_text": "Unlimited contemplation cards",       "plan_id": 105, "id": 319 },
+      { "feature_text": "200 min audio + video / month",       "plan_id": 105, "id": 320 },
+      { "feature_text": "Save 33% vs monthly billing",         "plan_id": 105, "id": 321 },
+      { "feature_text": "Priority support",                    "plan_id": 105, "id": 322 }
+    ],
+    "polar_plan_id": "d7e5a376-1f44-4c07-aaf9-6122e79de1ac"
   }
 ];
