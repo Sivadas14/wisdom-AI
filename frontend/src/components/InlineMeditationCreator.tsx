@@ -17,6 +17,7 @@ interface InlineMeditationCreatorProps {
     url: string;
     type: 'audio' | 'video';
   } | null;
+  initialMode?: 'audio' | 'video';
   onGenerate?: (options: { mode: 'audio' | 'video', length: string }) => void;
 }
 
@@ -79,6 +80,7 @@ const InlineMeditationCreator = ({
   messageId,
   existingContentGenerations = [],
   initialContent,
+  initialMode,
   onGenerate
 }: InlineMeditationCreatorProps) => {
   const [selectedLength, setSelectedLength] = useState("5 min");
@@ -154,8 +156,11 @@ const InlineMeditationCreator = ({
       setFullScreen(true);
       setCurrentContentUrl(initialContent.url);
       setCurrentContentType(initialContent.type);
+    } else if (initialMode) {
+      // Pre-select format based on which button the user clicked
+      setSelectedFormat(initialMode === 'video' ? 'Video' : 'Audio');
     }
-  }, [isOpen, initialContent]);
+  }, [isOpen, initialContent, initialMode]);
 
   // Handle when content is complete
   useEffect(() => {
@@ -433,7 +438,6 @@ const InlineMeditationCreator = ({
             <div className="grid grid-cols-2 items-center gap-3">
               {formats.map((format) => {
                 const enabled = isFormatEnabled(format);
-                if (!enabled) return null;
                 return (
                   <Button
                     key={format}
@@ -445,6 +449,8 @@ const InlineMeditationCreator = ({
                       : "border-orange-200 hover:border-brand-button"
                       } ${!enabled ? "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-gray-500 hover:border-gray-200" : ""}`}
                   >
+                    {format === "Audio" && <Volume2 className="w-3.5 h-3.5 mr-1.5" />}
+                    {format === "Video" && <Video className="w-3.5 h-3.5 mr-1.5" />}
                     {format} {!enabled && "(Upgrade Plan)"}
                   </Button>
                 );

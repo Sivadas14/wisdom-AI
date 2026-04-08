@@ -631,9 +631,17 @@ const Chat = () => {
     setShowExploreMore(!showExploreMore);
   };
 
+  const [meditationInitialMode, setMeditationInitialMode] = useState<'audio' | 'video'>('audio');
+
   const handleMeditationGuide = () => {
     setShowExploreMore(false);
     setShowMeditationCreator(!showMeditationCreator);
+  };
+
+  const handleOpenMeditationCreator = (mode: 'audio' | 'video') => {
+    setShowExploreMore(false);
+    setMeditationInitialMode(mode);
+    setShowMeditationCreator(true);
   };
 
   // Inline image generation handler
@@ -1248,14 +1256,24 @@ const Chat = () => {
                   Image
                 </Button>
                 <Button
-                  onClick={handleMeditationGuide}
+                  onClick={() => handleOpenMeditationCreator('audio')}
                   disabled={isBusy}
                   variant="outline"
                   size="sm"
                   className="rounded-full h-8 md:h-9 whitespace-nowrap px-3 text-xs md:text-sm"
                 >
-                  <Music className="w-3 md:w-3.5 h-3 md:h-3.5 mr-1 md:mr-1.5" />
-                  Meditation
+                  <Volume2 className="w-3 md:w-3.5 h-3 md:h-3.5 mr-1 md:mr-1.5" />
+                  Audio
+                </Button>
+                <Button
+                  onClick={() => handleOpenMeditationCreator('video')}
+                  disabled={isBusy}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full h-8 md:h-9 whitespace-nowrap px-3 text-xs md:text-sm"
+                >
+                  <Video className="w-3 md:w-3.5 h-3 md:h-3.5 mr-1 md:mr-1.5" />
+                  Video
                 </Button>
               </div>
             )}
@@ -1327,6 +1345,7 @@ const Chat = () => {
           conversationDetail?.content_generations?.filter(cg => cg.status === 'complete') || []
         }
         initialContent={selectedMedia}
+        initialMode={meditationInitialMode}
         onGenerate={handleGenerateMeditation}
       />
     </div>

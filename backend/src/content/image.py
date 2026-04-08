@@ -329,14 +329,14 @@ async def _get_quote_from_citations_or_random(
         f"""
     You are given passages from Sri Ramana Maharshi's authenticated teachings.
     Your task is to select and return the single most profound or meaningful sentence
-    (or at most two short sentences) from the provided text below.
+    (or at most two short sentences) directly from the provided text below.
 
     Rules:
     - You MUST quote or very closely paraphrase the actual text provided. Do NOT invent.
     - Do NOT draw on any knowledge outside the provided passages.
     - Choose the sentence that best stands alone as a contemplative insight.
-    - End your response with a source attribution in the form: — [source filename without extension]
-    - Return only the chosen sentence(s) plus the attribution. Nothing else.
+    - Return ONLY the chosen sentence(s). No attribution, no filename, no source label,
+      no preamble, no explanation. Just the quote itself.
 
     Source passages:
     {source_text}
@@ -344,7 +344,17 @@ async def _get_quote_from_citations_or_random(
     )
 
     quote_response = await model.chat_async(quote_prompt)
-    return quote_response.strip()
+    quote = quote_response.strip()
+
+    # Safety: strip any trailing attribution line (e.g. "— Talks with Sri Ramana Maharshi"
+    # or "Source: ..." or "From ...") that the LLM may append despite instructions.
+    import re
+    quote = re.sub(r'\n?\s*[—–-]+\s*\S.*$', '', quote, flags=re.MULTILINE).strip()
+    quote = re.sub(r'\n?\s*(Source|From|Ref|Reference)\s*:.*$', '', quote, flags=re.IGNORECASE | re.MULTILINE).strip()
+    # Strip leading "From filename:" if the LLM echoed a chunk prefix
+    quote = re.sub(r'^From [^:]+:\s*', '', quote, flags=re.IGNORECASE).strip()
+
+    return quote
 
 
 async def _get_random_chunks_text(session: AsyncSession) -> str:
@@ -497,8 +507,8 @@ async def _generate_image(prompt: str) -> Image.Image:
 def add_caption_to_image(
     image: Image.Image,
     caption_text: str,
-    font_size=136,
-    padding=48,
+    font_size=102,
+    padding=40,
     max_width_ratio=0.88,
 ):
     """
