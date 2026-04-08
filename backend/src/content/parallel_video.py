@@ -157,11 +157,12 @@ class ParallelVideoGenerator:
         # Step 4: Create video
         async with profile_operation("video_creation") as op:
             if len(library_images) >= 1:
-                # Ken Burns slideshow: generate audio then build slideshow
+                # LIGHT pipeline: single library image, no zoompan, no xfade.
+                # Designed to encode in <60s on 0.5 CPU Render Starter.
                 audio_bytes = await self._generate_audio_optimized(transcript)
                 quote = self._extract_quote_from_transcript(transcript)
-                video_path = await self._create_ken_burns_video_with_quote(
-                    library_images, audio_bytes, quote
+                video_path = await self._create_light_single_image_video(
+                    library_images[0], audio_bytes, quote
                 )
             else:
                 # Fallback: original single DALL-E image pipeline
@@ -179,7 +180,7 @@ class ParallelVideoGenerator:
         return content_path, transcript
 
     async def _get_multiple_library_images(
-        self, session: AsyncSession, target_count: int = 6
+        self, session: AsyncSession, target_count: int = 1
     ) -> list:
         """Fetch multiple random active images from the Ramana library.
 
@@ -468,6 +469,140 @@ class ParallelVideoGenerator:
                 raise Exception(f"FFmpeg Ken Burns failed (rc={result.returncode}): {error_tail}")
 
             tu.logger.info(f"Ken Burns video created: {output_path}")
+            return output_path
+
+        finally:
+            for f in temp_files:
+                try:
+                    if os.path.exists(f):
+                        os.unlink(f)
+                except Exception:
+                    pass
+
+    async def _create_light_single_image_video(
+        self,
+        image: Image.Image,
+        audio_bytes: bytes,
+        quote: str,
+    ) -> str:
+        """Lightweight video pipeline tuned for 0.5-CPU servers.
+
+        Single static library image + audio + animated quote drawtext overlay.
+        NO zoompan, NO xfade chain — these are the most expensive FFmpeg
+        filters and routinely hang or take >10 min on Render Starter.
+
+        Output: 854x480, 15 fps, x264 ultrafast, ~30-60 s encode for a 3-min audio.
+        """
+        WIDTH, HEIGHT = 854, 480
+        FPS = 15
+        QUOTE_SHOW_DUR = 15  # seconds the quote stays on screen
+
+        temp_files: list[str] = []
+        try:
+            # 1. Save audio to temp mp3
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as af:
+                af.write(audio_bytes)
+                audio_path = af.name
+            temp_files.append(audio_path)
+
+            # 2. Probe audio duration so we can size the quote fade window
+            try:
+                probe_cmd = [
+                    "ffprobe", "-v", "quiet",
+                    "-print_format", "json",
+                    "-show_format",
+                    audio_path,
+                ]
+                probe_result = subprocess.run(
+                    probe_cmd, capture_output=True, text=True, timeout=20
+                )
+                probe_data = json.loads(probe_result.stdout)
+                audio_duration = float(probe_data["format"]["duration"])
+            except Exception as e:
+                tu.logger.warning(f"ffprobe failed, defaulting audio_duration=180: {e}")
+                audio_duration = 180.0
+
+            tu.logger.info(
+                f"Light video: audio={audio_duration:.1f}s, target {WIDTH}x{HEIGHT}@{FPS}fps"
+            )
+
+            # 3. Resize image once via PIL (much cheaper than ffmpeg scale filter)
+            img_resized = self._resize_cover(image, WIDTH, HEIGHT)
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as imf:
+                img_resized.save(imf.name, "JPEG", quality=85, optimize=True)
+                image_path = imf.name
+            temp_files.append(image_path)
+
+            # 4. Save quote text to a file (avoids FFmpeg escape hell)
+            with tempfile.NamedTemporaryFile(
+                suffix=".txt", delete=False, mode="w", encoding="utf-8"
+            ) as tf:
+                tf.write(quote or "")
+                quote_textfile = tf.name
+            temp_files.append(quote_textfile)
+
+            font_path = self._find_drawtext_font()
+
+            # 5. Build a tiny filtergraph: format yuv420p + drawtext overlay
+            quote_end = min(float(QUOTE_SHOW_DUR), max(audio_duration - 2.0, 5.0))
+            fade_in_end = 1.0
+            fade_out_start = max(quote_end - 1.0, fade_in_end + 1.0)
+            alpha_expr = (
+                f"if(lt(t,{fade_in_end}),t,"
+                f"if(lt(t,{fade_out_start:.1f}),1,"
+                f"if(lt(t,{quote_end:.1f}),{quote_end:.1f}-t,0)))"
+            )
+
+            dt_parts = [f"drawtext=textfile={quote_textfile}"]
+            if font_path:
+                dt_parts.append(f"fontfile={font_path}")
+            dt_parts += [
+                "fontsize=32",
+                "fontcolor=white",
+                "shadowcolor=black@0.85",
+                "shadowx=2",
+                "shadowy=2",
+                "line_spacing=10",
+                "x=(w-text_w)/2",
+                "y=h*0.78",
+                f"alpha={alpha_expr}",
+                "fix_bounds=1",
+            ]
+            drawtext_filter = ":".join(dt_parts)
+            vf = f"format=yuv420p,{drawtext_filter}"
+
+            output_path = tempfile.mktemp(suffix=".mp4")
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-loop", "1",
+                "-framerate", str(FPS),
+                "-i", image_path,
+                "-i", audio_path,
+                "-vf", vf,
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-tune", "stillimage",
+                "-crf", "28",
+                "-c:a", "aac",
+                "-b:a", "96k",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                "-shortest",
+                "-r", str(FPS),
+                "-threads", "0",
+                output_path,
+            ]
+
+            tu.logger.info(f"Light FFmpeg cmd: {' '.join(cmd)}")
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=300
+            )
+            if result.returncode != 0:
+                error_tail = result.stderr[-3000:] if result.stderr else "(no stderr)"
+                raise Exception(f"FFmpeg light pipeline failed (rc={result.returncode}): {error_tail}")
+
+            tu.logger.info(f"Light video created: {output_path}")
             return output_path
 
         finally:
