@@ -1898,31 +1898,31 @@ async def create_razorpay_checkout(
     if not is_razorpay_enabled():
         raise HTTPException(status_code=503, detail="Razorpay is not configured on this server.")
 
-    # Load plan
-    plan_result = await session.execute(select(Plan).where(Plan.id == plan_id))
-    plan = plan_result.scalar_one_or_none()
-    if not plan:
-        raise HTTPException(status_code=404, detail="Plan not found")
-    if not plan.razorpay_plan_id:
-        raise HTTPException(
-            status_code=400,
-            detail="This plan does not have a Razorpay plan configured. Please contact support."
-        )
-
-    # Load user
-    user_result = await session.execute(
-        select(UserProfile).where(UserProfile.id == user_id)
-    )
-    user = user_result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if not user.email_id:
-        raise HTTPException(status_code=400, detail="User email not found")
-
-    settings = get_settings()
-    success_url = redirect_url or f"{settings.frontend_url}/subscription?upgrade=success"
-
     try:
+        # Load plan — inside try so any DB error returns 400 with real message instead of 500
+        plan_result = await session.execute(select(Plan).where(Plan.id == plan_id))
+        plan = plan_result.scalar_one_or_none()
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        if not plan.razorpay_plan_id:
+            raise HTTPException(
+                status_code=400,
+                detail="This plan does not have a Razorpay plan configured. Please contact support."
+            )
+
+        # Load user
+        user_result = await session.execute(
+            select(UserProfile).where(UserProfile.id == user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not user.email_id:
+            raise HTTPException(status_code=400, detail="User email not found")
+
+        settings = get_settings()
+        success_url = redirect_url or f"{settings.frontend_url}/subscription?upgrade=success"
+
         result = await run_in_threadpool(
             create_razorpay_subscription,
             plan.razorpay_plan_id,
@@ -1936,6 +1936,8 @@ async def create_razorpay_checkout(
             message="Razorpay checkout created",
             data={"checkout_url": result["short_url"]}
         )
+    except HTTPException:
+        raise  # re-raise 404/400/503 as-is without wrapping
     except Exception as e:
         logger.error(f"Razorpay checkout error: {e}")
         traceback.print_exc()
