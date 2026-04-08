@@ -6,8 +6,15 @@ Add new migrations as new async functions and call them from run_migrations().
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from tuneapi import tu
 
 from src.db import Plan, PlanType, BillingCycle
+
+
+def _log(msg: str) -> None:
+    """Log via tu.logger so output is guaranteed to appear in Render logs.
+    Plain print() can be lost to stdout buffering even with PYTHONUNBUFFERED."""
+    tu.logger.info(f"[MIGRATION] {msg}")
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +59,7 @@ async def _set_free_plan_limits(session: AsyncSession) -> None:
     free_plans = result.scalars().all()
 
     if not free_plans:
-        print("[MIGRATION] No FREE plan found — skipping.")
+        _log("No FREE plan found — skipping.")
         return
 
     for plan in free_plans:
@@ -69,7 +76,7 @@ async def _set_free_plan_limits(session: AsyncSession) -> None:
             current = getattr(plan, attr)
             # Compare as strings for chat_limit (stored as string in DB)
             if str(current) != str(target):
-                print(f"[MIGRATION] FREE {attr}: {current!r} → {target!r}")
+                _log(f"FREE {attr}: {current!r} → {target!r}")
                 setattr(plan, attr, target)
                 changed = True
 
@@ -77,7 +84,7 @@ async def _set_free_plan_limits(session: AsyncSession) -> None:
             session.add(plan)
 
     await session.commit()
-    print("[MIGRATION] Free (Explore) plan verified/updated.")
+    _log("Free (Explore) plan verified/updated.")
 
 
 async def _update_paid_plan_limits(session: AsyncSession) -> None:
@@ -134,7 +141,7 @@ async def _update_paid_plan_limits(session: AsyncSession) -> None:
 
         for attr, target in targets.items():
             if str(getattr(plan, attr)) != str(target):
-                print(f"[MIGRATION] {plan.plan_type}/{plan.billing_cycle} {attr}: {getattr(plan, attr)!r} → {target!r}")
+                _log(f"{plan.plan_type}/{plan.billing_cycle} {attr}: {getattr(plan, attr)!r} → {target!r}")
                 setattr(plan, attr, target)
                 changed = True
 
@@ -142,7 +149,7 @@ async def _update_paid_plan_limits(session: AsyncSession) -> None:
             session.add(plan)
 
     await session.commit()
-    print("[MIGRATION] Paid plan limits (Seeker/Devotee) verified/updated.")
+    _log("Paid plan limits (Seeker/Devotee) verified/updated.")
 
 
 async def _update_polar_plan_prices(session: AsyncSession) -> None:
@@ -174,7 +181,7 @@ async def _update_polar_plan_prices(session: AsyncSession) -> None:
         if key not in POLAR_TARGETS:
             continue
         if not plan.polar_plan_id or plan.polar_plan_id.startswith("prod_"):
-            print(f"[MIGRATION] Skipping Polar update for {plan.name} — no real polar_plan_id")
+            _log(f"Skipping Polar update for {plan.name} — no real polar_plan_id")
             continue
 
         price_cents, interval, new_name, description = POLAR_TARGETS[key]
@@ -189,9 +196,9 @@ async def _update_polar_plan_prices(session: AsyncSession) -> None:
                 billing_cycle=plan.billing_cycle,
                 prices=prices,
             )
-            print(f"[MIGRATION] Polar updated: {new_name} → ${price_cents/100:.2f}")
+            _log(f"Polar updated: {new_name} → ${price_cents/100:.2f}")
         except Exception as e:
-            print(f"[MIGRATION] Polar update FAILED for {plan.name}: {e}")
+            _log(f"Polar update FAILED for {plan.name}: {e}")
 
 
 async def _add_onboarding_seen_column(session: AsyncSession) -> None:
@@ -204,7 +211,7 @@ async def _add_onboarding_seen_column(session: AsyncSession) -> None:
         "ADD COLUMN IF NOT EXISTS onboarding_seen BOOLEAN NOT NULL DEFAULT FALSE"
     ))
     await session.commit()
-    print("[MIGRATION] onboarding_seen column verified/added.")
+    _log("onboarding_seen column verified/added.")
 
 
 async def _create_ramana_images_table(session: AsyncSession) -> None:
@@ -223,7 +230,7 @@ async def _create_ramana_images_table(session: AsyncSession) -> None:
         )
     """))
     await session.commit()
-    print("[MIGRATION] ramana_images table verified/created.")
+    _log("ramana_images table verified/created.")
 
 
 async def _add_razorpay_columns(session: AsyncSession) -> None:
@@ -236,7 +243,7 @@ async def _add_razorpay_columns(session: AsyncSession) -> None:
         "ADD COLUMN IF NOT EXISTS razorpay_plan_id VARCHAR UNIQUE"
     ))
     await session.commit()
-    print("[MIGRATION] razorpay_plan_id column verified/added to plans.")
+    _log("razorpay_plan_id column verified/added to plans.")
 
 
 async def _create_razorpay_plans(session: AsyncSession) -> None:
@@ -258,7 +265,7 @@ async def _create_razorpay_plans(session: AsyncSession) -> None:
 
     settings = get_settings()
     if not is_razorpay_enabled():
-        print("[MIGRATION] Razorpay not configured — skipping plan creation.")
+        _log("Razorpay not configured — skipping plan creation.")
         return
 
     result = await session.execute(select(Plan))
@@ -268,7 +275,7 @@ async def _create_razorpay_plans(session: AsyncSession) -> None:
         if plan.plan_type == PlanType.FREE:
             continue
         if plan.razorpay_plan_id:
-            print(f"[MIGRATION] Razorpay plan already exists for {plan.name}: {plan.razorpay_plan_id}")
+            _log(f"Razorpay plan already exists for {plan.name}: {plan.razorpay_plan_id}")
             continue
 
         try:
@@ -277,12 +284,12 @@ async def _create_razorpay_plans(session: AsyncSession) -> None:
             )
             plan.razorpay_plan_id = rzp_plan_id
             session.add(plan)
-            print(f"[MIGRATION] Razorpay plan created for {plan.name} → {rzp_plan_id}")
+            _log(f"Razorpay plan created for {plan.name} → {rzp_plan_id}")
         except Exception as e:
-            print(f"[MIGRATION] Razorpay plan creation FAILED for {plan.name}: {e}")
+            _log(f"Razorpay plan creation FAILED for {plan.name}: {e}")
 
     await session.commit()
-    print("[MIGRATION] Razorpay plans verified/created.")
+    _log("Razorpay plans verified/created.")
 
 
 async def _force_plan_limits_raw_sql(session: AsyncSession) -> None:
@@ -371,14 +378,14 @@ async def _force_plan_limits_raw_sql(session: AsyncSession) -> None:
          ORDER BY plan_type, billing_cycle
     """))
     rows = result.fetchall()
-    print("[MIGRATION] === PLAN LIMITS AFTER FORCEFUL UPDATE ===")
+    _log("=== PLAN LIMITS AFTER FORCEFUL UPDATE ===")
     for r in rows:
-        print(
-            f"[MIGRATION]   id={r.id} {r.plan_type}/{r.billing_cycle} "
+        _log(
+            f"  id={r.id} {r.plan_type}/{r.billing_cycle} "
             f"name={r.name!r} chats={r.chat_limit!r} cards={r.card_limit} "
             f"med={r.max_meditation_duration} audio={r.is_audio} video={r.is_video}"
         )
-    print("[MIGRATION] === END PLAN LIMITS ===")
+    _log("=== END PLAN LIMITS ===")
 
 
 async def _safe_migration(session: AsyncSession, name: str, func) -> None:
@@ -390,11 +397,11 @@ async def _safe_migration(session: AsyncSession, name: str, func) -> None:
     try:
         await func(session)
     except Exception as e:
-        print(f"[MIGRATION] ERROR in {name}: {e}")
+        _log(f"ERROR in {name}: {e}")
         try:
             await session.rollback()
         except Exception as re:
-            print(f"[MIGRATION] Rollback also failed for {name}: {re}")
+            _log(f"Rollback also failed for {name}: {re}")
 
 
 async def run_migrations(session_factory) -> None:
@@ -407,6 +414,12 @@ async def run_migrations(session_factory) -> None:
     SQLAlchemy models reference the new columns and the SELECT will fail
     if the column does not yet exist in the DB.
     """
+    # Unmissable entry-point marker. If this line does NOT appear in
+    # Render logs at startup, run_migrations is not being called at all
+    # (wrong branch deployed, or lifespan not wired up).
+    _log("############################################################")
+    _log("##  run_migrations() ENTRY POINT REACHED                  ##")
+    _log("############################################################")
     async with session_factory() as session:
         # ── Schema migrations first (ALTER / CREATE) ────────────────────────
         await _safe_migration(session, "_add_onboarding_seen_column", _add_onboarding_seen_column)
