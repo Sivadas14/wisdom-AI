@@ -180,7 +180,7 @@ const Register: React.FC = () => {
             <CardDescription>
               {step === 'form'
                 ? ''
-                : <>We have sent a 8-digit verification code to ${email}</>
+                : <>We have sent a 8-digit verification code to {email}</>
               }
             </CardDescription>
           </CardHeader>
