@@ -22,7 +22,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { INR_PRICES, isIndianUser } from './plansData';
+import { INR_PRICES, isIndianUser, setCurrencyOverride } from './plansData';
 
 interface UsageData {
     plan_name: string;
@@ -827,6 +827,25 @@ export const SubscriptionScreen: React.FC = () => {
                                     🇮🇳 Prices shown in INR — 20% India discount applied
                                 </div>
                             )}
+
+                            {/* Manual currency toggle — works for everyone */}
+                            <div className="mt-3 inline-flex items-center gap-3 text-xs text-[#472b20]/60">
+                                <span>Pay in:</span>
+                                <button
+                                    type="button"
+                                    onClick={() => { setCurrencyOverride('USD'); window.location.reload(); }}
+                                    className={`px-3 py-1 rounded-full border ${!indiaUser ? 'bg-[#472b20] text-white border-[#472b20]' : 'bg-white text-[#472b20] border-[#ECE5DF] hover:border-[#472b20]/40'}`}
+                                >
+                                    USD ($)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setCurrencyOverride('INR'); window.location.reload(); }}
+                                    className={`px-3 py-1 rounded-full border ${indiaUser ? 'bg-[#472b20] text-white border-[#472b20]' : 'bg-white text-[#472b20] border-[#ECE5DF] hover:border-[#472b20]/40'}`}
+                                >
+                                    INR (₹)
+                                </button>
+                            </div>
                         </div>
 
                         {/* Billing Toggle (Pill) */}

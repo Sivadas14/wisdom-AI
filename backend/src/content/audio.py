@@ -205,18 +205,28 @@ async def generate_audio_from_transcript_optimized(transcript: str) -> bytes:
         chunks.append(text[:split_idx].strip())
         text = text[split_idx:].strip()
 
-    tu.logger.info(f"Generating {len(chunks)} audio chunk(s) for meditation...")
-    audio_chunks = []
-    for i, chunk in enumerate(chunks):
-        if not chunk:
-            continue
-        audio_chunk = await model.text_to_speech_async(
-            prompt=chunk,
+    # Filter out empty chunks
+    chunks = [c for c in chunks if c]
+    tu.logger.info(f"Generating {len(chunks)} audio chunk(s) for meditation IN PARALLEL...")
+
+    import time as _time
+    _t0 = _time.time()
+
+    async def _gen_one(chunk_text: str) -> bytes:
+        return await model.text_to_speech_async(
+            prompt=chunk_text,
             voice="alloy",
             model="gpt-4o-mini-tts",
             instructions="Speak in a calm, neutral voice with natural pacing. Maintain consistent tone.",
         )
-        audio_chunks.append(audio_chunk)
+
+    # Run all TTS calls in parallel — this is the biggest single speedup
+    # for multi-chunk meditations (was sequential, blocking the for loop).
+    audio_chunks = await asyncio.gather(*[_gen_one(c) for c in chunks])
+
+    tu.logger.info(
+        f"TTS parallel generation done: {len(audio_chunks)} chunks in {_time.time() - _t0:.1f}s"
+    )
 
     return await _concatenate_audio_chunks(audio_chunks)
 

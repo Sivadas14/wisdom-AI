@@ -36,11 +36,63 @@ export const INR_PRICES: Record<string, { price: number; display: string; perMon
   "Devotee (Yearly)-YEARLY":{ price: 5399, display: "₹5,399", perMonth: "₹450/mo" },
 };
 
-/** Returns true when the user's phone/country indicates India. */
+/**
+ * Detect if the user is in India.
+ *
+ * Order of signals (most reliable first):
+ *   1. Manual override stored in localStorage ("currency_override" = "INR" | "USD")
+ *   2. Phone number / country code on the user profile (if ever collected)
+ *   3. Browser timezone — Asia/Kolkata or Asia/Calcutta is a strong India signal
+ *   4. Browser locale — en-IN, hi-*, ta-*, te-*, kn-*, ml-*, bn-*, gu-*, mr-*, pa-*
+ *
+ * Returns false otherwise (defaults to USD).
+ */
 export function isIndianUser(countryCode?: string | null, phoneNumber?: string | null): boolean {
+  // 1. Manual override always wins
+  try {
+    const override = typeof window !== "undefined" ? window.localStorage.getItem("currency_override") : null;
+    if (override === "INR") return true;
+    if (override === "USD") return false;
+  } catch {
+    /* localStorage may be blocked */
+  }
+
+  // 2. Profile phone / country
   if (countryCode === "+91") return true;
   if (phoneNumber && phoneNumber.startsWith("+91")) return true;
+
+  // 3. Timezone — most reliable browser signal
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    if (tz === "Asia/Kolkata" || tz === "Asia/Calcutta") return true;
+  } catch {
+    /* Intl may not be available */
+  }
+
+  // 4. Locale — covers Indian English + major Indian languages
+  try {
+    const locale = (typeof navigator !== "undefined" && navigator.language) || "";
+    if (locale === "en-IN") return true;
+    const lang = locale.split("-")[0].toLowerCase();
+    if (["hi", "ta", "te", "kn", "ml", "bn", "gu", "mr", "pa", "or", "as"].includes(lang)) return true;
+  } catch {
+    /* navigator may not be available */
+  }
+
   return false;
+}
+
+/** Manual currency override — call from a UI toggle. Pass null to clear. */
+export function setCurrencyOverride(currency: "INR" | "USD" | null): void {
+  try {
+    if (currency === null) {
+      window.localStorage.removeItem("currency_override");
+    } else {
+      window.localStorage.setItem("currency_override", currency);
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 export const SUBSCRIPTION_PLANS: LocalPlan[] = [

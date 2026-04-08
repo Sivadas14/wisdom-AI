@@ -494,9 +494,11 @@ class ParallelVideoGenerator:
         Output: 854x480, 15 fps, x264 ultrafast, ~30-60 s encode for a 3-min audio.
         """
         WIDTH, HEIGHT = 854, 480
-        FPS = 15
+        FPS = 10  # static image — even 1 fps would play fine, 10 is safe for all players
         QUOTE_SHOW_DUR = 15  # seconds the quote stays on screen
 
+        import time as _time
+        _t_start = _time.time()
         temp_files: list[str] = []
         try:
             # 1. Save audio to temp mp3
@@ -595,14 +597,20 @@ class ParallelVideoGenerator:
             ]
 
             tu.logger.info(f"Light FFmpeg cmd: {' '.join(cmd)}")
+            _t_ffmpeg = _time.time()
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=300
             )
+            ffmpeg_secs = _time.time() - _t_ffmpeg
             if result.returncode != 0:
                 error_tail = result.stderr[-3000:] if result.stderr else "(no stderr)"
                 raise Exception(f"FFmpeg light pipeline failed (rc={result.returncode}): {error_tail}")
 
-            tu.logger.info(f"Light video created: {output_path}")
+            total_secs = _time.time() - _t_start
+            tu.logger.info(
+                f"Light video created in {total_secs:.1f}s "
+                f"(ffmpeg={ffmpeg_secs:.1f}s) -> {output_path}"
+            )
             return output_path
 
         finally:
