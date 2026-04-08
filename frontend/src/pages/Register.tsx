@@ -110,8 +110,8 @@ const Register: React.FC = () => {
       return;
     }
 
-    if (otp.length !== 8) {
-      setError("Please enter a 8-digit verification code");
+    if (otp.length !== 6) {
+      setError("Please enter the 6-digit verification code from your email");
       return;
     }
 
@@ -180,7 +180,7 @@ const Register: React.FC = () => {
             <CardDescription>
               {step === 'form'
                 ? ''
-                : <>We have sent a 8-digit verification code to {email}</>
+                : <>We have sent a 6-digit verification code to {email}</>
               }
             </CardDescription>
           </CardHeader>
@@ -377,11 +377,11 @@ const Register: React.FC = () => {
                     id="otp"
                     type="text"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="Enter 6-digit code"
                     className="text-center tracking-widest text-lg font-mono h-12 text-base"
                     disabled={isLoading}
-                    maxLength={8}
+                    maxLength={6}
                     required
                   />
                   {/* <p className="text-xs text-gray-500 text-center">
@@ -429,7 +429,7 @@ const Register: React.FC = () => {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isLoading || otp.length !== 8}
+                    disabled={isLoading || otp.length !== 6}
                     className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
                   >
                     {isLoading ? "Verifying..." : "Verify Email"}

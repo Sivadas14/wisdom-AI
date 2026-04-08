@@ -356,11 +356,11 @@ const SignIn: React.FC = () => {
                         id="otp"
                         type="text"
                         value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="Enter 6-digit code"
                         className="mt-1 text-center tracking-widest text-lg font-mono"
                         disabled={isLoading}
-                        maxLength={8}
+                        maxLength={6}
                         required
                       />
                     </div>
@@ -392,7 +392,7 @@ const SignIn: React.FC = () => {
                       </Button>
                       <Button
                         type="submit"
-                        disabled={isLoading || otp.length !== 8}
+                        disabled={isLoading || otp.length !== 6}
                         className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
                       >
                         {isLoading ? "Verifying..." : "Verify & Sign In"}
