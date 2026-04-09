@@ -12,9 +12,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        // flowType: 'pkce' was here — REMOVED.
-        // With PKCE, signInWithOtp() sends a magic link (URL to click), not a
-        // 6-digit code. The default 'implicit' flow sends the actual 6-digit
-        // OTP code that the sign-in and register forms expect.
+        flowType: 'pkce' // Use PKCE flow for better security
     }
 });

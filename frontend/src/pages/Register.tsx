@@ -9,7 +9,7 @@ import { Mail, Smartphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Register: React.FC = () => {
-  const { register, signInWithGoogle, signInWithOtp, verifyOtp, resendOtp } = useAuth();
+  const { register, signInWithGoogle, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<'form' | 'otp'>('form');
@@ -80,17 +80,10 @@ const Register: React.FC = () => {
 
       if (response.success) {
         if (response.requiresEmailConfirmation) {
-          // Account created. signUp() sends a magic link, NOT a 6-digit code.
-          // We immediately call signInWithOtp() to send a proper 6-digit OTP
-          // so the user can verify with the code input shown below.
+          // Email confirmation required - show OTP step
           setPendingUser(response.user);
-          const otpResponse = await signInWithOtp(email);
-          if (!otpResponse.success) {
-            setError(otpResponse.message || "Account created but could not send verification code. Please use Sign In → OTP to verify.");
-            return;
-          }
           setStep('otp');
-          setSuccess("Account created! Please check your email for a 6-digit verification code.");
+          setSuccess("Registration successful! Please check your email for the verification code. Your profile has been created.");
         } else {
           // No email confirmation required - redirect to home
           setSuccess("Registration successful! Redirecting...");
@@ -117,8 +110,8 @@ const Register: React.FC = () => {
       return;
     }
 
-    if (otp.length !== 6) {
-      setError("Please enter the 6-digit verification code from your email");
+    if (otp.length !== 8) {
+      setError("Please enter a 8-digit verification code");
       return;
     }
 
@@ -187,7 +180,7 @@ const Register: React.FC = () => {
             <CardDescription>
               {step === 'form'
                 ? ''
-                : <>We have sent a 6-digit verification code to {email}</>
+                : <>We have sent a 8-digit verification code to ${email}</>
               }
             </CardDescription>
           </CardHeader>
@@ -384,11 +377,11 @@ const Register: React.FC = () => {
                     id="otp"
                     type="text"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
                     placeholder="Enter 6-digit code"
                     className="text-center tracking-widest text-lg font-mono h-12 text-base"
                     disabled={isLoading}
-                    maxLength={6}
+                    maxLength={8}
                     required
                   />
                   {/* <p className="text-xs text-gray-500 text-center">
@@ -436,7 +429,7 @@ const Register: React.FC = () => {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isLoading || otp.length !== 6}
+                    disabled={isLoading || otp.length !== 8}
                     className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
                   >
                     {isLoading ? "Verifying..." : "Verify Email"}
