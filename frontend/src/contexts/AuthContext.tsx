@@ -141,13 +141,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('❌ [AuthContext] No response when fetching profile');
         return null;
       }
+      if (response.status === 404) {
+        // Backend explicitly says the profile doesn't exist yet
+        console.log('🔵 [AuthContext] Profile not found (404)');
+        return null;
+      }
       if (response.ok) {
         const profileData = await response.json();
         console.log('✅ [AuthContext] Profile fetched successfully:', profileData);
 
-        // Check if the response actually contains an error or is missing critical data
+        // Defensive: old backend used to return 200 with an error body
         if (profileData.error || !profileData.id) {
-          console.log('🔵 [AuthContext] Profile not found in response (returned 200 with error)');
+          console.log('🔵 [AuthContext] Profile not found in response');
           return null;
         }
 
@@ -727,25 +732,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
-        console.log('✅ [AuthContext] Registration successful:', data.user.email);
-
-        // ALWAYS create profile, even if email confirmation is required
-        console.log('🔵 [AuthContext] Creating profile for user...');
-        const profileResult = await createUserProfileWithoutSession(data.user);
-        console.log('🔵 [AuthContext] Profile creation result:', profileResult);
+        console.log('✅ [AuthContext] Supabase signUp successful:', data.user.email);
 
         if (data.session) {
-          // User is automatically signed in (email confirmation not required)
-          console.log('🔵 [AuthContext] User auto-signed in');
-
-          // Store tokens immediately
+          // User auto-signed in (email confirmation disabled in Supabase dashboard).
+          // We have a valid session — create the profile with auth now.
+          console.log('🔵 [AuthContext] User auto-signed in, creating profile with session');
           storeSessionTokens(data.session);
-
-          // Ensure profile is fetched/created
           const profile = await ensureUserProfile(data.user, data.session);
-
           setUser(data.user);
-          //   setLoading(false);
 
           return {
             success: true,
@@ -756,13 +751,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             userProfile: profile
           };
         } else {
-          // Email confirmation required
-          console.log('🔵 [AuthContext] Email confirmation required - profile created anyway');
-          //   setLoading(false);
+          // Email confirmation required. Do NOT create the profile yet —
+          // we have no valid session. The profile is created after OTP
+          // verification in verifyOtp() -> ensureUserProfile(), which is
+          // the single source of truth and has a real session token.
+          console.log('🔵 [AuthContext] Email confirmation required - profile will be created after OTP verify');
 
           return {
             success: true,
-            message: 'Registration successful! Please check your email to confirm your account. Your profile has been created.',
+            message: 'Account created! Please check your email for a verification code.',
             user: data.user,
             requiresEmailConfirmation: true
           };
