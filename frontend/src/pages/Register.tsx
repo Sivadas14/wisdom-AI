@@ -8,6 +8,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mail, Smartphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
+// ---- Validation helpers (shared across auth screens if we need them later) ----
+
+// RFC 5322-lite: reasonable email pattern that catches obvious junk
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+// Password policy: at least 8 chars, one uppercase, one lowercase, one number
+const validatePassword = (password: string): { valid: boolean; message?: string } => {
+  if (password.length < 8) return { valid: false, message: "Password must be at least 8 characters long" };
+  if (!/[A-Z]/.test(password)) return { valid: false, message: "Password must contain at least one uppercase letter" };
+  if (!/[a-z]/.test(password)) return { valid: false, message: "Password must contain at least one lowercase letter" };
+  if (!/[0-9]/.test(password)) return { valid: false, message: "Password must contain at least one number" };
+  return { valid: true };
+};
+
+// Simple strength indicator for UI feedback
+const getPasswordStrength = (password: string): { label: string; color: string; pct: number } => {
+  if (password.length === 0) return { label: '', color: 'bg-gray-200', pct: 0 };
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+  if (score <= 2) return { label: 'Weak', color: 'bg-red-500', pct: 33 };
+  if (score <= 3) return { label: 'Medium', color: 'bg-yellow-500', pct: 66 };
+  return { label: 'Strong', color: 'bg-green-500', pct: 100 };
+};
+
 const Register: React.FC = () => {
   const { register, signInWithGoogle, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
@@ -22,43 +50,61 @@ const Register: React.FC = () => {
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
   const [pendingUser, setPendingUser] = useState<any>(null);
+
+  const passwordStrength = getPasswordStrength(password);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setErrorCode(null);
     setSuccess("");
 
-    // Validation
-    if (!name.trim()) {
+    // Trim inputs once, up front
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phone.replace(/\D/g, '').trim(); // digits only
+
+    // Name validation
+    if (!cleanName) {
       setError("Please enter your name");
       return;
     }
-
-    if (!email.trim()) {
-      setError("Please enter your email");
+    if (cleanName.length < 2) {
+      setError("Name must be at least 2 characters");
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    // Email validation
+    if (!cleanEmail) {
+      setError("Please enter your email");
+      return;
+    }
+    if (!EMAIL_REGEX.test(cleanEmail)) {
       setError("Please enter a valid email address");
       return;
     }
 
-    if (!phone.trim()) {
+    // Phone validation
+    if (!cleanPhone) {
       setError("Please enter your phone number");
       return;
     }
+    if (cleanPhone.length < 7 || cleanPhone.length > 15) {
+      setError("Please enter a valid phone number (7-15 digits)");
+      return;
+    }
 
+    // Password validation - stricter policy
     if (!password) {
       setError("Please enter a password");
       return;
     }
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long");
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) {
+      setError(pwCheck.message || "Password does not meet requirements");
       return;
     }
 
@@ -71,9 +117,9 @@ const Register: React.FC = () => {
 
     try {
       const response = await register({
-        name,
-        email,
-        phone,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
         password,
         country_code: countryCode,
       });
@@ -81,23 +127,30 @@ const Register: React.FC = () => {
       if (response.success) {
         if (response.requiresEmailConfirmation) {
           // signUp() with PKCE flow already sends an 8-digit OTP to the user's email.
-          // Do NOT call signInWithOtp() here — that sends a second email to the same
-          // address within seconds and Supabase rate-limits the request, so the user
-          // receives nothing. Just show the OTP input; the verify call uses type 'signup'.
+          // Only advance to OTP step AFTER we've confirmed it's a genuine new signup.
           setPendingUser(response.user);
           setStep('otp');
           setSuccess("Account created! Please check your email for an 8-digit verification code.");
         } else {
-          // No email confirmation required - redirect to home
           setSuccess("Registration successful! Redirecting...");
           setTimeout(() => {
             navigate('/');
           }, 2000);
         }
       } else {
-        setError(response.message);
+        // Handle specific error codes returned from AuthContext
+        if (response.code === 'USER_ALREADY_EXISTS') {
+          setErrorCode('USER_ALREADY_EXISTS');
+          setError(response.message);
+        } else if (response.code === 'RATE_LIMITED') {
+          setErrorCode('RATE_LIMITED');
+          setError(response.message);
+        } else {
+          setError(response.message || 'Registration failed');
+        }
       }
     } catch (err: any) {
+      console.error('❌ [Register] Unexpected error:', err);
       setError(err.message || "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -269,11 +322,26 @@ const Register: React.FC = () => {
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter your password (min. 6 characters)"
+                        placeholder="At least 8 characters"
                         className="mt-1"
                         disabled={isLoading}
                         required
                       />
+                      {password.length > 0 && (
+                        <div className="mt-2">
+                          <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${passwordStrength.color}`}
+                              style={{ width: `${passwordStrength.pct}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">
+                            Strength: <span className="font-medium">{passwordStrength.label}</span>
+                            {' · '}
+                            Must include uppercase, lowercase, and a number
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -290,20 +358,32 @@ const Register: React.FC = () => {
                         disabled={isLoading}
                         required
                       />
+                      {confirmPassword.length > 0 && password !== confirmPassword && (
+                        <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
+                      )}
                     </div>
                   </div>
 
                   {error && (
                     <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                       <p className="text-red-600 text-sm">{error}</p>
-                      {error.includes("already exists") && (
-                        <p className="text-red-600 text-sm mt-1">
-                          <Link
-                            to="/signin"
-                            className="font-medium underline hover:text-red-700"
-                          >
-                            Click here to sign in instead
-                          </Link>
+                      {errorCode === 'USER_ALREADY_EXISTS' && (
+                        <div className="mt-2 space-y-1">
+                          <p className="text-red-700 text-sm">
+                            <Link to="/signin" className="font-medium underline hover:text-red-800">
+                              Sign in with your existing account
+                            </Link>
+                          </p>
+                          <p className="text-red-700 text-sm">
+                            <Link to="/forgot-password" className="font-medium underline hover:text-red-800">
+                              Forgot your password? Reset it here
+                            </Link>
+                          </p>
+                        </div>
+                      )}
+                      {errorCode === 'RATE_LIMITED' && (
+                        <p className="text-red-700 text-xs mt-2">
+                          Tip: try a different email address, or wait an hour for the rate limit to reset.
                         </p>
                       )}
                     </div>

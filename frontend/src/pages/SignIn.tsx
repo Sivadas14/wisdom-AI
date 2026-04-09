@@ -24,15 +24,20 @@ const SignIn: React.FC = () => {
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
+  const [resendingConfirmation, setResendingConfirmation] = useState(false);
 
   const handleEmailPasswordSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setErrorCode(null);
     setSuccess("");
 
-    if (!email.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
       setError("Please enter your email");
       return;
     }
@@ -45,7 +50,7 @@ const SignIn: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await signInWithEmailPassword(email, password);
+      const response = await signInWithEmailPassword(cleanEmail, password);
 
       if (response.success) {
         setSuccess("Sign in successful! Redirecting...");
@@ -64,10 +69,19 @@ const SignIn: React.FC = () => {
           navigate(targetPath, { replace: true });
         }, 500);
       } else {
-        // Detect unconfirmed email specifically so user knows what to do
+        // Use structured error code from AuthContext to show precise messages
+        const code = (response as any).code || '';
+        setErrorCode(code || null);
         const msg = response.message || '';
-        if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('not confirmed')) {
-          setError('Your email address is not yet verified. Please check your inbox for the 8-digit verification code, or use the OTP sign-in option to verify and log in.');
+
+        if (code === 'EMAIL_NOT_CONFIRMED') {
+          setError('Your email address is not yet verified. Please verify it using the code we can send below, or check your inbox for a previous code.');
+        } else if (code === 'INVALID_CREDENTIALS') {
+          setError('Incorrect email or password. If you forgot your password, use the "Forgot Password" link below.');
+        } else if (code === 'RATE_LIMITED') {
+          setError(msg || 'Too many sign-in attempts. Please wait a few minutes and try again.');
+        } else if (code === 'USER_NOT_FOUND') {
+          setError('No account found with this email. Please register first.');
         } else {
           setError(msg || 'Sign in failed. Please check your email and password.');
         }
@@ -76,6 +90,30 @@ const SignIn: React.FC = () => {
       setError(err.message || "Sign in failed. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setError("Please enter your email first.");
+      return;
+    }
+    setResendingConfirmation(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await signInWithOtp(cleanEmail);
+      if (response.success) {
+        setSuccess("Verification code sent. Please check your email (and spam folder).");
+        setErrorCode(null);
+      } else {
+        setError(response.message || "Failed to send verification code.");
+      }
+    } catch (err: any) {
+      setError(err.message || "Failed to send verification code.");
+    } finally {
+      setResendingConfirmation(false);
     }
   };
 
@@ -310,7 +348,30 @@ const SignIn: React.FC = () => {
                   />
                 </div>
 
-                {error && <p className="text-red-600 text-sm">{error}</p>}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <p className="text-red-700 text-sm">{error}</p>
+                    {errorCode === 'EMAIL_NOT_CONFIRMED' && (
+                      <button
+                        type="button"
+                        onClick={handleResendConfirmation}
+                        disabled={resendingConfirmation}
+                        className="mt-2 text-sm font-medium text-orange-700 hover:text-orange-900 underline disabled:opacity-50"
+                      >
+                        {resendingConfirmation ? "Sending..." : "Resend verification code"}
+                      </button>
+                    )}
+                    {errorCode === 'INVALID_CREDENTIALS' && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/forgot-password')}
+                        className="mt-2 text-sm font-medium text-orange-700 hover:text-orange-900 underline block"
+                      >
+                        Forgot your password?
+                      </button>
+                    )}
+                  </div>
+                )}
                 {success && <p className="text-green-600 text-sm">{success}</p>}
 
                 <Button

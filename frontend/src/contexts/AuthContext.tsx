@@ -501,22 +501,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // ✅ Email/Password Sign-In using Supabase
   const signInWithEmailPassword = async (email: string, password: string): Promise<any> => {
-    // setLoading(true); // Removed to prevent unmounting PublicRoute
-
     try {
-      console.log('🔵 [AuthContext] Signing in with email/password...');
+      const cleanEmail = email.trim().toLowerCase();
+      console.log('🔵 [AuthContext] Signing in with email/password:', cleanEmail);
 
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: cleanEmail,
         password,
       });
 
       if (error) {
-        console.error('❌ [AuthContext] Sign in error:', error);
-        // setLoading(false);
+        console.error('❌ [AuthContext] Sign in error:', {
+          name: error.name,
+          message: error.message,
+          status: (error as any).status,
+          full: error,
+        });
+
+        // Disambiguate common Supabase error messages into user-friendly codes
+        const msg = (error.message || '').toLowerCase();
+        let code = 'UNKNOWN';
+        let friendlyMsg = error.message;
+
+        if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+          code = 'INVALID_CREDENTIALS';
+          friendlyMsg = 'Email or password is incorrect. Please check and try again.';
+        } else if (msg.includes('email not confirmed') || msg.includes('not confirmed')) {
+          code = 'EMAIL_NOT_CONFIRMED';
+          friendlyMsg = 'Your email is not yet verified. Please check your inbox for the verification code.';
+        } else if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('for security purposes')) {
+          code = 'RATE_LIMITED';
+          friendlyMsg = 'Too many sign-in attempts. Please wait a few minutes and try again.';
+        } else if (msg.includes('user not found')) {
+          code = 'USER_NOT_FOUND';
+          friendlyMsg = 'No account found with this email. Please register first.';
+        }
+
         return {
           success: false,
-          message: error.message || 'Invalid email or password'
+          code,
+          message: friendlyMsg || 'Sign in failed. Please try again.'
         };
       }
 
@@ -559,21 +583,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // ✅ Send OTP using Supabase
   const signInWithOtp = async (email: string): Promise<any> => {
-    // setLoading(true); // Removed to prevent unmounting PublicRoute
-
     try {
-      console.log('🔵 [AuthContext] Sending OTP to:', email);
+      const cleanEmail = email.trim().toLowerCase();
+      console.log('🔵 [AuthContext] Sending OTP to:', cleanEmail);
 
       const { data, error } = await supabase.auth.signInWithOtp({
-        email,
+        email: cleanEmail,
         options: {
           shouldCreateUser: true,
         }
       });
 
       if (error) {
-        console.error('❌ [AuthContext] OTP send error:', error);
-        // setLoading(false);
+        console.error('❌ [AuthContext] OTP send error:', {
+          name: error.name,
+          message: error.message,
+          status: (error as any).status,
+          full: error,
+        });
+
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('rate limit') || msg.includes('too many') || msg.includes('for security purposes')) {
+          return {
+            success: false,
+            code: 'RATE_LIMITED',
+            message: 'Too many requests. Please wait a few minutes before requesting another code.'
+          };
+        }
 
         return {
           success: false,
@@ -705,29 +741,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     password: string;
     country_code?: string;
   }): Promise<any> => {
-    // setLoading(true); // Removed to prevent unmounting PublicRoute
-
     try {
-      console.log('🔵 [AuthContext] Registering new user:', userData.email);
+      // Normalize email - Supabase is case-sensitive in some paths
+      const cleanEmail = userData.email.trim().toLowerCase();
+      console.log('🔵 [AuthContext] Registering new user:', cleanEmail);
 
       const { data, error } = await supabase.auth.signUp({
-        email: userData.email,
+        email: cleanEmail,
         password: userData.password,
         options: {
           data: {
-            name: userData.name,
-            phone: userData.phone || null,
+            name: userData.name.trim(),
+            phone: userData.phone?.trim() || null,
             country_code: userData.country_code || null,
           }
         }
       });
 
+      // Full error logging for diagnosis
       if (error) {
-        console.error('❌ [AuthContext] Registration error:', error);
-        // setLoading(false);
+        console.error('❌ [AuthContext] Supabase signUp returned error:', {
+          name: error.name,
+          message: error.message,
+          status: (error as any).status,
+          full: error,
+        });
+
+        // Detect rate limit specifically
+        const msg = (error.message || '').toLowerCase();
+        if (msg.includes('rate limit') || msg.includes('for security purposes') || msg.includes('too many')) {
+          return {
+            success: false,
+            code: 'RATE_LIMITED',
+            message: 'Too many signup attempts. Please wait an hour before trying again, or use a different email address.'
+          };
+        }
+
         return {
           success: false,
           message: error.message || 'Registration failed'
+        };
+      }
+
+      // CRITICAL: detect "user already exists" case.
+      // Supabase deliberately returns success with a fake user object when the
+      // email is already registered, to prevent email enumeration attacks.
+      // The signal is an empty identities array on the returned user.
+      // Docs: https://supabase.com/docs/reference/javascript/auth-signup
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        console.warn('⚠️ [AuthContext] signUp succeeded with empty identities - email already registered:', cleanEmail);
+        return {
+          success: false,
+          code: 'USER_ALREADY_EXISTS',
+          message: 'An account with this email already exists. Please sign in, or use Forgot Password if you do not remember your password.'
         };
       }
 
