@@ -9,7 +9,7 @@ import { Mail, Smartphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Register: React.FC = () => {
-  const { register, signInWithGoogle, signInWithOtp, verifyOtp, resendOtp } = useAuth();
+  const { register, signInWithGoogle, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<'form' | 'otp'>('form');
@@ -80,11 +80,11 @@ const Register: React.FC = () => {
 
       if (response.success) {
         if (response.requiresEmailConfirmation) {
-          // Account created. signUp() sends a magic link, not an 8-digit code.
-          // Call signInWithOtp() — exactly like the working sign-in OTP flow —
-          // so the user receives the same 8-digit code they can type in below.
+          // signUp() with PKCE flow already sends an 8-digit OTP to the user's email.
+          // Do NOT call signInWithOtp() here — that sends a second email to the same
+          // address within seconds and Supabase rate-limits the request, so the user
+          // receives nothing. Just show the OTP input; the verify call uses type 'signup'.
           setPendingUser(response.user);
-          await signInWithOtp(email);
           setStep('otp');
           setSuccess("Account created! Please check your email for an 8-digit verification code.");
         } else {
@@ -121,7 +121,7 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await verifyOtp(email, otp); // type 'email' — same as working sign-in OTP flow
+      const response = await verifyOtp(email, otp, 'signup'); // signUp() sends type 'signup' OTP
 
       if (response.success) {
         setSuccess("Email verified successfully! Redirecting...");
