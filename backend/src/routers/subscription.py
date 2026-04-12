@@ -1976,6 +1976,48 @@ async def create_razorpay_checkout(
     )
 
 
+@router.post("/razorpay-create-plans")
+async def create_razorpay_plans_manual(
+    session: AsyncSession = Depends(get_db_session),
+):
+    """
+    One-time admin endpoint to manually create Razorpay live plans.
+    Returns detailed results/errors for each plan.
+    Remove this endpoint after plans are created.
+    """
+    import asyncio
+    from src.razorpayservice.razorpay_client import is_razorpay_enabled
+    from src.razorpayservice.razorpay_service import create_razorpay_plan
+
+    if not is_razorpay_enabled():
+        return {"error": "Razorpay not configured. Check ASAM_RAZORPAY_KEY_ID and ASAM_RAZORPAY_KEY_SECRET env vars."}
+
+    result = await session.execute(select(Plan))
+    all_plans = result.scalars().all()
+    results = []
+
+    for plan in all_plans:
+        if plan.plan_type == PlanType.FREE:
+            results.append({"plan": plan.name, "status": "skipped", "reason": "FREE plan"})
+            continue
+        if plan.razorpay_plan_id:
+            results.append({"plan": plan.name, "status": "exists", "razorpay_plan_id": plan.razorpay_plan_id})
+            continue
+
+        try:
+            rzp_plan_id = await asyncio.to_thread(
+                create_razorpay_plan, plan.plan_type, plan.billing_cycle
+            )
+            plan.razorpay_plan_id = rzp_plan_id
+            session.add(plan)
+            results.append({"plan": plan.name, "status": "created", "razorpay_plan_id": rzp_plan_id})
+        except Exception as e:
+            results.append({"plan": plan.name, "status": "FAILED", "error": str(e)})
+
+    await session.commit()
+    return {"results": results}
+
+
 @router.post("/razorpay-webhook")
 async def razorpay_webhook(
     request: Request,
