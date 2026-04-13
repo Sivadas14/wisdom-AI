@@ -48,7 +48,12 @@ const Sidebar = () => {
             }
         };
         fetchSubscription();
-    }, [user, userProfile]);
+        // Re-fetch whenever the user's plan changes (upgrade / downgrade /
+        // renewal) so the sidebar label doesn't get stuck on "Free Plan"
+        // after an in-session upgrade. `usage?.plan_type` flips as soon as
+        // UsageContext refreshes, which happens synchronously after a
+        // Razorpay or Polar activation.
+    }, [user, userProfile, usage?.plan_type]);
 
     const fetchConversations = async (showLoading = false) => {
         try {

@@ -132,13 +132,17 @@ const App = () => {
 
                                         <Route path="/subscription" element={
                                             <ProtectedRoute>
-                                                <Subscription />
+                                                <MainLayout>
+                                                    <Subscription />
+                                                </MainLayout>
                                             </ProtectedRoute>
                                         } />
 
                                         <Route path="/billing" element={
                                             <ProtectedRoute>
-                                                <BillingPage />
+                                                <MainLayout>
+                                                    <BillingPage />
+                                                </MainLayout>
                                             </ProtectedRoute>
                                         } />
 
