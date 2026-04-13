@@ -1960,10 +1960,13 @@ async def create_razorpay_checkout(
             detail=f"Payment gateway configuration error: {exc}",
         )
     except Exception as exc:
-        logger.error("[RAZORPAY] Checkout error: %s", exc, exc_info=True)
+        import traceback
+        err_detail = f"{type(exc).__name__}: {exc}"
+        tb = traceback.format_exc()[-800:]
+        logger.error("[RAZORPAY] Checkout error: %s\n%s", exc, tb, exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail="Payment gateway returned an error. Please try again in a moment.",
+            detail=f"Payment gateway error: {err_detail}",
         )
 
     logger.info(
