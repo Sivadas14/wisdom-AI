@@ -1992,11 +1992,13 @@ async def create_razorpay_plans_manual(
     # Show first 12 chars of key to verify it's the right one, mask the rest
     key_preview = key_id[:12] + "..." if len(key_id) > 12 else key_id
 
-    # Dump all ASAM_RAZORPAY env vars at the OS level to debug loading issues
+    # Dump ALL ASAM_ env var NAMES to debug loading issues
     raw_env = {}
     for k, v in os.environ.items():
         if "RAZORPAY" in k.upper():
             raw_env[k] = v[:12] + "..." if len(v) > 12 else "(empty)" if not v else v
+    # Also list all ASAM_ var names (no values) to spot any naming issue
+    all_asam_keys = sorted([k for k in os.environ.keys() if k.startswith("ASAM")])
 
     if not is_razorpay_enabled():
         return {
@@ -2006,6 +2008,7 @@ async def create_razorpay_plans_manual(
             "key_id_value_repr": repr(settings.razorpay_key_id)[:30] if settings.razorpay_key_id else "None",
             "key_secret_set": bool(settings.razorpay_key_secret),
             "raw_env_vars": raw_env,
+            "all_asam_var_names": all_asam_keys,
             "hint": "Check ASAM_RAZORPAY_KEY_ID and ASAM_RAZORPAY_KEY_SECRET in App Runner env vars"
         }
 
