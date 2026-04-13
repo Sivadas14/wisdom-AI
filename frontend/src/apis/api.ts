@@ -416,6 +416,18 @@ export const paymentAPI = {
         return response.data;
     },
 
+    syncRazorpaySubscription: async (razorpaySubscriptionId?: string) => {
+        // Repairs a user whose Razorpay payment succeeded but whose plan is
+        // still FREE (missed webhook, paid before sync-activate shipped, etc.).
+        const response = await apiClient.post(
+            '/subscriptions/razorpay-sync-my-subscription',
+            razorpaySubscriptionId
+                ? { razorpay_subscription_id: razorpaySubscriptionId }
+                : {},
+        );
+        return response.data;
+    },
+
     syncSubscription: async (userId: string): Promise<any> => {
         // Matches CURL: GET /api/subscriptions/sync?user_id=...
         const response = await apiClient.get(`/subscriptions/sync?user_id=${encodeURIComponent(userId)}`);

@@ -2059,6 +2059,120 @@ async def create_razorpay_plans_manual(
     return {"key_id_preview": key_preview, "client_test": test_result, "results": results}
 
 
+@router.post("/razorpay-sync-my-subscription")
+async def razorpay_sync_my_subscription(
+    razorpay_subscription_id: str | None = Body(None, embed=True),
+    current_user: UserProfile = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+):
+    """
+    Repair endpoint for users whose Razorpay payment went through but whose
+    plan is still showing FREE (e.g. because the webhook never fired and
+    they paid before the synchronous verify flow shipped).
+
+    If razorpay_subscription_id is provided (e.g. copied from the Razorpay
+    payment-success email), we validate it belongs to this user and activate.
+
+    Otherwise we list the user's most recent Razorpay subscriptions (matched
+    via notes.user_id) and activate the newest one that is 'active' or
+    'authenticated'.
+    """
+    from src.razorpayservice.razorpay_service import RazorpayService
+    from src.razorpayservice.razorpay_client import is_razorpay_enabled, get_razorpay_client
+
+    if not is_razorpay_enabled():
+        raise HTTPException(status_code=503, detail="INR payment gateway is not available.")
+
+    svc = RazorpayService()
+
+    # Case A: caller supplied a specific subscription id
+    if razorpay_subscription_id:
+        try:
+            sub_data = await run_in_threadpool(svc.fetch_subscription, razorpay_subscription_id)
+        except Exception as exc:
+            logger.error(
+                "[RAZORPAY] sync: fetch failed for %s: %s",
+                razorpay_subscription_id, exc, exc_info=True,
+            )
+            raise HTTPException(status_code=502, detail="Could not fetch subscription from Razorpay.")
+
+        notes_user_id = (sub_data.get("notes") or {}).get("user_id")
+        if not notes_user_id or str(notes_user_id) != str(current_user.id):
+            raise HTTPException(
+                status_code=403,
+                detail="This subscription does not belong to your account.",
+            )
+
+        status = await svc.activate_subscription_from_payment(
+            session=session,
+            user_id=str(current_user.id),
+            razorpay_subscription_id=razorpay_subscription_id,
+            subscription_data=sub_data,
+        )
+        if status != "activated":
+            raise HTTPException(
+                status_code=409,
+                detail=f"Could not activate subscription (reason: {status}).",
+            )
+        return SuccessResponse(
+            message="Subscription activated",
+            data={"subscription_id": razorpay_subscription_id},
+        )
+
+    # Case B: no id given — search Razorpay for the user's subscriptions.
+    try:
+        client = get_razorpay_client()
+        # Razorpay API: list most recent subscriptions. We then filter by notes.user_id.
+        listing = await run_in_threadpool(lambda: client.subscription.all({"count": 50}))
+    except Exception as exc:
+        logger.error("[RAZORPAY] sync: list failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=502, detail="Could not list subscriptions from Razorpay.")
+
+    items = listing.get("items", []) if isinstance(listing, dict) else []
+    user_id_str = str(current_user.id)
+
+    # Keep only this user's subscriptions, newest first.
+    candidates = [
+        s for s in items
+        if ((s.get("notes") or {}).get("user_id") == user_id_str)
+    ]
+    candidates.sort(key=lambda s: s.get("created_at", 0), reverse=True)
+
+    if not candidates:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "No Razorpay subscription found for this account. "
+                "If you just paid, please forward me the subscription id from the payment email."
+            ),
+        )
+
+    # Prefer an active/authenticated one.
+    active_candidates = [
+        s for s in candidates
+        if (s.get("status") or "").lower() in ("active", "authenticated")
+    ]
+    chosen = active_candidates[0] if active_candidates else candidates[0]
+
+    sub_id = chosen.get("id")
+    status = await svc.activate_subscription_from_payment(
+        session=session,
+        user_id=user_id_str,
+        razorpay_subscription_id=sub_id,
+        subscription_data=chosen,
+    )
+    if status != "activated":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Subscription found ({sub_id}) but activation returned '{status}'.",
+        )
+
+    return SuccessResponse(
+        message="Subscription activated",
+        data={"subscription_id": sub_id, "plan_id": chosen.get("plan_id")},
+    )
+
+
 @router.post("/razorpay-verify-payment")
 async def razorpay_verify_payment(
     payload: dict = Body(...),

@@ -125,6 +125,28 @@ export const BillingPage: React.FC = () => {
         setShowPlansModal(true);
     };
 
+    const handleSyncRazorpay = async () => {
+        setIsProcessing(true);
+        try {
+            const res = await paymentAPI.syncRazorpaySubscription();
+            const subId = res?.data?.subscription_id || res?.subscription_id || '';
+            toast.success(
+                `Subscription activated${subId ? ` (${subId})` : ''}. Refreshing your plan...`,
+            );
+            await Promise.all([refetchUsage(), refreshSubscription()]);
+        } catch (error: any) {
+            console.error('Razorpay sync failed:', error);
+            const detail =
+                error?.response?.data?.detail ||
+                error?.response?.data?.message ||
+                error?.message ||
+                'Unknown error';
+            toast.error(`Could not sync subscription: ${detail}`);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handleBack = () => {
         if (currentView === 'history') {
             setCurrentView('billing');
@@ -190,6 +212,31 @@ export const BillingPage: React.FC = () => {
             <main className="max-w-4xl mx-auto space-y-6">
                 {currentView === 'billing' ? (
                     <>
+                        {isFree && (
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg shadow-sm border border-[#ECE5DF] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="text-sm text-[#472b20]">
+                                    <span className="font-semibold">Paid via Razorpay but still on Free?</span>
+                                    <span className="text-[#472b20]/70"> Click sync to activate your plan instantly.</span>
+                                </div>
+                                <Button
+                                    onClick={handleSyncRazorpay}
+                                    disabled={isProcessing}
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-[#472b20] border-[#d05e2d] hover:bg-[#ECE5DF] font-medium shrink-0"
+                                >
+                                    {isProcessing ? (
+                                        <>
+                                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                            Syncing...
+                                        </>
+                                    ) : (
+                                        'Sync with Razorpay'
+                                    )}
+                                </Button>
+                            </div>
+                        )}
+
                         {/* {subscriptionDetails?.subscription?.cancel_at_period_end && (
                             <div className="bg-[#FEFCE8] border border-[#FEF08A] shadow-sm rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
                                 <div className="flex items-center gap-4">
