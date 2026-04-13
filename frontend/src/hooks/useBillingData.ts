@@ -49,8 +49,8 @@ export const useUsageQuery = () => {
             return data as UsageData;
         },
         enabled: !!user,
-        staleTime: 1000 * 60 * 5, // 5 minutes
-        gcTime: 1000 * 60 * 30, // 30 minutes
+        staleTime: 0,              // Always refetch — usage must be current
+        gcTime: 1000 * 60 * 5,    // Keep in cache 5 min (but always re-validate)
     });
 };
 

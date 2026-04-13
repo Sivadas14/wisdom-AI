@@ -269,6 +269,7 @@ const Chat = () => {
                 setAudioGenerationContentId(null);
                 setGeneratingAudioForMessage(null);
                 setAudioGenerationError(null);
+                refreshUsage(); // Update meditation minutes immediately
               } else if (content.status === "failed") {
                 setAudioGenerationError("Audio generation failed. Please try again.");
                 setAudioGenerationContentId(null);
@@ -281,6 +282,7 @@ const Chat = () => {
                 setVideoGenerationContentId(null);
                 setGeneratingVideoForMessage(null);
                 setVideoGenerationError(null);
+                refreshUsage(); // Update meditation minutes immediately
               } else if (content.status === "failed") {
                 setVideoGenerationError("Video generation failed. Please try again.");
                 setVideoGenerationContentId(null);

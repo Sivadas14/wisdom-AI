@@ -5,6 +5,7 @@ import BaseModal from "./BaseModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { contentAPI } from "@/apis/api";
 import { getFullStorageUrl } from "@/lib/storage";
+import { useUsage } from "@/contexts/UsageContext";
 
 import type { ContentGeneration } from "@/apis/wire";
 
@@ -70,6 +71,7 @@ const useContentPolling = (contentId: string | null, shouldPoll: boolean) => {
 };
 
 const ContemplationModal = ({ isOpen, onClose, conversationId, messageId, existingContentGenerations = [], onContentGenerated }: ContemplationModalProps) => {
+  const { refreshUsage } = useUsage();
   const [fullScreen, setFullScreen] = useState(false);
   const [contentId, setContentId] = useState<string | null>(null);
   const [isInitiating, setIsInitiating] = useState(false);
@@ -104,6 +106,9 @@ const ContemplationModal = ({ isOpen, onClose, conversationId, messageId, existi
       if (onContentGenerated) {
         onContentGenerated();
       }
+
+      // Refresh usage so card count updates immediately
+      refreshUsage();
     }
   }, [status, contentUrl, onContentGenerated]);
 

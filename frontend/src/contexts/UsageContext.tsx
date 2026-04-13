@@ -110,12 +110,18 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     useEffect(() => {
-        if (user && userProfile) {
-            console.log('🔵 [UsageContext] User and profile ready, fetching data...');
+        if (user) {
+            // Fetch as soon as user is authenticated — don't wait for profile.
+            // This ensures usage shows immediately on registration and login.
+            console.log('🔵 [UsageContext] User ready, fetching usage and subscription...');
             fetchUsage();
             fetchSubscription();
+        } else {
+            setUsage(null);
+            setSubscription(null);
+            setLoading(false);
         }
-    }, [user, userProfile]);
+    }, [user]);
 
     // Proactive nudge: if a FREE user has exhausted their chat quota when the app
     // loads, automatically open the Plans modal. Fires at most once per browser session.

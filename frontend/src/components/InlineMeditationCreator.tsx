@@ -93,7 +93,7 @@ const InlineMeditationCreator = ({
   const [currentContentType, setCurrentContentType] = useState<'audio' | 'video' | null>(null);
 
   // const lengths = ["5 min", "10 min", "15 min", "20 min"];
-  const { usage } = useUsage();
+  const { usage, refreshUsage } = useUsage();
 
   const lengths = ["5 min", "10 min", "15 min", "20 min"];
 
@@ -171,6 +171,9 @@ const InlineMeditationCreator = ({
       setCurrentContentType(null);
       setIsInitiating(false);
       setError(null);
+
+      // Refresh usage so meditation minutes update immediately
+      refreshUsage();
     }
   }, [status, contentUrl]);
 
