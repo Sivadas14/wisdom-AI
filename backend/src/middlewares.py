@@ -568,8 +568,6 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/webhooks/",
         "/api/pollor/",
         "/api/subscriptions/webhook",
-        "/api/subscriptions/razorpay-create-plans",
-        "/api/subscriptions/razorpay-webhook",
         "/api/notification-bar/",
         "/health",
     ]
