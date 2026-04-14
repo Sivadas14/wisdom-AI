@@ -549,12 +549,20 @@ class ParallelVideoGenerator:
             quote_end = min(float(QUOTE_SHOW_DUR), max(audio_duration - 2.0, 5.0))
             fade_in_end = 1.0
             fade_out_start = max(quote_end - 1.0, fade_in_end + 1.0)
-            alpha_expr = (
+            # Build the alpha expression. Inside an FFmpeg filter option value,
+            # `,` is the option separator, so every `,` inside the expression
+            # MUST be backslash-escaped or the filtergraph parser chokes with
+            # rc=234 (EINVAL). Backslash-escape is the most portable option —
+            # single-quote wrapping is inconsistent across FFmpeg builds.
+            alpha_expr_raw = (
                 f"if(lt(t,{fade_in_end}),t,"
                 f"if(lt(t,{fade_out_start:.1f}),1,"
                 f"if(lt(t,{quote_end:.1f}),{quote_end:.1f}-t,0)))"
             )
+            alpha_expr = alpha_expr_raw.replace(",", "\\,")
 
+            # x expression also contains parens/text_w — that's fine; only the
+            # comma and colon characters are separators.
             dt_parts = [f"drawtext=textfile={quote_textfile}"]
             if font_path:
                 dt_parts.append(f"fontfile={font_path}")

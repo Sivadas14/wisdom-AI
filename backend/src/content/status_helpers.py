@@ -13,9 +13,19 @@ from sqlalchemy import select
 from src.db import ContentGeneration, get_background_session
 
 
-# Keep error messages short enough to display in the UI comfortably and avoid
-# writing unbounded stack trace text into the DB.
-_MAX_ERROR_LENGTH = 500
+# Keep error messages bounded but large enough to include the tail of a
+# subprocess stderr (where the actual error usually lives). We keep both
+# the head (tells us which code path failed) and the tail (tells us why).
+_MAX_ERROR_LENGTH = 2000
+
+
+def _truncate_preserving_ends(text: str, max_len: int) -> str:
+    """Truncate text keeping both ends so we retain context + cause."""
+    if len(text) <= max_len:
+        return text
+    head = max_len // 3
+    tail = max_len - head - 20  # leave room for the "... [truncated] ..." marker
+    return f"{text[:head]}\n...[truncated]...\n{text[-tail:]}"
 
 
 async def mark_content_failed(content_id: str, error: Exception | str) -> None:
@@ -25,9 +35,7 @@ async def mark_content_failed(content_id: str, error: Exception | str) -> None:
     by the exception that brought us here. Never raises — if we cannot write
     the failure, we log and move on (the task is already dead at that point).
     """
-    error_text = str(error)
-    if len(error_text) > _MAX_ERROR_LENGTH:
-        error_text = error_text[: _MAX_ERROR_LENGTH - 3] + "..."
+    error_text = _truncate_preserving_ends(str(error), _MAX_ERROR_LENGTH)
 
     try:
         async with get_background_session() as session:
