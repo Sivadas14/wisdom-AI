@@ -312,9 +312,9 @@ export interface UsageData {
         remaining: number;
     };
     image_cards: {
-        limit: number;
+        limit: number | string;
         used: number;
-        remaining: number;
+        remaining: number | string;
     };
     conversations: {
         limit: string | number;
@@ -322,9 +322,9 @@ export interface UsageData {
         remaining: number | string;
     };
     meditation_duration: {
-        limit: number;
+        limit: number | string;
         used: number;
-        remaining: number;
+        remaining: number | string;
     };
     addon_cards?: {
         limit: number;

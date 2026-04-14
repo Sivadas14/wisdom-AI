@@ -151,13 +151,27 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         await fetchSubscription();
     };
 
+    // Treat "Unlimited" (string, from Seeker/Devotee plans) as having remaining quota.
+    // The backend returns remaining as either a number OR the string "Unlimited";
+    // a naive `remaining > 0` check incorrectly returns false for the string case
+    // and triggered the "limit exceeded" modal for Seeker users with unlimited cards.
+    const hasRemaining = (remaining: number | string | undefined | null): boolean => {
+        if (typeof remaining === "string") {
+            // Any non-empty string (e.g. "Unlimited") means no numeric cap.
+            return remaining.length > 0;
+        }
+        if (typeof remaining === "number") {
+            return remaining > 0;
+        }
+        return false;
+    };
+
     const checkQuota = (feature: FeatureType): boolean => {
         if (!usage) return false;
 
         switch (feature) {
             case 'chat': {
-                const remaining = usage.conversations.remaining;
-                const canChat = typeof remaining === "number" ? remaining > 0 : typeof remaining === "string";
+                const canChat = hasRemaining(usage.conversations.remaining);
                 if (!canChat) {
                     toast.error("Conversation limit reached.");
                     setShowPlansModal(true);
@@ -166,7 +180,9 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 return true;
             }
             case 'image': {
-                const hasCards = usage.image_cards.remaining > 0 || (usage.addon_cards?.remaining || 0) > 0;
+                const hasCards =
+                    hasRemaining(usage.image_cards.remaining) ||
+                    hasRemaining(usage.addon_cards?.remaining);
                 if (!hasCards) {
                     setAddonsModalMode('cards');
                     setShowAddonsModal(true);
@@ -181,7 +197,9 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     return false;
                 }
                 // Check meditation_duration OR addon_minutes
-                const hasMinutes = usage.meditation_duration.remaining > 0 || (usage.addon_minutes?.remaining || 0) > 0;
+                const hasMinutes =
+                    hasRemaining(usage.meditation_duration.remaining) ||
+                    hasRemaining(usage.addon_minutes?.remaining);
                 if (!hasMinutes) {
                     setAddonsModalMode('minutes');
                     setShowAddonsModal(true);
@@ -195,7 +213,9 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                     setShowPlansModal(true);
                     return false;
                 }
-                const hasMinutes = usage.meditation_duration.remaining > 0 || (usage.addon_minutes?.remaining || 0) > 0;
+                const hasMinutes =
+                    hasRemaining(usage.meditation_duration.remaining) ||
+                    hasRemaining(usage.addon_minutes?.remaining);
                 if (!hasMinutes) {
                     setAddonsModalMode('minutes');
                     setShowAddonsModal(true);
