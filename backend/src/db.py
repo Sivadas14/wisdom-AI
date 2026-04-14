@@ -1032,6 +1032,21 @@ class ContentGeneration(Base):
     voice_id: Mapped[str | None] = mapped_column(String, nullable=True)
     transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # Generation status tracking (added 2026-04-14 to stop frontend from
+    # polling forever when a background job silently dies). Values:
+    # 'pending' | 'processing' | 'complete' | 'failed'. Enum type is
+    # created by the startup migration in src/migrations.py, so we set
+    # create_type=False here to avoid SQLAlchemy trying to create it again.
+    status: Mapped[str] = mapped_column(
+        pg_enum(
+            "pending", "processing", "complete", "failed",
+            name="content_status_enum", create_type=False,
+        ),
+        nullable=False,
+        server_default="pending",
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Relationships
     user: Mapped["UserProfile"] = relationship(
         "UserProfile", back_populates="content_generations"

@@ -246,6 +246,73 @@ async def _add_razorpay_columns(session: AsyncSession) -> None:
     _log("razorpay_plan_id column verified/added to plans.")
 
 
+async def _add_content_generation_status(session: AsyncSession) -> None:
+    """
+    Idempotently add `status` and `error_message` columns to
+    content_generations, and backfill existing rows.
+
+    Why: without a status column, a failed background job leaves
+    content_path NULL forever and the frontend polls indefinitely.
+    After this migration, failed rows are clearly marked and the UI
+    can show a real error instead of spinning.
+
+    Safe to run on every restart.
+    """
+    # 1. Create enum type (Postgres has no CREATE TYPE IF NOT EXISTS,
+    #    so we wrap in a DO block that checks pg_type first).
+    await session.execute(text("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_type WHERE typname = 'content_status_enum'
+            ) THEN
+                CREATE TYPE content_status_enum
+                    AS ENUM ('pending', 'processing', 'complete', 'failed');
+            END IF;
+        END$$;
+    """))
+
+    # 2. Add status column (default 'pending' so existing rows get a value
+    #    without a second UPDATE; we refine via backfill below).
+    await session.execute(text("""
+        ALTER TABLE content_generations
+        ADD COLUMN IF NOT EXISTS status content_status_enum
+            NOT NULL DEFAULT 'pending'
+    """))
+
+    # 3. Add error_message column.
+    await session.execute(text("""
+        ALTER TABLE content_generations
+        ADD COLUMN IF NOT EXISTS error_message TEXT
+    """))
+
+    # 4. Backfill — idempotent: running twice produces the same result
+    #    because the WHERE clauses scope to rows still at the default.
+    #    Rows with a content_path were generated successfully.
+    await session.execute(text("""
+        UPDATE content_generations
+           SET status = 'complete'
+         WHERE content_path IS NOT NULL
+           AND status = 'pending'
+    """))
+
+    #    Rows without a content_path never finished. If any were genuinely
+    #    mid-flight at deploy time they are already orphaned by the restart.
+    await session.execute(text("""
+        UPDATE content_generations
+           SET status = 'failed',
+               error_message = COALESCE(
+                   error_message,
+                   'Generation did not complete before server restart'
+               )
+         WHERE content_path IS NULL
+           AND status = 'pending'
+    """))
+
+    await session.commit()
+    _log("content_generations status/error_message columns verified + backfilled.")
+
+
 async def _create_razorpay_plans(session: AsyncSession) -> None:
     """
     Idempotently create Razorpay plans for paid tiers if:
@@ -425,6 +492,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_add_onboarding_seen_column", _add_onboarding_seen_column)
         await _safe_migration(session, "_create_ramana_images_table", _create_ramana_images_table)
         await _safe_migration(session, "_add_razorpay_columns", _add_razorpay_columns)
+        await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
 
         # ── Data migrations (depend on schema being up to date) ─────────────
         await _safe_migration(session, "_set_free_plan_limits", _set_free_plan_limits)
