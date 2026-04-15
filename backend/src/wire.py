@@ -160,10 +160,6 @@ class ContentGenerationResponse(tt.BM):
     id: str = tt.F("Unique identifier for generated content")
     status: str = tt.F("Processing status: pending, processing, complete, failed")
     error_message: str | None = tt.F("Error message when status='failed'", None)
-    debug_timings: dict | None = tt.F(
-        "DIAGNOSTIC: per-stage timings for the most recent generation of this content (ms).",
-        None,
-    )
 
 
 class ContentGeneration(tt.BM):
@@ -176,10 +172,6 @@ class ContentGeneration(tt.BM):
     created_at: datetime.datetime = tt.F("ISO timestamp of creation")
     transcript: str | None = tt.F("Full meditation script text")
     error_message: str | None = tt.F("Error message when status='failed'", None)
-    debug_timings: dict | None = tt.F(
-        "DIAGNOSTIC: per-stage timings for the most recent generation of this content (ms).",
-        None,
-    )
 
 
 class ContentGenerationListResponse(tt.BM):

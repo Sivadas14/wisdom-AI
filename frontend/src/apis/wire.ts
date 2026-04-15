@@ -61,10 +61,6 @@ export interface ContentGenerationResponse {
     id: string;
     status: 'pending' | 'processing' | 'complete' | 'failed';
     error_message?: string | null;
-    /** DIAGNOSTIC: per-stage timings (ms) for the most recent generation. Keys like
-     * conversation_load / source_content_generation / parallel_transcript_and_images /
-     * audio_generation / video_encode_ffmpeg / video_upload / total_ms. May be absent. */
-    debug_timings?: Record<string, number> | null;
 }
 
 export interface ContentGeneration {
@@ -77,10 +73,6 @@ export interface ContentGeneration {
     content_url: string | null;
     transcript?: string | null;
     error_message?: string | null;
-    /** DIAGNOSTIC: per-stage timings (ms) for the most recent generation. Keys like
-     * conversation_load / source_content_generation / parallel_transcript_and_images /
-     * audio_generation / video_encode_ffmpeg / video_upload / total_ms. May be absent. */
-    debug_timings?: Record<string, number> | null;
 }
 
 export interface ContentGenerationListResponse {

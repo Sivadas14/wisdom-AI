@@ -30,52 +30,14 @@ from src.content.audio import (
     generate_meditation_transcript_optimized,
     generate_audio_from_transcript_optimized,
 )
-from src.utils.profiler import profile_operation, print_profiler_summary, get_profiler
+from src.utils.profiler import profile_operation, print_profiler_summary
 from src.settings import get_supabase_client, get_supabase_admin_client, get_llm
 from src.db import get_db_session, get_background_session
 import hashlib
-from collections import OrderedDict
 
 # Cache for image generation with persistent storage
 _image_cache = {}
 _cache_file = Path("image_cache.pkl")
-
-# ── Diagnostic timings (Option B): ephemeral per-content-id timing breakdown
-# surfaced in GET /api/content/{id} so the frontend can show where video
-# generation time is actually going. Lost on process restart — that's fine,
-# this is a one-off diagnostic, not a persistence concern.
-RECENT_TIMINGS: "OrderedDict[str, dict]" = OrderedDict()
-_MAX_TIMINGS_ENTRIES = 50
-
-
-def _record_video_timings(content_id: str, extra: dict | None = None) -> None:
-    """Snapshot the current profiler state into RECENT_TIMINGS for content_id.
-
-    Safe to call multiple times; each call overwrites the previous snapshot
-    for the same content_id. Keeps only the last _MAX_TIMINGS_ENTRIES entries
-    to bound memory growth.
-    """
-    try:
-        prof = get_profiler()
-        ops = {
-            name: round(op.duration_ms, 1)
-            for name, op in prof.operations.items()
-            if op.duration_ms > 0
-        }
-        total = round(sum(ops.values()), 1)
-        payload: dict = {**ops, "total_ms": total}
-        if extra:
-            payload.update(extra)
-
-        # LRU-style cap
-        if content_id in RECENT_TIMINGS:
-            RECENT_TIMINGS.move_to_end(content_id)
-        RECENT_TIMINGS[content_id] = payload
-        while len(RECENT_TIMINGS) > _MAX_TIMINGS_ENTRIES:
-            RECENT_TIMINGS.popitem(last=False)
-    except Exception as e:
-        # Diagnostic code must never break the main flow
-        tu.logger.warning(f"_record_video_timings failed (non-fatal): {e}")
 
 def _load_image_cache():
     """Load image cache from disk"""
@@ -192,40 +154,28 @@ class ParallelVideoGenerator:
             transcript, library_images = await asyncio.gather(transcript_task, library_images_task)
             op.finish(transcript_length=len(transcript), library_image_count=len(library_images))
 
-        # Step 4: Create video — split into audio + encode sub-spans so the
-        # diagnostic can distinguish OpenAI TTS latency from FFmpeg encode.
-        if len(library_images) >= 1:
-            # KEN BURNS pipeline: multi-image slideshow with slow zoom-in
-            # + xfade crossfades + drawtext quote overlay.
-            # Tuned for AWS App Runner (more CPU than Render Starter).
-            async with profile_operation("audio_generation") as op_audio:
+        # Step 4: Create video
+        async with profile_operation("video_creation") as op:
+            if len(library_images) >= 1:
+                # KEN BURNS pipeline: multi-image slideshow with slow zoom-in
+                # + xfade crossfades + drawtext quote overlay.
+                # Tuned for AWS App Runner (more CPU than Render Starter).
                 audio_bytes = await self._generate_audio_optimized(transcript)
-                op_audio.finish(audio_bytes=len(audio_bytes))
-
-            async with profile_operation("video_encode_ffmpeg") as op_enc:
                 quote = self._extract_quote_from_transcript(transcript)
                 video_path = await self._create_ken_burns_video_with_quote(
                     library_images, audio_bytes, quote
                 )
-                op_enc.finish(video_path=video_path)
-        else:
-            # Fallback: original single DALL-E image pipeline
-            async with profile_operation("video_creation_fallback") as op:
+            else:
+                # Fallback: original single DALL-E image pipeline
                 image_prompt = await self._generate_image_prompt_cached()
                 pil_image = await self._generate_image_cached(image_prompt)
                 video_path = await self._create_video_streaming_parallel(pil_image, transcript)
-                op.finish(video_path=video_path)
+            op.finish(video_path=video_path)
 
         # Step 5: Upload video
         async with profile_operation("video_upload") as op:
             content_path = await self._upload_video_optimized(video_path, content_id)
             op.finish(upload_path=content_path)
-
-        # Snapshot timings so the frontend can surface them via GET /api/content/{id}
-        _record_video_timings(
-            content_id,
-            extra={"library_image_count": len(library_images)},
-        )
 
         print_profiler_summary()
         return content_path, transcript
@@ -352,15 +302,12 @@ class ParallelVideoGenerator:
         The quote is rendered as a drawtext overlay that fades in (0–1 s) and
         fades out (1 s before QUOTE_SHOW_DUR).
         """
-        # Speed-tuned settings. Ken Burns zoom is so slow (0.0008/frame) that
-        # 15fps is visually indistinguishable from 24fps, and 540p is crisp at
-        # typical player widths (most users view on mobile or a ~700-800px
-        # desktop player). Combined with preset=veryfast and crf=23, these give
-        # roughly a 4-5× encode speedup vs 720p/24fps/fast/crf22 with no
-        # perceivable quality loss on painterly library imagery.
+        # 720p output — crisp on large screens. Ken Burns zoom is slow enough
+        # (0.0008/frame) that 15fps is visually indistinguishable from 24fps,
+        # so we keep fps=15 and preset=veryfast for the easy encode wins.
         FADE_DUR = 1.0       # xfade crossfade duration (seconds)
         FPS = 15
-        WIDTH, HEIGHT = 960, 540
+        WIDTH, HEIGHT = 1280, 720
         QUOTE_SHOW_DUR = 15  # seconds the quote is visible
 
         n = len(images)
@@ -499,8 +446,8 @@ class ParallelVideoGenerator:
                 "-map", "[vout]",
                 "-map", f"{audio_index}:a",
                 "-c:v", "libx264",
-                "-preset", "veryfast",  # was "fast" — ~1.5× faster encode
-                "-crf", "23",           # was 22 — tiny quality drop, ~10% faster
+                "-preset", "veryfast",  # ~1.5× faster than "fast" at 720p
+                "-crf", "22",           # visually lossless for painterly imagery
                 "-c:a", "aac",
                 "-b:a", "128k",
                 "-pix_fmt", "yuv420p",

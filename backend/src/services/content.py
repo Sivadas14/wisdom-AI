@@ -20,7 +20,6 @@ from src.services.usage import get_usage
 from src.content.video import generate_video_content
 from src.content.audio import generate_audio_content
 from src.content.image import generate_image_content
-from src.content.parallel_video import RECENT_TIMINGS as VIDEO_RECENT_TIMINGS
 
 # Create helper function to map DB model to Wire model
 def map_to_wire_content(content: ContentGeneration, spb_client: Client) -> w.ContentGeneration:
@@ -260,10 +259,6 @@ async def get_content(
     )
     error_message = getattr(content, "error_message", None)
 
-    # DIAGNOSTIC: pull per-stage timings for this content_id if the video
-    # pipeline recorded any. None for audio/image content or pre-restart rows.
-    debug_timings = VIDEO_RECENT_TIMINGS.get(str(content.id))
-
     # Surface failures so the UI can show the error + Try Again button instead
     # of spinning forever.
     if status == "failed":
@@ -271,7 +266,6 @@ async def get_content(
             id=str(content.id),
             status="failed",
             error_message=error_message,
-            debug_timings=debug_timings,
         )
 
     if status == "complete" and content.content_path:
@@ -281,7 +275,7 @@ async def get_content(
             )
 
             if presigned_response.get("error"):
-                 return w.ContentGenerationResponse(id=str(content.id), status="processing", debug_timings=debug_timings)
+                 return w.ContentGenerationResponse(id=str(content.id), status="processing")
 
             content_url = presigned_response.get("signedURL")
             return w.ContentGeneration(
@@ -294,13 +288,12 @@ async def get_content(
                 created_at=content.created_at,
                 transcript=content.transcript,
                 error_message=None,
-                debug_timings=debug_timings,
             )
         except Exception:
-            return w.ContentGenerationResponse(id=str(content.id), status="processing", debug_timings=debug_timings)
+            return w.ContentGenerationResponse(id=str(content.id), status="processing")
 
     # pending / processing / anything else in-flight
-    return w.ContentGenerationResponse(id=str(content.id), status="processing", debug_timings=debug_timings)
+    return w.ContentGenerationResponse(id=str(content.id), status="processing")
 
 
 async def get_image_content(

@@ -491,7 +491,7 @@ const InlineMeditationCreator = ({
                   ⏳ Video generation takes time. Please keep this window open.
                 </p>
                 <p className="text-xs leading-relaxed" style={{ color: '#6b4a3a' }}>
-                  Estimated time — 5-min video: ~2 minutes · 10-min: ~3 minutes · 15-min: ~4 minutes · 20-min: ~5 minutes. Times vary slightly with server load.
+                  Estimated time — 5-min video: ~2 minutes · 10-min: ~2.5 minutes · 15-min: ~3 minutes · 20-min: ~3.5 minutes. Times vary slightly with server load.
                 </p>
               </div>
             )}

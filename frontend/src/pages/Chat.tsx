@@ -225,17 +225,6 @@ const Chat = () => {
 
           console.log(`Polled content ${contentId}:`, content.status, content.content_url);
 
-          // DIAGNOSTIC: print per-stage timings for video generation so we
-          // can identify the real bottleneck. The backend attaches these
-          // to the response when a generation has completed or failed.
-          if (content.debug_timings) {
-            console.log(
-              `%c⏱️ VIDEO TIMINGS (ms) for ${contentId}:`,
-              "background:#472b20;color:#F5F0EC;padding:2px 6px;border-radius:3px;font-weight:bold;"
-            );
-            console.table(content.debug_timings);
-          }
-
           // Only update if status changed to complete or failed
           if (content.status === "complete" || content.status === "failed") {
             setMessages(prev => prev.map(msg => {
