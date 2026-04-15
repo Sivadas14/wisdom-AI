@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, MessageCircle, Heart, MessageSquare, HelpCircle, Plus } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
+import AtmosphericEntry from "@/components/AtmosphericEntry";
 import { chatAPI } from "@/apis/api";
 import { type Conversation } from "@/apis/wire";
 
@@ -115,6 +116,7 @@ const Index = () => {
 
   return (
     <div className="min-h-full flex items-start justify-center p-4 md:pt-16 pb-20" style={{ backgroundColor: 'rgb(236, 229, 223)' }}>
+      <AtmosphericEntry />
       <div className="w-full max-w-6xl mx-auto">
         {/* User Menu in top right - Hidden on mobile as it's in sidebar */}
         <div className="hidden md:flex justify-end mb-8">
@@ -123,7 +125,7 @@ const Index = () => {
 
         <div className="text-center mb-10 md:mb-16 mt-8 md:mt-0">
           <h1 className="text-4xl md:text-6xl font-heading text-brand-heading mb-4 md:mb-8">
-            Mindful AI
+            Wisdom AI
           </h1>
         </div>
 

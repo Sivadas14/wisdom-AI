@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, Key, Smartphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import AtmosphericEntry from "@/components/AtmosphericEntry";
 
 const SignIn: React.FC = () => {
   const {
@@ -237,6 +238,7 @@ const SignIn: React.FC = () => {
 
   return (
     <div className="h-full overflow-y-auto flex justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: '#503b5d' }}>
+      <AtmosphericEntry />
       <div className="max-w-md w-full space-y-8 ">
         <Card >
           {/* <div className="mx-auto mb-4 mt-4 w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">

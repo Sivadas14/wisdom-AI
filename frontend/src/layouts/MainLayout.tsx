@@ -41,7 +41,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                                 </div>
                             </SheetContent>
                         </Sheet>
-                        <span className="font-heading text-[#472B20] font-bold">Mindful AI</span>
+                        <span className="font-heading text-[#472B20] font-bold">Wisdom AI</span>
                     </div>
                     <div className="flex items-center">
                         <UserMenu />
