@@ -5,10 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
-yaml
+ 
 concurrency:
   group: deploy-main
   cancel-in-progress: true
+
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: arunachalasamudra
