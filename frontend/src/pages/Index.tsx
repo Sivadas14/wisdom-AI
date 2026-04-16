@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowRight, MessageCircle, Heart, MessageSquare, HelpCircle, Plus } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
 import AtmosphericEntry from "@/components/AtmosphericEntry";
+import TeachingsSection from "@/components/TeachingsSection";
 import { chatAPI, contemplationAPI } from "@/apis/api";
 import { type Conversation, type Contemplation } from "@/apis/wire";
 
@@ -192,6 +193,9 @@ const Index = () => {
             </div>
           </div>
         </div>
+
+        {/* Guided Introduction to the Teachings */}
+        <TeachingsSection onExplore={handleQuickPrompt} />
 
         {/* Quick Prompts */}
         <div className="max-w-2xl mx-auto mb-10 md:mb-12">
