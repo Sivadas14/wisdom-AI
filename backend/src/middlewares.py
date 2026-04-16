@@ -571,6 +571,7 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/subscriptions/razorpay-create-plans",
         "/api/subscriptions/razorpay-webhook",
         "/api/notification-bar/",
+        "/api/contemplation/",    # Public — same quote for all users, no auth needed
         "/health",
     ]
 

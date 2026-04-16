@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 
 /**
- * AtmosphericEntry — a ~3-second sacred overlay that plays on the first
+ * AtmosphericEntry — a ~6-second sacred overlay that plays on the first
  * visit of a browser session to the public landing or the logged-in home.
  *
  * Timeline (ms):
  *   0    → cream background, nothing visible yet
- *   200  → dawn gradient + mountain silhouette fade in (800ms)
- *   1200 → tagline "Who am I?" fades in (600ms)
- *   2400 → everything fades out (600ms)
- *   3000 → overlay unmounts, page interactive
+ *   300  → dawn gradient + mountain silhouette fade in (800ms)
+ *   1800 → tagline "Who am I?" fades in (600ms)
+ *   5000 → everything fades out (1000ms)
+ *   6000 → overlay unmounts, page interactive
  *
  * Respects prefers-reduced-motion (skips instantly).
  * Dismissible by click, tap, or Escape key.
@@ -52,9 +52,9 @@ export default function AtmosphericEntry() {
 
     // Mount and run the phase timeline.
     setPhase("cream");
-    const t1 = window.setTimeout(() => setPhase("mountain"), 200);
-    const t2 = window.setTimeout(() => setPhase("tagline"), 1200);
-    const t3 = window.setTimeout(() => setPhase("fadeout"), 2400);
+    const t1 = window.setTimeout(() => setPhase("mountain"), 300);
+    const t2 = window.setTimeout(() => setPhase("tagline"), 1800);
+    const t3 = window.setTimeout(() => setPhase("fadeout"), 5000);
     const t4 = window.setTimeout(() => {
       setPhase("done");
       try {
@@ -62,7 +62,7 @@ export default function AtmosphericEntry() {
       } catch {
         // ignore
       }
-    }, 3000);
+    }, 6000);
 
     return () => {
       window.clearTimeout(t1);
@@ -113,7 +113,7 @@ export default function AtmosphericEntry() {
         background:
           "linear-gradient(180deg, #3a2318 0%, #6b3a22 32%, #D05E2D 62%, #ecd9c6 88%, #ece5df 100%)",
         opacity: overlayOpacity,
-        transition: "opacity 600ms ease-in-out",
+        transition: "opacity 1000ms ease-in-out",
       }}
     >
       {/* Arunachala mountain silhouette — hand-crafted SVG, no external asset.
