@@ -72,8 +72,8 @@ jobs:
               --service-arn "$APP_RUNNER_SERVICE_ARN" \
               --query 'Service.Status' --output text)
             echo "  Status: $STATUS (check $i/30)"
-            if [ "$STATUS" = "RUNNING" ]; then
-              echo "  Service is RUNNING — ready."
+            if [ "$STATUS" = "RUNNING" ] || [ "$STATUS" = "UPDATE_FAILED" ]; then
+              echo "  Service is $STATUS — proceeding with update."
               break
             fi
             if [ "$i" -eq 30 ]; then
