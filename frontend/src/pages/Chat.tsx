@@ -603,17 +603,16 @@ const Chat = () => {
     // Handle initial query even if no conversation ID yet
     if (initialQuery && !hasProcessedInitialQuery && !isLoadingConversation) {
       setHasProcessedInitialQuery(true);
-      if (initialQuery.trim()) {
-        setCurrentInput(initialQuery.trim());
-        // Auto-focus the input with the initial query
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 100);
-      }
-      // Clear state but don't replace URL yet if we are on /chat
+      // Clear navigation state immediately so a refresh does not re-send
       navigate(location.pathname, { replace: true, state: {} });
+      if (initialQuery.trim()) {
+        // Auto-send the prompt so the conversation starts immediately —
+        // the user clicked a card/pill expecting Wisdom AI to respond,
+        // not to see text sitting in an input box.
+        handleSendMessage(initialQuery.trim());
+      }
     }
-  }, [conversationId, location.state?.initialQuery, hasProcessedInitialQuery, isLoadingConversation, location.pathname, navigate]);
+  }, [conversationId, location.state?.initialQuery, hasProcessedInitialQuery, isLoadingConversation, location.pathname, navigate, handleSendMessage]);
 
   const handleTitleSave = async () => {
     if (conversationId && title.trim() !== (conversationDetail?.conversation.title || "")) {
