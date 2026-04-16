@@ -20,7 +20,6 @@ from __future__ import annotations
 import datetime
 import json
 import re
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -36,7 +35,10 @@ from src.settings import get_llm
 router = APIRouter(prefix="/api/contemplation", tags=["Contemplation"])
 
 
-IST = ZoneInfo("Asia/Kolkata")
+# India Standard Time = UTC+5:30. We use a fixed offset rather than
+# ZoneInfo("Asia/Kolkata") because the tzdata package is not guaranteed
+# to be present in the slim Docker image.
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 
 
 # Hardcoded fallback so the endpoint ALWAYS returns something readable
