@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { TEACHINGS } from "@/data/teachings";
 import {
@@ -43,10 +43,23 @@ interface Contemplation {
 
 function PublicHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
     <header
-      style={{ backgroundColor: "#F5F0EC", borderBottom: "1px solid #E8DFD8" }}
+      style={{
+        backgroundColor: scrolled ? "rgba(245,240,236,0.92)" : "#F5F0EC",
+        borderBottom: "1px solid #E8DFD8",
+        backdropFilter: scrolled ? "blur(12px)" : "none",
+        WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+        transition: "background-color 0.2s, backdrop-filter 0.2s",
+      }}
       className="sticky top-0 z-50"
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -1169,22 +1182,21 @@ function Footer() {
 
 export default function Landing() {
   const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
-
-  // Authenticated users can choose — we don't auto-redirect so they can
-  // still share / view the public page, but we offer a clear "Go to portal" CTA.
-  // If you prefer auto-redirect, uncomment below:
-  // useEffect(() => { if (isAuthenticated) navigate("/chat"); }, [isAuthenticated]);
 
   return (
-    <div style={{ backgroundColor: "#F5F0EC" }} className="min-h-screen">
+    <div
+      style={{ backgroundColor: "#F5F0EC", scrollBehavior: "smooth" }}
+      className="min-h-screen overflow-x-hidden"
+    >
       <PublicHeader isAuthenticated={isAuthenticated} />
-      <HeroSection isAuthenticated={isAuthenticated} />
-      <DailyContemplationSection />
-      <SacredLibrarySection />
-      <FeaturesSection />
-      <PricingSection />
-      <FinalCTA isAuthenticated={isAuthenticated} />
+      <main>
+        <HeroSection isAuthenticated={isAuthenticated} />
+        <DailyContemplationSection />
+        <SacredLibrarySection />
+        <FeaturesSection />
+        <PricingSection />
+        <FinalCTA isAuthenticated={isAuthenticated} />
+      </main>
       <Footer />
     </div>
   );

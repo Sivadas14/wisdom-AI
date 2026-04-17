@@ -97,14 +97,26 @@
     @apply border-border;
   }
 
-  html,
-  body,
-  #root {
+  html {
     height: 100%;
     width: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden;
+    scroll-behavior: smooth;
+    /* overflow NOT set here — the chat AppShell manages its own overflow-hidden.
+       Removing it allows the public Landing page to scroll normally. */
+  }
+
+  body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  #root {
+    height: 100%;
+    width: 100%;
   }
 
   body {

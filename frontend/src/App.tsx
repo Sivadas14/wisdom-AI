@@ -62,7 +62,7 @@ const OnboardingGate = () => {
  * The public Landing page renders outside this wrapper via a sibling Route.
  */
 const AppShell = () => (
-    <div className="h-full flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden">
         <AnnouncementBanner />
         <div className="flex-1 min-h-0 overflow-hidden">
             <Outlet />
