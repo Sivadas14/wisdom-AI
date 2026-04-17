@@ -1,12 +1,12 @@
 from tuneapi import tu
 
-from fastapi import Depends, Query, HTTPException,UploadFile
+from fastapi import Depends, Query, HTTPException, UploadFile, BackgroundTasks
 from uuid import UUID
 from supabase import Client
 from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi import  UploadFile, File, Depends, HTTPException
+from fastapi import UploadFile, File, Depends, HTTPException, BackgroundTasks
 from supabase import Client
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import insert
@@ -14,7 +14,7 @@ from uuid import uuid4
 from typing import List
 
 
-from src.db import get_db_session_fa, SourceDocument as DBSourceDocument
+from src.db import get_db_session_fa, SourceDocument as DBSourceDocument, get_background_session
 from src.settings import get_supabase_client
 from src import wire as w
 
@@ -396,14 +396,93 @@ async def list_source_data(
 # 4. UPLOAD  DATA
 # ============================================================================
 
+async def _index_pdf_background(
+    file_id: uuid4,
+    filename: str,
+    content: bytes,
+):
+    """
+    Background task: extract text, generate embeddings, save chunks.
+    Runs AFTER the HTTP response has been sent so there is no timeout risk.
+    """
+    tu.logger.info(f"[INDEX_BG] Starting background indexing for {filename} (id={file_id})")
+    try:
+        chunks = await extract_pdf_text(content)
+        tu.logger.info(f"[INDEX_BG] Extracted {len(chunks)} chunks from {filename}")
+
+        if chunks:
+            model = get_llm()
+            saved = 0
+            failed = 0
+            async with get_background_session() as bg_session:
+                for chunk in chunks:
+                    try:
+                        embedding_response = await model.embedding_async(
+                            chunk.content, model="text-embedding-3-small"
+                        )
+                        embedding_vector = embedding_response.embedding[0]
+                        db_chunk = DocumentChunk(
+                            id=uuid4(),
+                            source_document_id=file_id,
+                            content=chunk.content,
+                            embedding=embedding_vector,
+                            location=chunk.loc,
+                            model_used="text-embedding-3-small",
+                        )
+                        bg_session.add(db_chunk)
+                        saved += 1
+                    except Exception as e:
+                        tu.logger.error(f"[INDEX_BG] Chunk embed failed: {e}")
+                        failed += 1
+                        continue
+
+                # Mark document COMPLETED
+                result = await bg_session.execute(
+                    select(DBSourceDocument).where(DBSourceDocument.id == file_id)
+                )
+                doc = result.scalar_one_or_none()
+                if doc:
+                    doc.status = DocumentStatus.COMPLETED
+                await bg_session.commit()
+            tu.logger.info(f"[INDEX_BG] Done {filename}: {saved} chunks saved, {failed} failed")
+        else:
+            # No chunks — still mark completed
+            async with get_background_session() as bg_session:
+                result = await bg_session.execute(
+                    select(DBSourceDocument).where(DBSourceDocument.id == file_id)
+                )
+                doc = result.scalar_one_or_none()
+                if doc:
+                    doc.status = DocumentStatus.COMPLETED
+                await bg_session.commit()
+            tu.logger.warning(f"[INDEX_BG] No chunks extracted from {filename}")
+
+    except Exception as e:
+        tu.logger.error(f"[INDEX_BG] Fatal error for {filename}: {e}")
+        # Mark document FAILED so admin can see it in the UI
+        try:
+            async with get_background_session() as bg_session:
+                result = await bg_session.execute(
+                    select(DBSourceDocument).where(DBSourceDocument.id == file_id)
+                )
+                doc = result.scalar_one_or_none()
+                if doc:
+                    doc.status = DocumentStatus.FAILED
+                await bg_session.commit()
+        except Exception as inner:
+            tu.logger.error(f"[INDEX_BG] Could not mark FAILED: {inner}")
+
+
 # @router.post("/upload", response_model=w.SourceDocument)
 async def upload_source_pdfs(
+    background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
     session: AsyncSession = Depends(get_db_session_fa),
     spb_client: Client = Depends(get_supabase_admin_client),
 ):
     """
-    Upload multiple PDFs to Supabase and create DB records.
+    Upload PDFs: saves file + creates DB record immediately (status=PROCESSING),
+    then indexes embeddings in the background so the request never times out.
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
@@ -411,30 +490,24 @@ async def upload_source_pdfs(
     created_docs = []
 
     for file in files:
-
         # 1. Validate type
         if not file.filename.lower().endswith(".pdf"):
             raise HTTPException(
                 status_code=400, detail=f"Invalid file type: {file.filename}"
             )
 
-        # 2. Generate internal name
+        # 2. Read content
         file_id = uuid4()
         stored_filename = file.filename
-
-        # 3. Read content
         content = await file.read()
         file_size = len(content)
 
-        # 4. Upload to Supabase Storage
+        # 3. Upload to Supabase Storage
         try:
             spb_client.storage.from_("source-files").upload(
                 stored_filename,
                 content,
-                {
-                    "content-type": "application/pdf",
-                    "upsert": "true",
-                },
+                {"content-type": "application/pdf", "upsert": "true"},
             )
         except Exception as e:
             raise HTTPException(
@@ -442,60 +515,32 @@ async def upload_source_pdfs(
                 detail=f"Upload failed for {file.filename}: {str(e)}",
             )
 
-        # 5. Create DB row
+        # 4. Create DB record with PROCESSING status — commit immediately
         db_record = DBSourceDocument(
             id=file_id,
             filename=stored_filename,
             file_size_bytes=file_size,
             active=True,
-            status=DocumentStatus.COMPLETED,
+            status=DocumentStatus.PROCESSING,
         )
-
         session.add(db_record)
-        created_docs.append(db_record)
-        
-        # 6. Extract and Chunk
-        chunks = []
-        if file.filename.lower().endswith(".pdf"):
-            chunks = await extract_pdf_text(content)
-            
-        # 7. Generate Embeddings and Save Chunks
-        if chunks:
-            model = get_llm()
-            tu.logger.info(f"Generated {len(chunks)} chunks for {file.filename}")
-            
-            for chunk in chunks:
-                try:
-                    # Generate embedding
-                    embedding_response = await model.embedding_async(
-                        chunk.content, model="text-embedding-3-small"
-                    )
-                    embedding_vector = embedding_response.embedding[0]
-                    
-                    # Create Chunk Record
-                    db_chunk = DocumentChunk(
-                        id=uuid4(),
-                        source_document_id=file_id,
-                        content=chunk.content,
-                        embedding=embedding_vector,
-                        location=chunk.loc,
-                        model_used="text-embedding-3-small"
-                    )
-                    session.add(db_chunk)
-                except Exception as e:
-                    tu.logger.error(f"Failed to process chunk {chunk.id}: {e}")
-                    # Continue to next chunk instead of failing the whole upload
-                    continue
+        created_docs.append((db_record, content))
 
-
-    # 6. Save everything in one commit
+    # Commit all records before scheduling background work
     await session.commit()
 
-    # 7. Convert to wire models
-    return [
-        await doc.to_bm()
-        for doc in created_docs
-    ]
+    # 5. Schedule background indexing for each file (runs after response returns)
+    for db_record, content in created_docs:
+        background_tasks.add_task(
+            _index_pdf_background,
+            file_id=db_record.id,
+            filename=db_record.filename,
+            content=content,
+        )
+        tu.logger.info(f"[UPLOAD] Queued background indexing for {db_record.filename}")
+
+    # 6. Return immediately — status will show PROCESSING in the UI
+    return [await doc.to_bm() for doc, _ in created_docs]
 
 
 # ============================================================================
