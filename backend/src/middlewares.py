@@ -573,6 +573,7 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/notification-bar/",
         "/api/contemplation/",    # Public — same quote for all users, no auth needed
         "/health",
+        "/api/admin/make-admin",  # Bootstrap endpoint — secured by admin_secret, not JWT
     ]
 
     if any(request.url.path.startswith(path) for path in public_paths):
