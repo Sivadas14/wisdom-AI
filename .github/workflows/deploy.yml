@@ -52,6 +52,7 @@ jobs:
             --build-arg VITE_API_BASE_URL=/api \
             --build-arg VITE_SUPABASE_URL=https://jmmqzddkwsmwdczwtrwq.supabase.co \
             --build-arg VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImptbXF6ZGRrd3Ntd2Rjend0cndxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk3NDQ3NTAsImV4cCI6MjA4NTMyMDc1MH0.NRqYCh6j1VmIPckh3S2Tcs5f9xNo9n5Nr1khohlVTU8 \
+            --build-arg GIT_SHA="${GIT_SHA}" \
             -t "$IMAGE_TAG" \
             -t "$IMAGE_LATEST" \
             .
@@ -113,28 +114,45 @@ jobs:
           echo "$RESULT" | jq -r '.Service | "  Status: \(.Status)"'
 
       - name: Wait for deployment to complete
+        env:
+          GIT_SHA: ${{ github.sha }}
         run: |
-          echo "Waiting for service to reach RUNNING (up to 15 min)..."
-          # Give App Runner a few seconds to begin the transition
-          sleep 15
+          echo "Waiting for service to reach RUNNING with new version (up to 15 min)..."
+          echo "Expected version: $GIT_SHA"
+          # Give App Runner time to begin the transition before polling
+          sleep 30
+          SERVICE_URL=$(aws apprunner describe-service \
+            --service-arn "$APP_RUNNER_SERVICE_ARN" \
+            --query 'Service.ServiceUrl' --output text)
           for i in $(seq 1 45); do
             STATUS=$(aws apprunner describe-service \
               --service-arn "$APP_RUNNER_SERVICE_ARN" \
               --query 'Service.Status' --output text)
             echo "  Status: $STATUS (check $i/45, ~$((i * 20 / 60))m elapsed)"
 
-            if [ "$STATUS" = "RUNNING" ]; then
-              echo "Deployment succeeded! Service is live."
-              exit 0
-            fi
             if [ "$STATUS" = "UPDATE_FAILED" ]; then
               echo "ERROR: App Runner reported UPDATE_FAILED."
               echo "Check App Runner logs in the AWS console."
               exit 1
             fi
+
+            if [ "$STATUS" = "RUNNING" ]; then
+              # CRITICAL: verify the *new* image is actually running, not a reverted old one.
+              # App Runner silently reverts to the previous healthy revision on startup failure,
+              # keeping status=RUNNING — so we must confirm the version via the health endpoint.
+              DEPLOYED_SHA=$(curl -sf "https://$SERVICE_URL/health" \
+                | python3 -c "import sys,json; print(json.load(sys.stdin).get('version',''))" 2>/dev/null || echo "")
+              echo "  Deployed version: $DEPLOYED_SHA"
+              if [ "$DEPLOYED_SHA" = "$GIT_SHA" ]; then
+                echo "Deployment verified! New version is live: $GIT_SHA"
+                exit 0
+              else
+                echo "  RUNNING but wrong version ($DEPLOYED_SHA != $GIT_SHA) — App Runner may have reverted. Continuing to wait..."
+              fi
+            fi
             sleep 20
           done
-          echo "ERROR: Timed out after 15 minutes."
+          echo "ERROR: Timed out after 15 minutes. New version never confirmed."
           exit 1
 
       - name: Verify deployment
