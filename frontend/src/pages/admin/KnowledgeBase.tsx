@@ -54,6 +54,8 @@ export default function KnowledgeBase() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver]   = useState(false);
   const [queue, setQueue]         = useState<{ name: string; done: boolean; error?: string }[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<SourceDoc | null>(null);
+  const [deleting, setDeleting]   = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Fetch document list ──────────────────────────────────────────────────────
@@ -96,6 +98,23 @@ export default function KnowledgeBase() {
       setUploading(false);
       // Clear queue after 4 seconds
       setTimeout(() => setQueue([]), 4000);
+    }
+  };
+
+  // ── Delete handler ───────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await adminAPI.deleteSourceDocument(deleteTarget.id);
+      toast.success(`"${deleteTarget.filename.split("/").pop()}" deleted successfully`);
+      setDeleteTarget(null);
+      await fetchDocs();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? "Delete failed";
+      toast.error(`Delete failed: ${msg}`);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -243,15 +262,15 @@ export default function KnowledgeBase() {
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3">Size</th>
                 <th className="px-6 py-3">Uploaded</th>
+                <th className="px-6 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {docs.map(doc => {
                 const meta = STATUS_META[doc.status] ?? STATUS_META.pending;
-                // Strip path prefix — show only the bare filename
                 const name = doc.filename.split("/").pop() ?? doc.filename;
                 return (
-                  <tr key={doc.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={doc.id} className="hover:bg-gray-50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-orange-400 flex-shrink-0" />
@@ -277,6 +296,15 @@ export default function KnowledgeBase() {
                     <td className="px-6 py-4 text-gray-400">
                       {fmt_date(doc.created_at)}
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => setDeleteTarget(doc)}
+                        title="Delete this book"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -296,6 +324,77 @@ export default function KnowledgeBase() {
           Refresh the list to check status.
         </p>
       </div>
+
+      {/* ── Delete confirmation modal ─────────────────────────────────────── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => !deleting && setDeleteTarget(null)}
+          />
+          {/* Dialog */}
+          <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
+            {/* Close button */}
+            <button
+              onClick={() => !deleting && setDeleteTarget(null)}
+              disabled={deleting}
+              className="absolute top-4 right-4 p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Icon + title */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Delete book?</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone.</p>
+              </div>
+            </div>
+
+            {/* Filename */}
+            <div className="rounded-lg bg-gray-50 border border-gray-100 px-4 py-3 text-sm text-gray-700 break-all">
+              {deleteTarget.filename.split("/").pop()}
+            </div>
+
+            <p className="text-sm text-gray-500">
+              All indexed chunks and embeddings for this book will be permanently removed from the
+              knowledge base. Wisdom AI will no longer be able to answer questions from it.
+            </p>
+
+            {/* Actions */}
+            <div className="flex gap-3 justify-end pt-1">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-60 transition-colors flex items-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Deleting…
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete book
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

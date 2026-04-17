@@ -371,6 +371,10 @@ export const adminAPI = {
         });
         return response.data;
     },
+    deleteSourceDocument: async (documentId: string): Promise<{ success: boolean; message: string }> => {
+        const response = await apiClient.delete(`/admin/source-data/${documentId}`);
+        return response.data;
+    },
     getAllProfiles: async (): Promise<UserProfile[]> => {
         const response = await apiClient.get('/profiles/'); // based on user request "profiles/"
         return response.data;

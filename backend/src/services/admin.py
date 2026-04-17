@@ -393,7 +393,44 @@ async def list_source_data(
 
 
 # ============================================================================
-# 4. UPLOAD  DATA
+# 4. DELETE SOURCE DOCUMENT
+# ============================================================================
+
+async def delete_source_document(
+    document_id: UUID,
+    session: AsyncSession = Depends(get_db_session_fa),
+    spb_client: Client = Depends(get_supabase_admin_client),
+):
+    """
+    Delete a source document and all its chunks.
+    Also removes the file from Supabase Storage (best-effort).
+    """
+    result = await session.execute(
+        select(DBSourceDocument).where(DBSourceDocument.id == document_id)
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    filename = doc.filename
+
+    # Delete DB record (cascade removes all chunks automatically)
+    await session.delete(doc)
+    await session.commit()
+    tu.logger.info(f"[DELETE_DOC] Deleted document {document_id} ({filename}) and its chunks")
+
+    # Best-effort: remove from Supabase Storage (don't fail if missing)
+    try:
+        spb_client.storage.from_("source-files").remove([filename])
+        tu.logger.info(f"[DELETE_DOC] Removed {filename} from Supabase Storage")
+    except Exception as e:
+        tu.logger.warning(f"[DELETE_DOC] Storage remove failed (non-fatal): {e}")
+
+    return {"success": True, "message": f"Deleted '{filename}' and all its indexed passages."}
+
+
+# ============================================================================
+# 5. UPLOAD  DATA
 # ============================================================================
 
 async def _index_pdf_background(
