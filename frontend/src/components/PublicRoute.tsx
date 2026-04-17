@@ -22,7 +22,8 @@ const PublicRoute: React.FC<PublicRouteProps> = ({ element }) => {
     }
 
     if (isAuthenticated) {
-        const targetPath = userProfile?.role === 'ADMIN' ? '/admin' : '/';
+        // '/' is the public landing page; authenticated users go to the portal or admin
+        const targetPath = userProfile?.role === 'ADMIN' ? '/admin' : '/home';
         return <Navigate to={targetPath} replace />;
     }
 

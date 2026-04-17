@@ -89,15 +89,16 @@ const AuthCallback: React.FC = () => {
           console.log('✅ [AuthCallback] Profile complete, redirecting...');
           setStatus('Redirecting...');
           const params = new URLSearchParams(window.location.search);
-          const redirectTo = params.get('redirectTo') || '/';
+          // Default to /home — '/' is now the public landing page
+          const redirectTo = params.get('redirectTo') || '/home';
 
           setTimeout(() => {
             navigate(redirectTo, { replace: true });
           }, 500);
         } catch (err) {
           console.error('❌ [AuthCallback] Error checking profile:', err);
-          // On error, just redirect to home
-          navigate('/', { replace: true });
+          // On error, just redirect to home portal ('/' is now the public landing page)
+          navigate('/home', { replace: true });
         }
       };
 

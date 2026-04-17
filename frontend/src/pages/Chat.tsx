@@ -1028,7 +1028,7 @@ const Chat = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/home")}
               className="text-[#472B20]"
             >
               <ArrowLeft className="h-5 w-5" />

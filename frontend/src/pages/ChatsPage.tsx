@@ -143,7 +143,7 @@ const ChatsPage = () => {
     };
 
     const handleNewChat = () => {
-        navigate("/");
+        navigate("/home");
     };
 
     return (

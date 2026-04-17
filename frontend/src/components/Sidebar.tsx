@@ -108,7 +108,7 @@ const Sidebar = () => {
             setShowPlansModal(true);
             return;
         }
-        navigate("/");
+        navigate("/home");
     };
 
     const handleLogout = async () => {
@@ -119,7 +119,7 @@ const Sidebar = () => {
     return (
         <div className="flex bg-[#F5F0EC] flex-col h-full w-[260px] border-r border-[#ECE5DF]">
             <div className="px-4 pt-2 pb-2">
-                <div onClick={() => navigate("/")} className="cursor-pointer">
+                <div onClick={() => navigate("/home")} className="cursor-pointer">
                     {/* <img
                         src="/images/LogoPrimary/Logo-Primary.svg"
                         alt="ArunachalaSamudra"

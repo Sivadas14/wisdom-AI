@@ -134,7 +134,7 @@ const Register: React.FC = () => {
         } else {
           setSuccess("Registration successful! Redirecting...");
           setTimeout(() => {
-            navigate('/');
+            navigate('/home');
           }, 2000);
         }
       } else {
@@ -181,7 +181,7 @@ const Register: React.FC = () => {
 
         // Small delay to ensure auth state is fully updated
         setTimeout(() => {
-          navigate('/');
+          navigate('/home');
         }, 500);
       } else {
         setError(response.message || "Invalid verification code. Please try again.");

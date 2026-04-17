@@ -58,7 +58,8 @@ const SignIn: React.FC = () => {
 
         const location = window.history.state?.usr;
         const fromState = location as { from?: { pathname: string; search: string } } | undefined;
-        let targetPath = fromState?.from?.pathname ? `${fromState.from.pathname}${fromState.from.search || ''}` : '/';
+        // Default to /home (chat portal) — '/' is now the public landing page
+        let targetPath = fromState?.from?.pathname ? `${fromState.from.pathname}${fromState.from.search || ''}` : '/home';
 
         if (response.userProfile?.role === 'ADMIN') {
           targetPath = '/admin';
@@ -173,7 +174,8 @@ const SignIn: React.FC = () => {
         // Correct way to access location state
         const location = window.history.state?.usr;
         const fromState = location as { from?: { pathname: string; search: string } } | undefined;
-        let targetPath = fromState?.from?.pathname ? `${fromState.from.pathname}${fromState.from.search || ''}` : '/';
+        // Default to /home (chat portal) — '/' is now the public landing page
+        let targetPath = fromState?.from?.pathname ? `${fromState.from.pathname}${fromState.from.search || ''}` : '/home';
 
         if (response.userProfile?.role === 'ADMIN') {
           targetPath = '/admin';

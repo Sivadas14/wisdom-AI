@@ -83,8 +83,8 @@ const ProfileCompletion: React.FC = () => {
                 return;
             }
 
-            // Success - redirect to home
-            navigate('/');
+            // Success - redirect to home portal ('/' is now the public landing page)
+            navigate('/home');
         } catch (err: any) {
             setError(err.message || "Failed to complete profile");
         } finally {
