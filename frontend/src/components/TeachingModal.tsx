@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { X, Play, Pause, Square, Volume2 } from "lucide-react";
+import { X, Play, Pause, Square, Volume2, ArrowLeft } from "lucide-react";
 import { type Teaching } from "@/data/teachings";
 
 interface TeachingModalProps {
@@ -57,21 +57,40 @@ export default function TeachingModal({
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(teaching.introduction);
-    utterance.rate = 0.88;
-    utterance.pitch = 0.95;
+    // Slow, deliberate pace — like a calm teacher reading aloud
+    utterance.rate = 0.80;
+    utterance.pitch = 0.90;
+    utterance.volume = 1.0;
 
-    // Prefer a calm, clear English voice
+    // Voice priority: dignified, deep UK/Australian male voices first,
+    // then any UK English, then clear US male, then any English fallback.
+    const VOICE_PRIORITY = [
+      "Daniel",               // macOS/iOS UK English Male — very dignified
+      "Arthur",               // macOS Ventura+ UK English Male
+      "Google UK English Male",
+      "Gordon",               // macOS Australian Male
+      "Alex",                 // macOS US English Male (deep, clear)
+      "Fred",                 // macOS US English Male (older, unique)
+      "Google US English",
+    ];
+
     const loadVoice = () => {
       const voices = window.speechSynthesis.getVoices();
-      const preferred = voices.find(
+      // Try each preferred voice in order
+      for (const name of VOICE_PRIORITY) {
+        const match = voices.find((v) => v.name === name);
+        if (match) { utterance.voice = match; return; }
+      }
+      // Final fallback: any English voice that isn't female
+      const fallback = voices.find(
         (v) =>
-          v.name === "Google UK English Female" ||
-          v.name === "Samantha" ||
-          v.name === "Karen" ||
-          v.name === "Moira" ||
-          (v.lang.startsWith("en") && v.name.toLowerCase().includes("female"))
+          v.lang.startsWith("en") &&
+          !v.name.toLowerCase().includes("female") &&
+          !["samantha", "karen", "moira", "victoria", "tessa"].includes(
+            v.name.toLowerCase()
+          )
       );
-      if (preferred) utterance.voice = preferred;
+      if (fallback) utterance.voice = fallback;
     };
 
     // Voices may not be loaded yet on first call
@@ -135,18 +154,30 @@ export default function TeachingModal({
       >
         {/* Header */}
         <div
-          className="flex-shrink-0 px-6 pt-6 pb-4"
+          className="flex-shrink-0 px-6 pt-5 pb-4"
           style={{
             background: "linear-gradient(135deg, #3a2318 0%, #6b3a22 100%)",
           }}
         >
-          <button
-            onClick={() => { stopAudio(); onClose(); }}
-            className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          {/* Top row: Back ← on left, X on right */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => { stopAudio(); onClose(); }}
+              className="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-sm font-body"
+              aria-label="Back to teachings"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back</span>
+            </button>
+
+            <button
+              onClick={() => { stopAudio(); onClose(); }}
+              className="text-white/50 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
           <p className="text-xs font-body tracking-widest uppercase text-orange-300 mb-1">
             {teaching.sanskrit}

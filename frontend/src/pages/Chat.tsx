@@ -1105,20 +1105,6 @@ const Chat = () => {
                 Ask anything about Ramana Maharshi's teachings, or choose a topic below
               </p>
 
-              {/* ── DEPLOYMENT PROBE ── remove after confirming new code is live */}
-              <div style={{
-                background: "#c0392b",
-                color: "white",
-                padding: "6px 14px",
-                borderRadius: "6px",
-                fontSize: "12px",
-                fontFamily: "monospace",
-                display: "inline-block",
-                marginBottom: "16px",
-              }}>
-                BUILD: 17-APR-2026-v4
-              </div>
-
               {/* Today's Contemplation Card */}
               <div className="w-full mb-6">
                 <div
