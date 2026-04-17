@@ -447,7 +447,7 @@ const Register: React.FC = () => {
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Check Your Email</h3>
                   <p className="text-sm text-gray-600 mb-4">
-                    We sent a 6-digit verification code to:<br />
+                    We sent an 8-digit verification code to:<br />
                     <strong className="text-gray-800">{email}</strong>
                   </p>
                 </div> */}
@@ -461,14 +461,14 @@ const Register: React.FC = () => {
                     type="text"
                     value={otp}
                     onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder="Enter 6-digit code"
+                    placeholder="Enter 8-digit code"
                     className="text-center tracking-widest text-lg font-mono h-12 text-base"
                     disabled={isLoading}
                     maxLength={8}
                     required
                   />
                   {/* <p className="text-xs text-gray-500 text-center">
-                    Enter the 6-digit code from your email
+                    Enter the 8-digit code from your email
                   </p> */}
                 </div>
 

@@ -87,8 +87,8 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
       return;
     }
 
-    if (otp.length < 6) {
-      setError("Verification code must be 6 digits");
+    if (otp.length < 8) {
+      setError("Verification code must be 8 digits");
       return;
     }
 
@@ -179,7 +179,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
           </DialogTitle>
           <DialogDescription className="text-center text-gray-600">
             {isOtpSent
-              ? `Enter the 6-digit code sent to ${email}`
+              ? `Enter the 8-digit code sent to ${email}`
               : "Join our mindful community by creating your account"
             }
           </DialogDescription>
@@ -284,7 +284,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
                       <Mail className="w-6 h-6 text-blue-600" />
                     </div>
                     <p className="text-sm text-gray-600 mb-4">
-                      We sent a 6-digit verification code to:<br />
+                      We sent an 8-digit verification code to:<br />
                       <strong>{email}</strong>
                     </p>
                   </div>
