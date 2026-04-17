@@ -363,6 +363,14 @@ export const adminAPI = {
         const response = await apiClient.get('/admin/source-data/list');
         return response.data;
     },
+    uploadSourcePdfs: async (files: File[]): Promise<{ id: string; filename: string; status: string }[]> => {
+        const form = new FormData();
+        files.forEach(f => form.append('files', f));
+        const response = await apiClient.post('/admin/upload', form, {
+            headers: { 'Content-Type': undefined },
+        });
+        return response.data;
+    },
     getAllProfiles: async (): Promise<UserProfile[]> => {
         const response = await apiClient.get('/profiles/'); // based on user request "profiles/"
         return response.data;
