@@ -91,7 +91,9 @@ async def _close_db(app: FastAPI):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[TRACE] lifespan() start")
+    deployed_sha = os.getenv("GIT_SHA", "unknown")
+    print(f"[TRACE] lifespan() start  GIT_SHA={deployed_sha}")
+    logger.info(f"=== DEPLOYED VERSION: {deployed_sha} ===")
     try:
         tu.logger.info("Initializing application lifespan...")
         # Setup

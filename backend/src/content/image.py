@@ -260,16 +260,61 @@ async def generate_contemplation_card(
 # ------------------------------------------------------------
 
 
+async def _get_conversation_topic_summary(
+    session: AsyncSession,
+    conversation_id: str,
+) -> str:
+    """
+    Return a brief plain-English summary of what the conversation was about,
+    by reading the last 6 messages (3 turns). Used to guide contextual quote selection.
+    """
+    try:
+        query = (
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(6)
+        )
+        result = await session.execute(query)
+        messages = list(reversed(result.scalars().all()))
+        if not messages:
+            return ""
+        # Build a short transcript snippet
+        parts = []
+        for msg in messages:
+            role = "User" if msg.role == MessageRole.USER else "Assistant"
+            # Trim each message to 300 chars to keep the context concise
+            content = (msg.content or "")[:300]
+            if content.strip():
+                parts.append(f"{role}: {content}")
+        return "\n".join(parts)
+    except Exception as e:
+        logger.warning(f"Could not get conversation topic: {e}")
+        return ""
+
+
 async def _get_quote_from_citations_or_random(
     session: AsyncSession,
     conversation_id: str,
     message_id: str,
 ) -> str:
     """
-    Check for citations in the current message or conversation.
-    If none exist, pick a random source file and generate a quote from random chunks.
+    Pick a Ramana quote that is thematically relevant to the conversation.
+
+    Strategy:
+    1. Prefer chunks that were actually cited by the AI assistant in this message
+       (they were retrieved by semantic search, so they're already on-topic).
+    2. Fall back to any cited chunk in the conversation.
+    3. Fall back to random chunks from a random source document.
+
+    In all cases, pass a brief conversation-topic summary to the LLM so it can
+    choose the quote that best matches what the user was exploring.
     """
     model = get_llm("gpt-4o")
+
+    # Get a brief summary of the conversation topic so the LLM can pick a quote
+    # that mirrors what the user was actually exploring.
+    conversation_topic = await _get_conversation_topic_summary(session, conversation_id)
 
     # First, get the current message
     current_message_query = select(Message).where(Message.id == message_id)
@@ -369,6 +414,20 @@ async def _get_quote_from_citations_or_random(
         logger.info("Source text not usable — using fallback Ramana quote")
         return random.choice(FALLBACK_RAMANA_QUOTES)
 
+    # Build a context hint for the quote-selection prompt so the LLM knows
+    # what the user was exploring and can pick the most relevant passage.
+    topic_hint = ""
+    if conversation_topic.strip():
+        topic_hint = dedent(f"""
+    The user was exploring this topic in their conversation:
+    ---
+    {conversation_topic}
+    ---
+    Prioritise choosing a quote that speaks directly to the above theme.
+    If no passage in the source text is relevant to that theme,
+    choose the most profound passage available.
+    """)
+
     # Extract a genuine quote from the Ramana source text.
     # Crucially: we ask the LLM to EXTRACT or closely paraphrase from the provided text,
     # never to invent or draw on general knowledge.
@@ -378,7 +437,7 @@ async def _get_quote_from_citations_or_random(
     Your task is to select and return a complete, meaningful quote directly from
     the provided text below — something that would look beautiful on a
     contemplation card.
-
+    {topic_hint}
     Rules:
     - You MUST quote or very closely paraphrase the actual text provided. Do NOT invent.
     - Do NOT draw on any knowledge outside the provided passages.
