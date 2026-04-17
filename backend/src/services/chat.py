@@ -297,24 +297,12 @@ async def _llm_chat(
         )
         ai_message.follow_up_questions = follow_up  # Direct assignment
         
-        # Generate title if conversation doesn't have one
-        # Generate title if conversation doesn't have one
+        # Generate title from the user's own words — no API call needed
         if not conversation.title:
-            try:
-                # Generate a relevant title
-                title_thread = tt.Thread(
-                    tt.system("Generate a short, concise title (3-6 words) for this conversation based ONLY on the user's message. Use only the information provided, no general knowledge."),
-                    tt.human(f"Message: {user_message}\n\nTitle:")
-                )
-                title_response = await model.chat_async(title_thread)
-                generated_title = str(title_response.content).strip().strip('"')
-                conversation.title = generated_title
-            except Exception as e:
-                tu.logger.error(f"Failed to generate title: {e}")
-                conversation.title = "New Conversation"
-            
+            words = user_message.strip().split()
+            conversation.title = " ".join(words[:7]) + ("…" if len(words) > 7 else "")
             await session.commit()
-        
+
         op.finish(commits_count=4, citations_count=len(citations))
     
     yield ta.to_openai_chunk(tt.assistant(f"<message_id>{ai_message.id}</message_id>"))
@@ -449,27 +437,16 @@ async def _llm_chat_optimized(
         # Use this instead:
         ai_message.follow_up_questions = follow_up
         
-        # Generate title if conversation doesn't have one
-        # Generate title if conversation doesn't have one
+        # Generate title from the user's own words — no API call needed
         if not conversation.title:
-            try:
-                # Generate a relevant title
-                title_thread = tt.Thread(
-                    tt.system("Generate a short, concise title (3-6 words) for this conversation based ONLY on the user's message. Use only the information provided, no general knowledge."),
-                    tt.human(f"Message: {user_message}\n\nTitle:")
-                )
-                title_response = await model.chat_async(title_thread)
-                generated_title = str(title_response.content).strip().strip('"')
-                conversation.title = generated_title
-            except Exception as e:
-                tu.logger.error(f"Failed to generate title: {e}")
-                conversation.title = "New Conversation"
-        
+            words = user_message.strip().split()
+            conversation.title = " ".join(words[:7]) + ("…" if len(words) > 7 else "")
+
         # SINGLE BATCH COMMIT
         session.add(ai_message)
         await session.commit()
         await session.refresh(ai_message)
-        
+
         op.finish(commits_count=1, citations_count=len(citations))
     
     yield ta.to_openai_chunk(tt.assistant(f"<message_id>{ai_message.id}</message_id>"))
@@ -508,7 +485,7 @@ async def _llm_chat_streaming_optimized(
     # STEP 1: Intent pre-classification — fast gate before any vector work #
     # ------------------------------------------------------------------ #
     async with profile_operation("intent_classification") as op:
-        is_on_topic = await _classify_intent(model, user_message)
+        is_on_topic = _classify_intent(user_message)
         op.finish(on_topic=is_on_topic)
 
     # ------------------------------------------------------------------ #
@@ -533,36 +510,19 @@ async def _llm_chat_streaming_optimized(
     async with profile_operation("thread_preparation") as op:
         # Check if chunks were found
         if not chunks or len(chunks) == 0:
-            tu.logger.warning(f"No sufficiently relevant passages found for query: {user_message}")
-            # No relevant Ramana library content found — ask the LLM for a warm, on-brand
-            # response that never reveals internal terminology.
-            master_thread.append(
-                tt.human(
-                    dedent(
-                        f"""
-                        The library did not return a relevant passage for this question.
-
-                        INSTRUCTIONS — respond as a warm, humble teacher:
-                        - If this is a simple greeting (hi, hello, namaste, etc.), reply briefly
-                          and warmly in the spirit of Ramana's silence. Do not add spiritual content.
-                        - For all other questions, write a short, compassionate response that:
-                            * Acknowledges the question with genuine warmth.
-                            * Explains, in natural flowing prose, that this particular topic is not
-                              covered in the passages currently available to you.
-                            * Gently suggests the seeker explore the Arunachala Samudra library
-                              (accessible from the app) or visit the Ashram's own library at
-                              Ramanasramam.org for deeper study of this text.
-                            * Invites them to ask another question or try rephrasing.
-                        - NEVER use words like "chunks", "database", "vector", "threshold",
-                          "similarity", "retrieval", or any technical term whatsoever.
-                        - Keep the tone gentle, devotional, and encouraging — as Bhagavan himself
-                          would: direct the seeker inward, not to a system.
-
-                        User's message: {user_message}
-                        """
-                    )
-                )
+            tu.logger.warning(f"[NO_CHUNKS] No passages found for query — returning static refusal (no API call): {user_message[:80]!r}")
+            # Return immediately — no OpenAI call. The library must supply the answer.
+            static_refusal = (
+                "The library does not currently have indexed passages that match your question. "
+                "This could mean the relevant book has not yet been uploaded to the knowledge base, "
+                "or the topic may be outside what Bhagavan's preserved texts address directly.\n\n"
+                "Please try rephrasing your question, or explore the full collection at "
+                "Ramanasramam.org. You are also welcome to ask about any other teaching from "
+                "the Ramana Maharshi library."
             )
+            yield ta.to_openai_chunk(tt.assistant(static_refusal))
+            yield "[DONE]\n\n"
+            return
         else:
             # Chunks found - use strict RAG approach
             chunk_text = "Here are the ONLY passages you may use to answer the question:\n\n"
@@ -676,22 +636,11 @@ async def _llm_chat_streaming_optimized(
         
         ai_message.follow_up_questions = follow_up
         
-        # Generate title if conversation doesn't have one
+        # Generate title from the user's own words — no API call needed
         if not conversation.title:
-            try:
-                # Generate a relevant title
-                title_thread = tt.Thread(
-                    tt.system("Generate a short, concise title (3-6 words) for this conversation based ONLY on the user's message. Use only the information provided, no general knowledge."),
-                    tt.human(f"Message: {user_message}\n\nTitle:")
-                )
-                title_response = await model.chat_async(title_thread)
-                tu.logger.info(f"Title response: {title_response}")
-                generated_title = str(title_response).strip().strip('"')
-                conversation.title = generated_title
-            except Exception as e:
-                tu.logger.error(f"Failed to generate title: {e}")
-                conversation.title = "New Conversation"
-        
+            words = user_message.strip().split()
+            conversation.title = " ".join(words[:7]) + ("…" if len(words) > 7 else "")
+
         # SINGLE BATCH COMMIT
         session.add(ai_message)
         session.add(conversation)
@@ -771,24 +720,21 @@ async def _build_contextual_query(
         return user_message
 
 
-async def _classify_intent(
-    model: tt.ModelInterface,
+def _classify_intent(
     user_message: str,
 ) -> bool:
     """Pre-classify whether a query is Ramana-topic or clearly off-topic.
 
     Returns True  → proceed to vector search and LLM response.
-    Returns False → short-circuit with the no-chunk refusal path.
+    Returns False → short-circuit immediately (no API call at all).
 
-    Simple greetings and very short messages always pass (True) without calling
-    the model, to avoid unnecessary latency on common openers.
-
-    Defaults to True on any classification error so genuine queries are never
-    silently dropped.
+    Uses keyword matching ONLY — zero API calls, zero cost, instant.
+    Defaults to True (pass) for anything ambiguous so genuine questions
+    are never silently dropped.
     """
     stripped = user_message.strip().lower()
 
-    # Fast path: greetings / very short messages pass without an API call
+    # Fast pass: greetings / very short messages
     INSTANT_PASS = {
         "hi", "hello", "hey", "namaste", "om", "om namah shivaya",
         "good morning", "good evening", "good afternoon",
@@ -797,36 +743,27 @@ async def _classify_intent(
     if stripped in INSTANT_PASS or len(stripped) <= 4:
         return True
 
-    classification_prompt = dedent(
-        f"""
-        You are a classifier for a Sri Ramana Maharshi wisdom application.
-        Decide whether the message below should be answered from the Ramana Maharshi library.
+    # Hard block: clearly off-topic keywords
+    OFF_TOPIC = [
+        "cricket", "football", "soccer", "ipl", "nfl", "nba", "hockey",
+        "tennis", "sport", "match", "score", "player", "team",
+        "movie", "film", "netflix", "amazon prime", "bollywood", "actor", "actress",
+        "politics", "election", "modi", "trump", "biden", "government", "party",
+        "stock", "crypto", "bitcoin", "ethereum", "invest", "finance", "market",
+        "recipe", "food", "restaurant", "cook", "meal", "diet",
+        "weather", "temperature", "forecast", "rain",
+        "game", "gaming", "playstation", "xbox", "nintendo",
+        "fashion", "shopping", "clothes", "shoes",
+        "news", "breaking", "headline",
+    ]
+    for kw in OFF_TOPIC:
+        if kw in stripped:
+            tu.logger.info(f"[INTENT] BLOCK (keyword={kw!r}) — {user_message[:60]!r}")
+            return False
 
-        Reply YES if the message is:
-        - A greeting or conversational opener
-        - Related to Sri Ramana Maharshi, self-enquiry, "Who Am I?", Advaita Vedanta,
-          the Self, consciousness, meditation, silence, surrender, Arunachala,
-          Tiruvannamalai, spiritual liberation, or contemplative practice
-
-        Reply NO if the message is clearly about an unrelated topic such as:
-        - Sports, entertainment, politics, food, technology, geography, general science,
-          history unrelated to Indian spiritual traditions, or other worldly subjects
-
-        Message: "{user_message}"
-
-        Reply with only YES or NO.
-        """
-    ).strip()
-
-    try:
-        response = await model.chat_async(classification_prompt)
-        answer = (response.content if hasattr(response, "content") else str(response)).strip().upper()
-        is_relevant = answer.startswith("YES")
-        tu.logger.info(f"[INTENT] {'PASS' if is_relevant else 'BLOCK'} — {user_message[:60]!r}")
-        return is_relevant
-    except Exception as e:
-        tu.logger.warning(f"[INTENT] Classification failed, defaulting to PASS: {e}")
-        return True  # Fail open — never silently drop a genuine question
+    # Everything else: spiritual, philosophical, or ambiguous → pass
+    tu.logger.info(f"[INTENT] PASS — {user_message[:60]!r}")
+    return True
 
 
 async def _embedding_search_optimized(
