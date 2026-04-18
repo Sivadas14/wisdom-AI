@@ -1037,25 +1037,26 @@ function Footer() {
     setSubscribeState("loading");
     setErrorMsg("");
     try {
-      // Post directly to Loops public newsletter-form endpoint (no backend needed)
-      const formData = new URLSearchParams();
-      formData.append("email", trimmed);
-
-      const res = await fetch(
-        "https://app.loops.so/api/newsletter-form/34c57503fff70c6e2f3423db78b59606",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formData.toString(),
-        }
-      );
+      const res = await fetch("https://app.loops.so/api/v1/contacts/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "ApiKey 34c57503fff70c6e2f3423db78b59606",
+        },
+        body: JSON.stringify({
+          email: trimmed,
+          subscribed: true,
+          source: "co.in website",
+          userGroup: "Newsletter",
+        }),
+      });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && (data.success || data.id)) {
+      if (data.success === true || data.id) {
         setSubscribeState("success");
       } else {
-        // Loops returns { success: false, message: "..." } for duplicates — still show success
+        // Loops returns success:false with a message for duplicates — treat as success
         const msg = (data.message || "").toLowerCase();
-        if (msg.includes("already") || msg.includes("exist") || msg.includes("subscribed")) {
+        if (msg.includes("already") || msg.includes("exist") || msg.includes("duplicate")) {
           setSubscribeState("success");
         } else {
           setErrorMsg(data.message || "Something went wrong. Please try again.");
