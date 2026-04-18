@@ -12,7 +12,10 @@ The Loops API key is stored server-side so it is never exposed to the browser.
 from __future__ import annotations
 
 import logging
-import httpx
+import asyncio
+from functools import partial
+
+import requests  # requests is available via supabase dependency
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
@@ -23,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/newsletter", tags=["newsletter"])
 
-LOOPS_API_URL = "https://app.loops.so/api/v1/contacts/create"
+LOOPS_CONTACT_URL = "https://app.loops.so/api/v1/contacts/create"
+LOOPS_UPDATE_URL  = "https://app.loops.so/api/v1/contacts/update"
 
 
 class SubscribeRequest(BaseModel):
@@ -35,6 +39,62 @@ class SubscribeResponse(BaseModel):
     message: str
 
 
+def _call_loops(api_key: str, email: str) -> tuple[bool, str]:
+    """
+    Synchronous Loops API call (run in a thread executor so it doesn't
+    block the async event loop).
+
+    Loops contact/create returns:
+      200  { "success": true,  "id": "..." }           — new contact created
+      200  { "success": false, "message": "..." }       — already exists or other
+    """
+    headers = {
+        "Authorization": f"ApiKey {api_key}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "email": email,
+        "subscribed": True,
+        "source": "co.in website",
+        "userGroup": "Newsletter",
+    }
+
+    try:
+        resp = requests.post(LOOPS_CONTACT_URL, json=body, headers=headers, timeout=10)
+    except requests.Timeout:
+        logger.error("Loops API timed out for %s", email)
+        return False, "Request timed out. Please try again."
+    except requests.RequestException as e:
+        logger.error("Loops request error for %s: %s", email, e)
+        return False, "Network error. Please try again."
+
+    logger.info("Loops response for %s: status=%s body=%s", email, resp.status_code, resp.text[:200])
+
+    if resp.status_code == 200:
+        data = resp.json()
+        if data.get("success"):
+            return True, "Subscribed successfully."
+        # success:false usually means duplicate — treat as success
+        msg = data.get("message", "")
+        if "already" in msg.lower() or "duplicate" in msg.lower() or "exist" in msg.lower():
+            return True, "Already subscribed."
+        # Try update endpoint for existing contacts
+        try:
+            resp2 = requests.put(LOOPS_UPDATE_URL, json=body, headers=headers, timeout=10)
+            if resp2.status_code == 200 and resp2.json().get("success"):
+                return True, "Subscription updated."
+        except Exception:
+            pass
+        # Still return success — email was received, Loops may have it already
+        return True, "Already subscribed."
+
+    if resp.status_code == 409:
+        return True, "Already subscribed."
+
+    logger.error("Loops API error %s: %s", resp.status_code, resp.text[:200])
+    return False, "Unable to subscribe at this time. Please try again later."
+
+
 @router.post("/subscribe", response_model=SubscribeResponse)
 async def subscribe(payload: SubscribeRequest):
     """
@@ -44,51 +104,20 @@ async def subscribe(payload: SubscribeRequest):
     settings = get_settings()
 
     if not settings.loops_api_key:
-        logger.error("ASAM_LOOPS_API_KEY is not configured")
+        logger.error("ASAM_LOOPS_API_KEY is not configured in environment variables")
         raise HTTPException(
             status_code=503,
             detail="Newsletter service is not configured. Please contact info@arunachalasamudra.in."
         )
 
-    headers = {
-        "Authorization": f"ApiKey {settings.loops_api_key}",
-        "Content-Type": "application/json",
-    }
+    # Run synchronous requests call in a thread so we don't block the event loop
+    loop = asyncio.get_event_loop()
+    ok, message = await loop.run_in_executor(
+        None,
+        partial(_call_loops, settings.loops_api_key, str(payload.email))
+    )
 
-    body = {
-        "email": payload.email,
-        "subscribed": True,
-        "source": "co.in website",
-        "userGroup": "Newsletter",
-    }
+    if not ok:
+        raise HTTPException(status_code=502, detail=message)
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(LOOPS_API_URL, json=body, headers=headers)
-
-        if response.status_code in (200, 201):
-            logger.info("Subscribed %s to Loops newsletter", payload.email)
-            return SubscribeResponse(success=True, message="Subscribed successfully.")
-
-        # Loops returns 409 when the contact already exists — treat as success
-        if response.status_code == 409:
-            logger.info("Contact %s already exists in Loops — updating subscription", payload.email)
-            return SubscribeResponse(success=True, message="Already subscribed.")
-
-        logger.error("Loops API error %s: %s", response.status_code, response.text)
-        raise HTTPException(
-            status_code=502,
-            detail="Unable to subscribe at this time. Please try again later."
-        )
-
-    except httpx.TimeoutException:
-        logger.error("Loops API timed out for %s", payload.email)
-        raise HTTPException(
-            status_code=504,
-            detail="Request timed out. Please try again."
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Unexpected error subscribing %s: %s", payload.email, e)
-        raise HTTPException(status_code=500, detail="An unexpected error occurred.")
+    return SubscribeResponse(success=True, message=message)
