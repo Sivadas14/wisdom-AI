@@ -235,11 +235,11 @@ function PublicHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
         style={{ borderBottom: `1px solid ${T.border}` }}
         className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between"
       >
-        <Link to="/">
+        <a href="https://www.arunachalasamudra.in" style={{ textDecoration: "none" }}>
           <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "1.3rem", letterSpacing: "-0.01em" }}>
             Arunachala Samudra
           </span>
-        </Link>
+        </a>
         <div className="hidden md:flex items-center gap-1.5" style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.82rem" }}>
           <Mail className="w-3.5 h-3.5" />
           <a href="mailto:info@arunachalasamudra.co.in" className="hover:opacity-70 transition-opacity">
@@ -1092,10 +1092,12 @@ function Footer() {
             <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.72rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1rem" }}>Resources</p>
             <ul className="space-y-2">
               {[
-                { label: "Arunachala Samudra .in",  href: "https://www.arunachalasamudra.in"  },
-                { label: "Ramanasramam.org",         href: "https://www.ramanasramam.org"      },
-                { label: "David Godman",              href: "https://www.davidgodman.org"       },
-                { label: "Mountain Path Journal",     href: "https://www.mountainpath.org"      },
+                { label: "Arunachala Samudra .in",   href: "https://www.arunachalasamudra.in"                          },
+                { label: "Digital Experience Centre", href: "https://www.arunachalasamudra.in/digital-experience-centre" },
+                { label: "Sacred Teachings",          href: "https://www.arunachalasamudra.in/sacred-teachings"         },
+                { label: "Ramanasramam.org",          href: "https://www.ramanasramam.org"                              },
+                { label: "David Godman",              href: "https://www.davidgodman.org"                               },
+                { label: "Mountain Path Journal",     href: "https://www.mountainpath.org"                              },
                 { label: "Arunachala Ashrama NY",     href: "https://www.arunachala.org"        },
               ].map(({ label, href }) => (
                 <li key={label}><a href={href} target="_blank" rel="noopener noreferrer" style={{ fontFamily: T.sans, color: "#8A6D5E", fontSize: "0.85rem" }} className="hover:text-[#C4A892] transition-colors">{label}</a></li>
