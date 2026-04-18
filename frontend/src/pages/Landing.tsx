@@ -280,9 +280,11 @@ function PublicHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
           <Link to="/signin" style={{ color: T.brown, fontFamily: T.sans, fontSize: "0.85rem" }} className="hover:opacity-60 transition-opacity">
             Sign In
           </Link>
-          <Link to={isAuthenticated ? "/home" : "/register"} style={btn}>
-            {isAuthenticated ? "Go to Portal →" : "Begin — it's free"}
-          </Link>
+          {isAuthenticated ? (
+            <Link to="/home" style={btn}>Go to Portal →</Link>
+          ) : (
+            <a href="#try" style={btn}>Begin — it's free</a>
+          )}
         </div>
       </div>
 
@@ -307,9 +309,11 @@ function PublicHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
           </div>
           <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: "1rem" }} className="flex flex-col gap-3">
             <Link to="/signin" style={{ color: T.brown, fontFamily: T.sans }} onClick={() => setMenuOpen(false)}>Sign In</Link>
-            <Link to={isAuthenticated ? "/home" : "/register"} style={{ ...btn, textAlign: "center" }} onClick={() => setMenuOpen(false)}>
-              {isAuthenticated ? "Go to Portal →" : "Begin — it's free"}
-            </Link>
+            {isAuthenticated ? (
+              <Link to="/home" style={{ ...btn, textAlign: "center" }} onClick={() => setMenuOpen(false)}>Go to Portal →</Link>
+            ) : (
+              <a href="#try" style={{ ...btn, textAlign: "center" }} onClick={() => setMenuOpen(false)}>Begin — it's free</a>
+            )}
           </div>
         </div>
       )}
@@ -378,9 +382,9 @@ function HeroSection({ isAuthenticated }: { isAuthenticated: boolean }) {
             </Link>
           ) : (
             <>
-              <Link to="/register" style={{ ...btn, fontSize: "0.95rem", padding: "0.85rem 2rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+              <a href="#try" style={{ ...btn, fontSize: "0.95rem", padding: "0.85rem 2rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
                 Begin — it's free <ArrowRight className="w-4 h-4" />
-              </Link>
+              </a>
               <Link to="/signin" style={{ fontFamily: T.sans, fontSize: "0.95rem", fontWeight: 600, padding: "0.85rem 2rem", borderRadius: "5px", border: "1px solid rgba(245,220,200,0.28)", color: "rgba(245,220,200,0.88)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                 Sign in
               </Link>
@@ -1003,9 +1007,15 @@ function FinalCTA({ isAuthenticated }: { isAuthenticated: boolean }) {
         <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "1rem", lineHeight: 1.7, marginBottom: "2.5rem" }}>
           Whether you are new to Ramana's teachings or have studied them for years, the portal meets you exactly where you are.
         </p>
-        <Link to={isAuthenticated ? "/home" : "/register"} style={{ ...btn, fontSize: "0.95rem", padding: "0.85rem 2.25rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
-          {isAuthenticated ? "Return to your portal" : "Begin — it's free"} <ArrowRight className="w-4 h-4" />
-        </Link>
+        {isAuthenticated ? (
+          <Link to="/home" style={{ ...btn, fontSize: "0.95rem", padding: "0.85rem 2.25rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+            Return to your portal <ArrowRight className="w-4 h-4" />
+          </Link>
+        ) : (
+          <a href="#try" style={{ ...btn, fontSize: "0.95rem", padding: "0.85rem 2.25rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+            Begin — it's free <ArrowRight className="w-4 h-4" />
+          </a>
+        )}
       </div>
     </section>
   );
