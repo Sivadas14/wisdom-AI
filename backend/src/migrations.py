@@ -526,6 +526,25 @@ async def _create_guest_sessions_table(session: AsyncSession) -> None:
     _log("guest_sessions table verified/created.")
 
 
+async def _create_newsletter_subscribers_table(session: AsyncSession) -> None:
+    """Idempotently create the newsletter_subscribers table."""
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+            id            SERIAL      PRIMARY KEY,
+            email         VARCHAR(320) NOT NULL UNIQUE,
+            source        VARCHAR(100) NOT NULL DEFAULT 'co.in website',
+            subscribed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            active        BOOLEAN NOT NULL DEFAULT TRUE
+        )
+    """))
+    await session.execute(text("""
+        CREATE INDEX IF NOT EXISTS ix_newsletter_subscribers_email
+            ON newsletter_subscribers (email)
+    """))
+    await session.commit()
+    _log("newsletter_subscribers table verified/created.")
+
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -548,6 +567,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_create_ramana_images_table", _create_ramana_images_table)
         await _safe_migration(session, "_create_guest_sessions_table", _create_guest_sessions_table)
         await _safe_migration(session, "_create_daily_contemplations_table", _create_daily_contemplations_table)
+        await _safe_migration(session, "_create_newsletter_subscribers_table", _create_newsletter_subscribers_table)
         await _safe_migration(session, "_add_razorpay_columns", _add_razorpay_columns)
         await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
 

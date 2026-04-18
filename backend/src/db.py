@@ -369,6 +369,19 @@ class NotificationBar(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class NewsletterSubscriber(Base):
+    """Emails collected from the 'Subscribe for wisdom articles' footer form."""
+    __tablename__ = "newsletter_subscribers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(100), nullable=False, default="co.in website")
+    subscribed_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
 class DailyContemplation(Base):
     """One Ramana-inspired contemplation per calendar day (IST).
 

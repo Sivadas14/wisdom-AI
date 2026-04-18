@@ -1,26 +1,25 @@
 """
-Newsletter subscription — Loops integration.
+Newsletter subscription — stores emails in the newsletter_subscribers table.
 
-POST /api/newsletter/subscribe  — adds email to Loops
-GET  /api/newsletter/test       — diagnostic: tests the Loops API key live
+POST /api/newsletter/subscribe  — saves email to database
+GET  /api/newsletter/test       — returns subscriber count (diagnostic)
 """
 
 from __future__ import annotations
 
 import logging
-import httpx
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.settings import get_settings
+from src.db import NewsletterSubscriber, get_db_session_fa
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/newsletter", tags=["newsletter"])
-
-# Loops REST API endpoint — requires API key in Authorization header
-LOOPS_URL = "https://app.loops.so/api/v1/contacts/create"
 
 
 class SubscribeRequest(BaseModel):
@@ -33,51 +32,38 @@ class SubscribeResponse(BaseModel):
 
 
 @router.post("/subscribe", response_model=SubscribeResponse)
-async def subscribe(payload: SubscribeRequest):
-    """Add email to Loops via the v1 contacts API."""
-    settings = get_settings()
-    logger.info("Subscribing %s to Loops", payload.email)
+async def subscribe(
+    payload: SubscribeRequest,
+    db: AsyncSession = Depends(get_db_session_fa),
+):
+    """Save subscriber email to the database."""
+    email = str(payload.email).lower().strip()
+    logger.info("Newsletter subscribe request: %s", email)
+
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                LOOPS_URL,
-                json={"email": str(payload.email), "subscribed": True, "source": "co.in website", "userGroup": "Newsletter"},
-                headers={"Authorization": f"ApiKey {settings.loops_api_key}", "Content-Type": "application/json"},
-            )
+        subscriber = NewsletterSubscriber(email=email, source="co.in website")
+        db.add(subscriber)
+        await db.commit()
+        logger.info("Saved new subscriber: %s", email)
+        return SubscribeResponse(success=True, message="Subscribed successfully.")
 
-        logger.info("Loops response status=%s body=%s", resp.status_code, resp.text[:300])
-        data = resp.json()
+    except IntegrityError:
+        await db.rollback()
+        logger.info("Duplicate subscriber (already exists): %s", email)
+        return SubscribeResponse(success=True, message="Already subscribed.")
 
-        if data.get("success") or data.get("id"):
-            return SubscribeResponse(success=True, message="Subscribed successfully.")
-
-        msg = (data.get("message") or "").lower()
-        if any(w in msg for w in ("already", "exist", "duplicate", "subscribed")):
-            return SubscribeResponse(success=True, message="Already subscribed.")
-
-        logger.error("Loops error %s: %s", resp.status_code, resp.text)
-        raise HTTPException(status_code=502, detail=data.get("message", "Unable to subscribe. Please try again."))
-
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Request timed out. Please try again.")
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error("Unexpected error: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        await db.rollback()
+        logger.error("Error saving subscriber %s: %s", email, e)
+        raise HTTPException(status_code=500, detail="Unable to subscribe. Please try again.")
 
 
 @router.get("/test")
-async def test_loops():
-    """Diagnostic: calls Loops with a probe email and returns the raw response."""
-    settings = get_settings()
+async def test_newsletter(db: AsyncSession = Depends(get_db_session_fa)):
+    """Diagnostic: returns total subscriber count."""
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                LOOPS_URL,
-                json={"email": "probe@arunachalasamudra.co.in", "subscribed": True, "source": "diagnostic-test"},
-                headers={"Authorization": f"ApiKey {settings.loops_api_key}", "Content-Type": "application/json"},
-            )
-        return {"loops_status": resp.status_code, "loops_body": resp.json(), "key_prefix": settings.loops_api_key[:8] + "..."}
+        result = await db.execute(select(func.count()).select_from(NewsletterSubscriber))
+        count = result.scalar()
+        return {"status": "ok", "total_subscribers": count}
     except Exception as e:
-        return {"error": str(e)}
+        return {"status": "error", "detail": str(e)}
