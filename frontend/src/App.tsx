@@ -87,93 +87,87 @@ const App = () => {
                         <BrowserRouter>
                             <OnboardingGate />
                             <Routes>
-                                {/* ── Public landing page — fully standalone, no shell wrapper ── */}
-                                <Route path="/" element={<Landing />} />
+                                {/*
+                                 * Root layout route — all app paths live under "/".
+                                 *
+                                 * WHY: React Router v6 scores path="*" (splat, score≈2) HIGHER
+                                 * than path="/" (root, score≈0), so a bare sibling
+                                 * <Route path="/" element={<Landing/>}/> would be beaten by the
+                                 * catch-all and redirect unauthenticated visitors to /signin.
+                                 *
+                                 * The index route pattern fixes this: an <index> route is
+                                 * GUARANTEED to win over any splat for the exact parent path.
+                                 */}
+                                <Route path="/">
 
-                                {/* ── All other routes live inside AppShell (announcement banner +
-                                       the fixed-height overflow-hidden wrapper the chat UI needs) ── */}
-                                <Route element={<AppShell />}>
-                                    <Route path="/signin" element={<PublicRoute element={<SignIn />} />} />
-                                    <Route path="/register" element={<PublicRoute element={<Register />} />} />
-                                    <Route path="/forgot-password" element={<PublicRoute element={<ForgotPassword />} />} />
-                                    <Route path="/reset-password" element={<ResetPassword />} />
-                                    <Route path="/privacy" element={<PublicRoute element={<Privacy />} />} />
-                                    <Route path="/terms" element={<PublicRoute element={<Terms />} />} />
-                                    <Route path="/profile-completion" element={<ProfileCompletion />} />
-                                    <Route path="/callback" element={<AuthCallback />} />
-                                    <Route path="/admin/login" element={<AdminLogin />} />
+                                    {/* ── Landing page: index = renders ONLY for exactly "/" ── */}
+                                    <Route index element={<Landing />} />
 
-                                    {/* Main App Routes - Wrapped in MainLayout */}
-                                    <Route path="/home" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <Chat />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
+                                    {/* ── All other routes: wrapped in AppShell ── */}
+                                    <Route element={<AppShell />}>
+                                        {/* Public routes */}
+                                        <Route path="signin"           element={<PublicRoute element={<SignIn />} />} />
+                                        <Route path="register"         element={<PublicRoute element={<Register />} />} />
+                                        <Route path="forgot-password"  element={<PublicRoute element={<ForgotPassword />} />} />
+                                        <Route path="reset-password"   element={<ResetPassword />} />
+                                        <Route path="privacy"          element={<PublicRoute element={<Privacy />} />} />
+                                        <Route path="terms"            element={<PublicRoute element={<Terms />} />} />
+                                        <Route path="profile-completion" element={<ProfileCompletion />} />
+                                        <Route path="callback"         element={<AuthCallback />} />
+                                        <Route path="admin/login"      element={<AdminLogin />} />
 
-                                    <Route path="/chats" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <ChatsPage />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
+                                        {/* Authenticated portal routes */}
+                                        <Route path="home" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><Chat /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="chats" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><ChatsPage /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="chat" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><Chat /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="chat/:conversationId" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><Chat /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="subscription" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><Subscription /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="billing" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><BillingPage /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
+                                        <Route path="library" element={
+                                            <ProtectedRoute>
+                                                <MainLayout><Library /></MainLayout>
+                                            </ProtectedRoute>
+                                        } />
 
-                                    <Route path="/chat" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <Chat />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
+                                        {/* Admin routes */}
+                                        <Route path="admin" element={<AdminRoute element={<AdminLayout />} />}>
+                                            <Route index           element={<Dashboard />} />
+                                            <Route path="users"        element={<UserManagement />} />
+                                            <Route path="plans"        element={<PlanManagement />} />
+                                            <Route path="banners"      element={<NotificationManagement />} />
+                                            <Route path="images"       element={<ImageLibrary />} />
+                                            <Route path="payments"     element={<PaymentHistory />} />
+                                            <Route path="knowledge-base" element={<KnowledgeBase />} />
+                                        </Route>
 
-                                    <Route path="/chat/:conversationId" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <Chat />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
-
-                                    {/* Admin Routes - Protected */}
-                                    <Route path="/admin" element={
-                                        <AdminRoute element={<AdminLayout />} />
-                                    }>
-                                        <Route index element={<Dashboard />} />
-                                        <Route path="users" element={<UserManagement />} />
-                                        <Route path="plans" element={<PlanManagement />} />
-                                        <Route path="banners" element={<NotificationManagement />} />
-                                        <Route path="images" element={<ImageLibrary />} />
-                                        <Route path="payments" element={<PaymentHistory />} />
-                                        <Route path="knowledge-base" element={<KnowledgeBase />} />
+                                        {/* Unknown paths → back to landing */}
+                                        <Route path="*" element={<NotFound />} />
                                     </Route>
 
-                                    <Route path="/subscription" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <Subscription />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
-
-                                    <Route path="/billing" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <BillingPage />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
-
-                                    <Route path="/library" element={
-                                        <ProtectedRoute>
-                                            <MainLayout>
-                                                <Library />
-                                            </MainLayout>
-                                        </ProtectedRoute>
-                                    } />
-
-                                    <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
                                 </Route>
                             </Routes>
                         </BrowserRouter>
