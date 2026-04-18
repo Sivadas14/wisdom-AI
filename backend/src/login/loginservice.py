@@ -16,7 +16,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 # Import the functions, not the settings object directly to avoid circular imports
-from src.settings import get_settings, get_supabase_client, get_supabase_jwt_client
+from src.settings import get_settings, get_supabase_client, get_supabase_admin_client, get_supabase_jwt_client
 
 # PKCE utility - fix the import
 from src.login.pkce import generate_pkce  # Changed to match the actual function name
@@ -35,13 +35,21 @@ class Authorization:
     def __init__(self):
         # Don't initialize supabase client in __init__ to avoid early import issues
         self._supabase = None
+        self._supabase_admin = None
         self.PKCE_STORE = {}
-    
+
     @property
     def supabase(self):
         if self._supabase is None:
             self._supabase = get_supabase_client(get_settings())
         return self._supabase
+
+    @property
+    def supabase_admin(self):
+        """Admin client using service role key — required for auth.admin.* operations."""
+        if self._supabase_admin is None:
+            self._supabase_admin = get_supabase_admin_client(get_settings())
+        return self._supabase_admin
 
     def start_google_oauth(self, settings = Depends(get_settings)):
         code_verifier, code_challenge = generate_pkce()
@@ -109,7 +117,7 @@ class Authorization:
     
     async def check_email_exists(self, request: EmailRequest):
         try:
-            result = self.supabase.auth.admin.list_users()
+            result = self.supabase_admin.auth.admin.list_users()
             users = result.users if hasattr(result, "users") else []
 
             email_exists = any(user.email == request.email for user in users)
@@ -220,7 +228,7 @@ class Authorization:
 
             # Use Supabase admin API to check existence — lightweight single-email filter
             try:
-                all_users = self.supabase.auth.admin.list_users()
+                all_users = self.supabase_admin.auth.admin.list_users()
                 users_list = all_users if isinstance(all_users, list) else (all_users.users if hasattr(all_users, "users") else [])
                 matched = [u for u in users_list if u.email == request.email]
                 if not matched:
