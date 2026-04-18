@@ -143,20 +143,18 @@ jobs:
 
               if [ "$DEPLOYED_SHA" = "$GIT_SHA" ]; then
                 # Exact match — this commit is live
-                echo "✓ Deployment verified! This commit is live: $GIT_SHA"
+                echo "✓ Deployment verified! This commit ($GIT_SHA) is live."
                 exit 0
               elif [ -n "$DEPLOYED_SHA" ]; then
-                # A non-empty SHA is live — either this commit or a newer one.
-                # With cancel-in-progress concurrency, only the latest workflow reaches
-                # this point. If a different SHA is running it means App Runner queued
-                # and applied the most recent image — which is the correct outcome.
-                echo "✓ Service is RUNNING with a valid version ($DEPLOYED_SHA)."
-                echo "  (A newer commit may have been applied by App Runner — this is expected.)"
-                exit 0
+                # A DIFFERENT SHA is live — App Runner silently reverted to old code.
+                # This means the new container failed its health check.
+                # Check App Runner logs in the AWS console for startup errors.
+                echo "✗ App Runner reverted! Expected $GIT_SHA but got $DEPLOYED_SHA."
+                echo "  The new container failed its health check — check App Runner logs."
+                exit 1
               else
-                # Empty SHA means the health endpoint is unreachable or App Runner
-                # silently reverted to an old unhealthy image. Keep waiting.
-                echo "  RUNNING but health endpoint returned no version — possible silent revert. Waiting..."
+                # Empty SHA — health endpoint unreachable, keep waiting
+                echo "  RUNNING but health check returned no version — waiting..."
               fi
             fi
             sleep 20

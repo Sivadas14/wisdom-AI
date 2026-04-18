@@ -95,38 +95,47 @@ async def lifespan(app: FastAPI):
     deployed_sha = os.getenv("GIT_SHA", "unknown")
     print(f"[TRACE] lifespan() start  GIT_SHA={deployed_sha}")
     logger.info(f"=== DEPLOYED VERSION: {deployed_sha} ===")
+
+    # ── Database setup ──────────────────────────────────────────────────────
+    # Wrapped in its own try/except so a DB connection failure at startup does
+    # NOT crash uvicorn.  App Runner would otherwise revert to the old image
+    # and we'd never see the new code run.
     try:
-        tu.logger.info("Initializing application lifespan...")
-        # Setup
         await _setup_db(app)
         tu.logger.info("Database setup successfully.")
-
-        # Run startup migrations (idempotent — safe on every restart)
-        await run_migrations(app.state.db_session_factory)
-        tu.logger.info("Startup migrations complete.")
-        
-        # Start background pre-generation after server is up
-        print("[TRACE] scheduling background_image_pregeneration")
-        asyncio.create_task(background_image_pregeneration())
-        tu.logger.info("Background tasks scheduled.")
-        
-        print("[TRACE] lifespan() yielding")
-        yield
-        
-        print("[TRACE] lifespan() shutdown start")
-        tu.logger.info("Shutting down application lifespan...")
     except Exception as e:
-        print(f"[TRACE] CRITICAL: Startup failed during lifespan: {str(e)}")
-        tu.logger.error(f"Startup failed: {str(e)}")
-        # Re-raise to ensure the process exits on failure
-        raise
-    finally:
-        # Cleanup
+        print(f"[TRACE] WARNING: DB setup failed — server still starting: {e}")
+        tu.logger.error(f"DB setup error (non-fatal): {e}")
+        app.state.db_engine = None
+        app.state.db_session_factory = None
+
+    # ── Startup migrations ──────────────────────────────────────────────────
+    # Only attempt if DB setup succeeded.  Each individual migration is already
+    # wrapped in _safe_migration so per-migration errors are already non-fatal.
+    if getattr(app.state, "db_session_factory", None) is not None:
         try:
-            await _close_db(app)
-            tu.logger.info("Database connections closed.")
+            await run_migrations(app.state.db_session_factory)
+            tu.logger.info("Startup migrations complete.")
         except Exception as e:
-            tu.logger.error(f"Error during cleanup: {str(e)}")
+            print(f"[TRACE] WARNING: Migrations failed — server still starting: {e}")
+            tu.logger.error(f"Migration error (non-fatal): {e}")
+
+    # ── Background tasks ────────────────────────────────────────────────────
+    print("[TRACE] scheduling background_image_pregeneration")
+    asyncio.create_task(background_image_pregeneration())
+    tu.logger.info("Background tasks scheduled.")
+
+    print("[TRACE] lifespan() yielding — server ready")
+    yield  # Server accepts requests from this point on
+
+    # ── Shutdown ────────────────────────────────────────────────────────────
+    print("[TRACE] lifespan() shutdown start")
+    tu.logger.info("Shutting down application lifespan...")
+    try:
+        await _close_db(app)
+        tu.logger.info("Database connections closed.")
+    except Exception as e:
+        tu.logger.error(f"Error during cleanup: {e}")
 
 async def background_image_pregeneration():
     """Pre-generate images in background after server startup"""
