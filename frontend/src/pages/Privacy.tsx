@@ -318,13 +318,14 @@ const Privacy = () => {
                         14. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?
                     </h2>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        If you have questions or comments about this notice, you may email us at <a href="mailto:contact@arunachalasamudra.co.in " className="text-brand-button hover:underline">contact@arunachalasamudra.co.in </a> or contact us by post at:
+                        If you have questions or comments about this notice, you may email us at <a href="mailto:info@arunachalasamudra.in" className="text-brand-button hover:underline">info@arunachalasamudra.in</a> or contact us by post at:
                     </p>
                     <div className="text-brand-body font-body ml-4">
+                        <p><strong>The Legal Manager</strong></p>
                         <p>Arunachala Samudra</p>
-                        <p>__________</p>
-                        <p>__________</p>
-                        <p>India</p>
+                        <p>No 49 Kalakshetra Road</p>
+                        <p>Tiruvanmiyur, Chennai 600041</p>
+                        <p>Tamil Nadu, India</p>
                     </div>
                 </div>
 

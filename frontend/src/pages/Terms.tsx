@@ -22,7 +22,7 @@ const Terms = () => {
                         We operate, as well as any other related products and services that refer or link to these legal terms (the '<strong>Legal Terms</strong>') (collectively, the '<strong>Services</strong>').
                     </p>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        You can contact us by email at <strong>__________</strong> or by mail to <strong>__________</strong>, <strong>__________</strong>, <strong>__________</strong>.
+                        You can contact us by email at <strong>info@arunachalasamudra.in</strong> or by mail to <strong>The Legal Manager, Arunachala Samudra, No 49 Kalakshetra Road, Tiruvanmiyur, Chennai 600041, India</strong>.
                     </p>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
                         These Legal Terms constitute a legally binding agreement made between you, whether personally or on behalf of an entity ('<strong>you</strong>'), and <strong>__________</strong>, concerning your access to and use of the Services. You agree that by accessing the Services, you have read, understood, and agreed to be bound by all of these Legal Terms. IF YOU DO NOT AGREE WITH ALL OF THESE LEGAL TERMS, THEN YOU ARE EXPRESSLY PROHIBITED FROM USING THE SERVICES AND YOU MUST DISCONTINUE USE IMMEDIATELY.
@@ -232,7 +232,7 @@ const Terms = () => {
                         10. GOVERNING LAW
                     </h2>
                     <p className="text-brand-body font-body leading-relaxed">
-                        These Legal Terms shall be governed by and defined following the laws of <strong>__________</strong>. <strong>__________</strong> and yourself irrevocably consent that the courts of <strong>__________</strong> shall have exclusive jurisdiction to resolve any dispute which may arise in connection with these Legal Terms.
+                        These Legal Terms shall be governed by and defined following the laws of <strong>India</strong>. <strong>Arunachala Samudra</strong> and yourself irrevocably consent that the courts of <strong>Chennai, Tamil Nadu, India</strong> shall have exclusive jurisdiction to resolve any dispute which may arise in connection with these Legal Terms.
                     </p>
                 </div>
 
@@ -245,14 +245,14 @@ const Terms = () => {
                         Informal Negotiations
                     </h3>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        To expedite resolution and control the cost of any dispute, controversy, or claim related to these Legal Terms, the Parties agree to first attempt to negotiate any Dispute informally for at least <strong>__________</strong> days before initiating arbitration.
+                        To expedite resolution and control the cost of any dispute, controversy, or claim related to these Legal Terms, the Parties agree to first attempt to negotiate any Dispute informally for at least <strong>30</strong> days before initiating arbitration.
                     </p>
 
                     <h3 className="text-xl font-heading text-brand-heading mb-3">
                         Binding Arbitration
                     </h3>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        Any dispute arising out of or in connection with these Legal Terms shall be referred to and finally resolved by arbitration. The number of arbitrators shall be <strong>__________</strong>. The seat of arbitration shall be <strong>__________</strong>. The language of the proceedings shall be <strong>__________</strong>.
+                        Any dispute arising out of or in connection with these Legal Terms shall be referred to and finally resolved by arbitration under the Arbitration and Conciliation Act, 1996 (India). The number of arbitrators shall be <strong>one (1)</strong>. The seat of arbitration shall be <strong>Chennai, Tamil Nadu, India</strong>. The language of the proceedings shall be <strong>English</strong>.
                     </p>
                 </div>
 
@@ -335,7 +335,12 @@ const Terms = () => {
                         In order to resolve a complaint regarding the Services or to receive further information regarding use of the Services, please contact us at:
                     </p>
                     <div className="text-brand-body font-body ml-4">
-                        <p><strong>__________</strong></p>
+                        <p><strong>The Legal Manager</strong></p>
+                        <p>Arunachala Samudra</p>
+                        <p>No 49 Kalakshetra Road</p>
+                        <p>Tiruvanmiyur, Chennai 600041</p>
+                        <p>Tamil Nadu, India</p>
+                        <p><a href="mailto:info@arunachalasamudra.in" className="text-brand-button hover:underline">info@arunachalasamudra.in</a></p>
                     </div>
                 </div>
             </div>

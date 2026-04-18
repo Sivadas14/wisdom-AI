@@ -127,6 +127,8 @@ const Register: React.FC = () => {
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [agreedPrivacy, setAgreedPrivacy] = useState(false);
 
   const pwStrength = getPasswordStrength(password);
 
@@ -147,6 +149,8 @@ const Register: React.FC = () => {
     const pwCheck = validatePassword(password);
     if (!pwCheck.valid)                        { setError(pwCheck.message || "Password does not meet requirements"); return; }
     if (password !== confirmPassword)          { setError("Passwords do not match"); return; }
+    if (!agreedTerms)                          { setError("Please confirm you have read and agree to our Terms of Service"); return; }
+    if (!agreedPrivacy)                        { setError("Please confirm you have read and agree to our Privacy Policy"); return; }
 
     setIsLoading(true);
     try {
@@ -353,6 +357,40 @@ const Register: React.FC = () => {
                 )}
               </div>
 
+              {/* Terms & Privacy checkboxes */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", padding: "0.85rem", backgroundColor: "#FAF6F3", border: `1px solid ${T.border}`, borderRadius: "4px" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={agreedTerms}
+                    onChange={e => setAgreedTerms(e.target.checked)}
+                    disabled={isLoading}
+                    style={{ marginTop: "2px", accentColor: T.accent, flexShrink: 0, width: "16px", height: "16px" }}
+                  />
+                  <span style={{ fontFamily: T.sans, fontSize: "0.82rem", color: T.brown, lineHeight: 1.5 }}>
+                    I have read, understood and agree to the{" "}
+                    <Link to="/terms" target="_blank" style={{ color: T.accent, fontWeight: 600, textDecoration: "underline" }}>
+                      Terms of Service
+                    </Link>
+                  </span>
+                </label>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={agreedPrivacy}
+                    onChange={e => setAgreedPrivacy(e.target.checked)}
+                    disabled={isLoading}
+                    style={{ marginTop: "2px", accentColor: T.accent, flexShrink: 0, width: "16px", height: "16px" }}
+                  />
+                  <span style={{ fontFamily: T.sans, fontSize: "0.82rem", color: T.brown, lineHeight: 1.5 }}>
+                    I have read, understood and agree to the{" "}
+                    <Link to="/privacy" target="_blank" style={{ color: T.accent, fontWeight: 600, textDecoration: "underline" }}>
+                      Privacy Policy
+                    </Link>
+                  </span>
+                </label>
+              </div>
+
               {/* Error */}
               {error && (
                 <div style={{ backgroundColor: "#FEF2EE", border: "1px solid #F5C4B2", borderRadius: "4px", padding: "0.75rem 1rem" }}>
@@ -373,7 +411,11 @@ const Register: React.FC = () => {
                 <p style={{ color: "#2E7D32", fontFamily: T.sans, fontSize: "0.84rem", margin: 0 }}>{success}</p>
               )}
 
-              <button type="submit" disabled={isLoading} style={{ ...btnPrimary, opacity: isLoading ? 0.65 : 1, marginTop: "0.25rem" }}>
+              <button
+                type="submit"
+                disabled={isLoading || !agreedTerms || !agreedPrivacy}
+                style={{ ...btnPrimary, opacity: (isLoading || !agreedTerms || !agreedPrivacy) ? 0.55 : 1, marginTop: "0.25rem" }}
+              >
                 {isLoading ? "Creating Account…" : "Create Account"}
               </button>
             </form>
