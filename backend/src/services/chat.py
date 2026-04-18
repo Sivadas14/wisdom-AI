@@ -5,13 +5,15 @@ import time
 import asyncio
 from asyncio import sleep
 from textwrap import dedent
+from typing import List
 from supabase import Client
 from sqlalchemy import select, desc, text, and_, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi import Depends, Query, HTTPException
+from fastapi import Depends, Query, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from src import wire as w, db
 from src.settings import get_supabase_client, Settings,get_settings
@@ -997,6 +999,186 @@ async def chat_completions(
 
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GUEST CHAT  (no authentication required, stateless, rate-limited)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Simple in-memory rate limiter: {session_id: message_count}
+# Resets on server restart, which is acceptable for a free-trial feature.
+_GUEST_SESSION_COUNTS: dict[str, int] = {}
+GUEST_MESSAGE_LIMIT = 5
+
+
+class GuestChatMessage(BaseModel):
+    role: str   # "user" or "assistant"
+    content: str
+
+
+class GuestChatRequest(BaseModel):
+    message: str
+    session_id: str
+    history: List[GuestChatMessage] = []
+
+
+async def _guest_chat_stream(
+    session: AsyncSession,
+    model: tt.ModelInterface,
+    user_message: str,
+    history: List[GuestChatMessage],
+):
+    """Stateless RAG streaming chat for unauthenticated visitors.
+
+    Runs the same embedding → LLM pipeline as the authenticated endpoint but
+    writes nothing to the database and includes no DB-linked metadata
+    (message IDs, titles, etc.).
+    """
+
+    SYSTEM_PROMPT = dedent(
+        f"""
+        The current time is {tu.SimplerTimes.get_now_human()}
+
+        You are a wisdom guide rooted exclusively in the authenticated teachings of Sri Ramana Maharshi.
+        Your sole source of knowledge is the Ramana Maharshi library — texts such as
+        "Who Am I?", "Talks with Sri Ramana Maharshi", "Letters from Sri Ramanasramam",
+        "Day by Day with Bhagavan", "Guru Vachaka Kovai", and related works preserved at
+        Sri Ramanasramam, Tiruvannamalai.
+
+        STRICT GUARDRAILS:
+        1. Answer ONLY from the passages provided in this conversation.
+        2. Never draw on general knowledge, training data, or any outside source.
+        3. Quote or paraphrase with the source text cited naturally.
+        4. If passages are insufficient, respond warmly and invite the seeker to the library.
+        5. Never speculate or hallucinate. Never use technical terms like "chunks".
+        6. Respond warmly even to greetings, anchored in Ramana's spirit of silence and self-inquiry.
+        """
+    ).strip()
+
+    # Intent classification — skip vector search for clearly off-topic messages
+    is_on_topic = _classify_intent(user_message)
+
+    if not is_on_topic:
+        refusal = (
+            "With humility, I can only speak from the teachings of Sri Ramana Maharshi. "
+            "Your question seems to be outside that scope. "
+            "Please feel free to ask about self-inquiry, the nature of the Self, or "
+            "any other teaching preserved in the Ramana Maharshi library."
+        )
+        yield ta.to_openai_chunk(tt.assistant(refusal))
+        yield "[DONE]\n\n"
+        return
+
+    # Embedding + vector search
+    try:
+        chunks = await _embedding_search_optimized(session, model, user_message)
+    except Exception as e:
+        tu.logger.error(f"Guest chat embedding search failed: {e}")
+        chunks = []
+
+    if not chunks:
+        no_chunks = (
+            "The library does not have indexed passages matching your question at this moment. "
+            "Please try rephrasing, or explore the full collection at Ramanasramam.org."
+        )
+        yield ta.to_openai_chunk(tt.assistant(no_chunks))
+        yield "[DONE]\n\n"
+        return
+
+    # Build thread: system + prior history + RAG context + final user question
+    master_thread = tt.Thread(tt.system(SYSTEM_PROMPT))
+
+    # Replay prior conversation turns (limited to last 6 to keep context manageable)
+    for msg in history[-6:]:
+        if msg.role == "user":
+            master_thread.append(tt.human(msg.content))
+        elif msg.role == "assistant":
+            master_thread.append(tt.assistant(msg.content))
+
+    # Inject retrieved passages
+    chunk_text = "Here are the ONLY passages you may use to answer the question:\n\n"
+    for c_content, c_fname in chunks:
+        chunk_text += f"<source> {c_fname} </source>\n"
+        chunk_text += f"<passage> {c_content} </passage>\n"
+        chunk_text += "--------------------------------\n"
+
+    master_thread.append(tt.human("Retrieve relevant passages from the library"))
+    master_thread.append(tt.assistant(chunk_text))
+    master_thread.append(
+        tt.human(
+            dedent(
+                f"""
+                CRITICAL INSTRUCTIONS:
+                - Use ONLY the passages above. No general knowledge.
+                - If passages are insufficient, say so warmly. Never hallucinate.
+                - Never use the word "chunks" or any technical retrieval term.
+                - Respond as a compassionate wisdom guide in first-person narrative.
+                - Cite the source text naturally when relevant.
+
+                User's message: {user_message}
+                """
+            )
+        )
+    )
+
+    # Stream LLM response
+    response_content = ""
+    try:
+        if hasattr(model, "chat_stream"):
+            async for chunk in model.chat_stream(master_thread):
+                content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                response_content += content
+                yield ta.to_openai_chunk(tt.assistant(content))
+        else:
+            response = await model.chat_async(master_thread)
+            response_content = response.content if hasattr(response, "content") else str(response)
+            words = response_content.split()
+            for i, word in enumerate(words):
+                yield ta.to_openai_chunk(tt.assistant(word if i == 0 else " " + word))
+                await asyncio.sleep(0.025)
+    except Exception as e:
+        tu.logger.error(f"Guest chat LLM error: {e}")
+        yield ta.to_openai_chunk(tt.assistant("An error occurred. Please try again."))
+
+    yield "[DONE]\n\n"
+
+
+async def guest_chat_completion(
+    request: GuestChatRequest,
+    session: AsyncSession = Depends(get_db_session_fa),
+    settings: Settings = Depends(get_settings),
+):
+    """POST /api/chat/guest — unauthenticated, rate-limited by session_id."""
+
+    sid = (request.session_id or "").strip()
+    if not sid:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+
+    # Rate limit check
+    count = _GUEST_SESSION_COUNTS.get(sid, 0)
+    if count >= GUEST_MESSAGE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "GUEST_LIMIT_REACHED",
+                "message": (
+                    f"You have used all {GUEST_MESSAGE_LIMIT} free questions. "
+                    "Sign up for free to continue your journey with the wisdom of Ramana Maharshi."
+                ),
+                "limit": GUEST_MESSAGE_LIMIT,
+            },
+        )
+
+    # Increment counter before the call (pessimistic — avoids abuse on slow connections)
+    _GUEST_SESSION_COUNTS[sid] = count + 1
+
+    model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
+
+    return StreamingResponse(
+        _guest_chat_stream(session, model, request.message, request.history),
+        media_type="text/plain",
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 async def create_conversation(
     user: db.UserProfile = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session_fa),

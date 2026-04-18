@@ -587,10 +587,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const cleanEmail = email.trim().toLowerCase();
       console.log('🔵 [AuthContext] Sending OTP to:', cleanEmail);
 
+      // ── Guard: email must be registered before we send an OTP ──
+      // We check against the backend (which queries Supabase admin API) so that
+      // OTP sign-in cannot be used as a backdoor to create unverified accounts.
+      try {
+        const checkRes = await fetch(`${API_BASE_URL}/auth/check-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail }),
+        });
+        const checkData = await checkRes.json();
+        if (!checkData?.exists) {
+          return {
+            success: false,
+            code: 'NOT_REGISTERED',
+            message: 'No account found with this email. Please register first before signing in with OTP.',
+          };
+        }
+      } catch (checkErr: any) {
+        console.warn('⚠️ [AuthContext] Email existence check failed, proceeding cautiously:', checkErr);
+        // Don't block if the check itself fails — Supabase will still refuse shouldCreateUser:false
+      }
+
+      // shouldCreateUser: false — OTP can only sign in existing, verified accounts.
       const { data, error } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
         options: {
-          shouldCreateUser: true,
+          shouldCreateUser: false,
         }
       });
 
@@ -610,6 +633,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             message: 'Too many requests. Please wait a few minutes before requesting another code.'
           };
         }
+        if (msg.includes('signup') || msg.includes('not found') || msg.includes('email not confirmed')) {
+          return {
+            success: false,
+            code: 'NOT_REGISTERED',
+            message: 'No verified account found for this email. Please register and verify your email first.',
+          };
+        }
 
         return {
           success: false,
@@ -618,7 +648,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       console.log('✅ [AuthContext] OTP sent successfully');
-      // setLoading(false);
 
       return {
         success: true,
@@ -626,8 +655,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
     } catch (error: any) {
       console.error('❌ [AuthContext] Unexpected error:', error);
-      // setLoading(false);
-
       return { success: false, message: error.message || 'Failed to send verification code' };
     }
   };

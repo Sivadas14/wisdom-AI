@@ -18,14 +18,14 @@
  *   9. Footer         — dark chocolate, 5-column, subscribe form, mandala
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { TEACHINGS } from "@/data/teachings";
 import {
   BookOpen, Sparkles, MessageCircle, Music,
   ChevronDown, ChevronUp, ArrowRight, CheckCircle2,
-  Menu, X, Mail, Layers,
+  Menu, X, Mail, Layers, Send, Lock,
 } from "lucide-react";
 
 // ─── Design tokens (matching arunachalasamudra.in) ────────────────────────────
@@ -263,6 +263,7 @@ function PublicHeader({ isAuthenticated }: { isAuthenticated: boolean }) {
           {[
             { label: "Teachings",          href: "#teachings"    },
             { label: "Daily Contemplation",href: "#contemplation"},
+            { label: "Try Free",           href: "#try"          },
             { label: "Features",           href: "#features"     },
             { label: "Pricing",            href: "#pricing"      },
           ].map(({ label, href }) => (
@@ -566,6 +567,261 @@ function SacredLibrarySection() {
 // ─── 7. Features — "What's Inside the Portal" ─────────────────────────────────
 // Note: Daily Contemplation and Sacred Library are already shown as full
 // sections above, so they are intentionally NOT listed here.
+// ─── Guest Chat ───────────────────────────────────────────────────────────────
+const GUEST_SESSION_ID_KEY  = "as_guest_sid";
+const GUEST_MSG_COUNT_KEY   = "as_guest_count";
+const GUEST_MESSAGES_KEY    = "as_guest_msgs";
+const GUEST_LIMIT           = 5;
+const API_BASE              = (import.meta.env.VITE_API_BASE_URL as string || "/api").replace(/\/$/, "");
+
+type GMsg = { role: "user" | "assistant"; content: string };
+
+function getGuestSessionId(): string {
+  try {
+    let id = sessionStorage.getItem(GUEST_SESSION_ID_KEY);
+    if (!id) {
+      id = `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      sessionStorage.setItem(GUEST_SESSION_ID_KEY, id);
+    }
+    return id;
+  } catch { return `g_${Date.now()}`; }
+}
+
+function GuestChatSection() {
+  const [messages, setMessages] = useState<GMsg[]>(() => {
+    try { return JSON.parse(sessionStorage.getItem(GUEST_MESSAGES_KEY) || "[]"); }
+    catch { return []; }
+  });
+  const [input, setInput]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [count, setCount]   = useState<number>(() => {
+    try { return parseInt(sessionStorage.getItem(GUEST_MSG_COUNT_KEY) || "0", 10); }
+    catch { return 0; }
+  });
+  const [showModal, setShowModal] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const saveMsgs = (msgs: GMsg[]) => {
+    try { sessionStorage.setItem(GUEST_MESSAGES_KEY, JSON.stringify(msgs.slice(-20))); } catch {}
+  };
+
+  const handleSend = async () => {
+    const q = input.trim();
+    if (!q || loading) return;
+    if (count >= GUEST_LIMIT) { setShowModal(true); return; }
+
+    const sid       = getGuestSessionId();
+    const newCount  = count + 1;
+    setCount(newCount);
+    try { sessionStorage.setItem(GUEST_MSG_COUNT_KEY, String(newCount)); } catch {}
+
+    const userMsg: GMsg = { role: "user", content: q };
+    const prev = [...messages, userMsg];
+    const withPlaceholder: GMsg[] = [...prev, { role: "assistant", content: "" }];
+    setMessages(withPlaceholder);
+    saveMsgs(prev);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/chat/guest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: q,
+          session_id: sid,
+          history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+        }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 429) { setShowModal(true); setMessages(prev); saveMsgs(prev); setLoading(false); return; }
+        throw new Error("Failed");
+      }
+
+      const reader  = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let partial   = "";
+      let aiText    = "";
+
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        partial += decoder.decode(value, { stream: true });
+        const lines = partial.split("\n");
+        partial = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim() || line === "[DONE]") continue;
+          try {
+            let content = "";
+            if (line.startsWith("data: ")) {
+              const jstr = line.slice(6).trim();
+              if (jstr === "[DONE]") continue;
+              const cd = JSON.parse(jstr);
+              content = cd.choices?.[0]?.delta?.content || "";
+            }
+            // Skip backend metadata tags
+            if (content && /<(message_id|citations|questions|title)[^>]*>/.test(content)) continue;
+            if (content) {
+              aiText += content;
+              setMessages(p => {
+                const u = [...p];
+                u[u.length - 1] = { role: "assistant", content: aiText };
+                return u;
+              });
+            }
+          } catch {}
+        }
+      }
+
+      const finalMsgs: GMsg[] = [...prev, { role: "assistant", content: aiText || "…" }];
+      setMessages(finalMsgs);
+      saveMsgs(finalMsgs);
+      if (newCount >= GUEST_LIMIT) setTimeout(() => setShowModal(true), 1800);
+    } catch {
+      const errMsgs: GMsg[] = [...prev, { role: "assistant", content: "Unable to respond right now. Please try again." }];
+      setMessages(errMsgs);
+      saveMsgs(errMsgs);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const remaining = Math.max(0, GUEST_LIMIT - count);
+
+  return (
+    <section id="try" style={{ backgroundColor: T.umber, position: "relative", overflow: "hidden" }} className="py-20 px-6">
+      {/* Atmospheric radial glow */}
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 60% 70% at 50% 40%, rgba(184,90,45,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      {/* Sign-up modal overlay */}
+      {showModal && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
+          <div style={{ backgroundColor: T.cream, borderRadius: "6px", padding: "2.5rem", maxWidth: "420px", width: "100%", textAlign: "center", position: "relative" }}>
+            <button onClick={() => setShowModal(false)} style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", cursor: "pointer", color: T.muted, fontSize: "1.4rem" }} aria-label="Close">✕</button>
+            <div style={{ width: "3rem", height: "3rem", borderRadius: "50%", backgroundColor: T.creamMid, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.25rem" }}>
+              <Lock className="w-5 h-5" style={{ color: T.accent }} />
+            </div>
+            <h3 style={{ fontFamily: T.serif, color: T.brown, fontSize: "1.5rem", marginBottom: "0.75rem" }}>
+              You've used your {GUEST_LIMIT} free questions
+            </h3>
+            <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.9rem", lineHeight: 1.7, marginBottom: "2rem" }}>
+              Sign up free to continue your inquiry into the teachings of Sri Ramana Maharshi — with unlimited access to the wisdom guide.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Link to="/register" style={{ ...btn, display: "block", textAlign: "center", fontSize: "0.95rem", padding: "0.85rem" }}>
+                Create free account
+              </Link>
+              <Link to="/register?plan=seeker" style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.85rem", textDecoration: "underline" }}>
+                Or upgrade to Seeker — $5.99 / ₹499 per month
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-3xl mx-auto relative z-10">
+        <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", textAlign: "center" }}>
+          Try free — no sign-up needed
+        </p>
+        <h2 style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "clamp(1.7rem, 3.5vw, 2.5rem)", lineHeight: 1.25, marginBottom: "0.75rem", textAlign: "center" }}>
+          Ask Bhagavan anything
+        </h2>
+        <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.9rem", lineHeight: 1.7, marginBottom: "2rem", textAlign: "center" }}>
+          Answers drawn exclusively from the authenticated Ramana Maharshi library — not the internet, not general AI.
+          {remaining > 0
+            ? <span style={{ color: T.accent, fontWeight: 600 }}> {remaining} free question{remaining !== 1 ? "s" : ""} remaining.</span>
+            : <span style={{ color: "#e8a070" }}> You've used all your free questions.</span>
+          }
+        </p>
+
+        {/* Chat window */}
+        <div style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", overflow: "hidden" }}>
+          {/* Messages */}
+          <div style={{ height: "360px", overflowY: "auto", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {messages.length === 0 && (
+              <div style={{ margin: "auto", textAlign: "center" }}>
+                <p style={{ fontFamily: T.serif, color: "#C4A892", fontSize: "1.05rem", fontStyle: "italic", marginBottom: "1rem" }}>
+                  "Who am I?" — that is the enquiry.
+                </p>
+                <p style={{ fontFamily: T.sans, color: "#7A6054", fontSize: "0.82rem" }}>
+                  Ask about self-inquiry, the nature of the mind, surrender, silence…
+                </p>
+              </div>
+            )}
+            {messages.map((m, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                <div style={{
+                  maxWidth: "80%",
+                  padding: "0.75rem 1rem",
+                  borderRadius: m.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                  backgroundColor: m.role === "user" ? T.accent : "rgba(255,255,255,0.1)",
+                  color: m.role === "user" ? "#fff" : "#E8DCD4",
+                  fontFamily: T.sans,
+                  fontSize: "0.88rem",
+                  lineHeight: 1.65,
+                }}>
+                  {m.content || (loading && i === messages.length - 1 ? (
+                    <span style={{ opacity: 0.6 }}>Contemplating…</span>
+                  ) : "…")}
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.875rem 1rem", display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
+            {remaining > 0 ? (
+              <>
+                <textarea
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  placeholder="Ask about self-inquiry, silence, the mind…"
+                  disabled={loading}
+                  rows={1}
+                  style={{
+                    flex: 1,
+                    background: "transparent",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    borderRadius: "5px",
+                    padding: "0.6rem 0.875rem",
+                    color: "#F5F0EC",
+                    fontFamily: T.sans,
+                    fontSize: "0.88rem",
+                    resize: "none",
+                    outline: "none",
+                    lineHeight: 1.5,
+                  }}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={loading || !input.trim()}
+                  style={{ ...btn, padding: "0.6rem 1rem", display: "flex", alignItems: "center", gap: "0.35rem", opacity: (loading || !input.trim()) ? 0.5 : 1, flexShrink: 0 }}
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <button onClick={() => setShowModal(true)} style={{ ...btn, padding: "0.65rem 1.75rem", display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+                  <Lock className="w-4 h-4" /> Sign up to continue
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Features ─────────────────────────────────────────────────────────────────
 const FEATURES = [
   {
     icon: <MessageCircle className="w-5 h-5" />,
@@ -626,8 +882,23 @@ function FeaturesSection() {
 }
 
 // ─── 8. Pricing — dual USD + INR ──────────────────────────────────────────────
-const PLAN_FREE   = ["5 conversations per month", "Today's Contemplation — free forever", "Sacred Library introductions", "2 Contemplation Cards per month"];
-const PLAN_SEEKER = ["30 conversations per month", "Unlimited daily contemplation", "10 Contextual Contemplation Cards", "Guided meditation — audio & video", "Pre-built inquiry queries", "Priority answers from full library", "Email support"];
+// Free tier: no login required — chat widget on landing page + daily card
+const PLAN_FREE   = [
+  "5 AI wisdom questions — no account needed",
+  "Today's Contemplation Card — free forever, no login",
+  "Sacred Library introductions",
+  "No audio / video (paid feature)",
+];
+// Seeker tier: login required, full suite
+const PLAN_SEEKER = [
+  "30 conversations per month",
+  "Unlimited daily contemplation",
+  "10 Contextual Contemplation Cards per month",
+  "Guided meditation — text-based, rooted in your inquiry",
+  "Pre-built inquiry queries for every level",
+  "Priority answers from the full Ramana library",
+  "Email support",
+];
 
 function PricingSection() {
   return (
@@ -651,8 +922,11 @@ function PricingSection() {
               <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "2.75rem", lineHeight: 1 }}>$0</span>
               <span style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.88rem", marginBottom: "0.35rem" }}>/&nbsp;month</span>
             </div>
-            <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.8rem", marginBottom: "1.5rem" }}>
+            <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.8rem", marginBottom: "0.25rem" }}>
               ₹0 / month
+            </p>
+            <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.77rem", fontWeight: 600, marginBottom: "1.5rem" }}>
+              No account required
             </p>
             <ul className="space-y-3 mb-8">
               {PLAN_FREE.map(item => (
@@ -662,12 +936,12 @@ function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Link to="/register"
+            <a href="#try"
               style={{ ...btn, display: "block", textAlign: "center", backgroundColor: "transparent", color: T.brown, border: `1.5px solid ${T.border}` }}
               className="hover:bg-[#EDE5DC] transition-colors"
             >
-              Start for free
-            </Link>
+              Try it now — no login
+            </a>
           </div>
 
           {/* Seeker plan */}
@@ -847,6 +1121,7 @@ export default function Landing() {
         <HeroSection isAuthenticated={isAuthenticated} />
         <SelfEnquiryBanner isAuthenticated={isAuthenticated} />
         <DailyContemplationSection />
+        <GuestChatSection />
         <SacredLibrarySection />
         <FeaturesSection />
         <PricingSection />

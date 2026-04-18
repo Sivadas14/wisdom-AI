@@ -143,7 +143,12 @@ const SignIn: React.FC = () => {
         setSuccess(response.message);
       } else {
         console.error('❌ [SignIn] OTP send failed:', response.message);
-        setError(response.message);
+        // Give a clear, actionable message for unregistered emails
+        if (response.code === 'NOT_REGISTERED') {
+          setError('No account found for this email. Please register first — it only takes a minute.');
+        } else {
+          setError(response.message);
+        }
       }
     } catch (err: any) {
       console.error('❌ [SignIn] handleSendOtp error:', err);
@@ -409,7 +414,18 @@ const SignIn: React.FC = () => {
                       />
                     </div>
 
-                    {error && <p className="text-red-600 text-sm">{error}</p>}
+                    {error && (
+                      <div>
+                        <p className="text-red-600 text-sm">{error}</p>
+                        {error.includes('register first') && (
+                          <p className="text-sm mt-1">
+                            <a href="/register" className="text-orange-700 font-semibold underline hover:text-orange-900">
+                              Create an account →
+                            </a>
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {success && <p className="text-green-600 text-sm">{success}</p>}
 
                     <Button

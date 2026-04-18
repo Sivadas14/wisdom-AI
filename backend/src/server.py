@@ -240,7 +240,10 @@ def get_app() -> FastAPI:
     # app.add_api_route("/api/auth/me", auth_svc.get_current_user, methods=["GET"], tags=["auth"], dependencies=auth_dependency)
     # app.add_api_route("/api/auth/refresh", auth_svc.refresh_jwt, methods=["POST"], tags=["auth"], dependencies=auth_dependency)
     # app.add_api_route("/api/auth/l    ogout", auth_svc.logout, methods=["POST"], tags=["auth"], dependencies=auth_dependency)
-    # chat
+    # chat — guest (public, no auth)
+    app.add_api_route("/api/chat/guest", chat_svc.guest_chat_completion, methods=["POST"], tags=["chat"])
+
+    # chat — authenticated
     app.add_api_route("/api/chat", chat_svc.get_conversations, methods=["GET"], tags=["chat"])
     app.add_api_route("/api/chat", chat_svc.create_conversation, methods=["POST"], tags=["chat"])
     app.add_api_route("/api/chat/{conversation_id}", chat_svc.get_conversation, methods=["GET"], tags=["chat"])

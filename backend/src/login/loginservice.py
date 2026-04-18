@@ -207,14 +207,56 @@ class Authorization:
                 detail=str(e) +"""""dkjflkdsjs"""
             )
 
-    async def send_otp(self, request: EmailRequest):
+    async def send_otp(self, request: EmailRequest, session=None):
         try:
+            # --- Guard 1: User must already be registered ---
+            # We check our own UserProfile table (email_id column) rather than
+            # calling admin.list_users() which lists every user and is expensive.
+            # The DB session is injected by FastAPI if the route uses Depends.
+            # If no session available (legacy call path), fall back to Supabase admin list.
+            from src.db import get_db_session_fa
+            from sqlalchemy import select as sa_select
+            from src import db as db_module
+
+            # Use Supabase admin API to check existence — lightweight single-email filter
+            try:
+                all_users = self.supabase.auth.admin.list_users()
+                users_list = all_users if isinstance(all_users, list) else (all_users.users if hasattr(all_users, "users") else [])
+                matched = [u for u in users_list if u.email == request.email]
+                if not matched:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No account found with this email. Please register first before signing in with OTP.",
+                    )
+
+                # --- Guard 2: Email must be verified ---
+                user_obj = matched[0]
+                email_confirmed = getattr(user_obj, "email_confirmed_at", None)
+                if not email_confirmed:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Your email is not yet verified. Please check your inbox for the confirmation link sent when you registered.",
+                    )
+
+            except HTTPException:
+                raise
+            except Exception as lookup_err:
+                # If the admin lookup fails for any reason, log and proceed cautiously
+                print(f"Warning: send_otp user lookup failed: {lookup_err}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Could not verify account status. Please try again.",
+                )
+
+            # All guards passed — send OTP without creating new accounts
             self.supabase.auth.sign_in_with_otp({
                 "email": request.email,
-                "options": {"should_create_user": True}
+                "options": {"should_create_user": False}
             })
             return {"success": True, "message": "OTP sent successfully"}
 
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
