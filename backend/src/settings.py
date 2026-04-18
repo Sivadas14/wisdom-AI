@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str | None = None
 
     # Loops email marketing (newsletter subscriptions)
-    loops_api_key: str = "34c57503fff70c6e2f3423db78b59606"
+    loops_api_key: str = "f0e4c2cda1a893524bc7a54c0a10229c"
 
     # performance settings
     echo_db: bool = False

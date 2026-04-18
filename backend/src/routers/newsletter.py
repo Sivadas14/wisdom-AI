@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/newsletter", tags=["newsletter"])
 
-# Loops newsletter-form endpoint — public, no auth needed, uses Form ID
-LOOPS_FORM_ID = "34c57503fff70c6e2f3423db78b59606"
-LOOPS_FORM_URL = f"https://app.loops.so/api/newsletter-form/{LOOPS_FORM_ID}"
+# Loops REST API endpoint — requires API key in Authorization header
+LOOPS_URL = "https://app.loops.so/api/v1/contacts/create"
 
 
 class SubscribeRequest(BaseModel):
@@ -35,32 +34,31 @@ class SubscribeResponse(BaseModel):
 
 @router.post("/subscribe", response_model=SubscribeResponse)
 async def subscribe(payload: SubscribeRequest):
-    """Submit email to Loops via the public newsletter-form endpoint (no API key needed)."""
-    logger.info("Subscribing %s to Loops via form endpoint", payload.email)
+    """Add email to Loops via the v1 contacts API."""
+    settings = get_settings()
+    logger.info("Subscribing %s to Loops", payload.email)
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                LOOPS_FORM_URL,
-                data={"email": str(payload.email)},
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                LOOPS_URL,
+                json={"email": str(payload.email), "subscribed": True, "source": "co.in website", "userGroup": "Newsletter"},
+                headers={"Authorization": f"ApiKey {settings.loops_api_key}", "Content-Type": "application/json"},
             )
 
         logger.info("Loops response status=%s body=%s", resp.status_code, resp.text[:300])
-
         data = resp.json()
-        if data.get("success"):
+
+        if data.get("success") or data.get("id"):
             return SubscribeResponse(success=True, message="Subscribed successfully.")
 
-        # Duplicate or already subscribed — still a success from user's perspective
         msg = (data.get("message") or "").lower()
         if any(w in msg for w in ("already", "exist", "duplicate", "subscribed")):
             return SubscribeResponse(success=True, message="Already subscribed.")
 
-        logger.error("Loops form error %s: %s", resp.status_code, resp.text)
+        logger.error("Loops error %s: %s", resp.status_code, resp.text)
         raise HTTPException(status_code=502, detail=data.get("message", "Unable to subscribe. Please try again."))
 
     except httpx.TimeoutException:
-        logger.error("Loops API timed out")
         raise HTTPException(status_code=504, detail="Request timed out. Please try again.")
     except HTTPException:
         raise
@@ -71,18 +69,15 @@ async def subscribe(payload: SubscribeRequest):
 
 @router.get("/test")
 async def test_loops():
-    """Diagnostic: submits a probe email to Loops and returns the raw response."""
+    """Diagnostic: calls Loops with a probe email and returns the raw response."""
+    settings = get_settings()
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                LOOPS_FORM_URL,
-                data={"email": "probe@arunachalasamudra.co.in"},
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                LOOPS_URL,
+                json={"email": "probe@arunachalasamudra.co.in", "subscribed": True, "source": "diagnostic-test"},
+                headers={"Authorization": f"ApiKey {settings.loops_api_key}", "Content-Type": "application/json"},
             )
-        return {
-            "form_id": LOOPS_FORM_ID,
-            "loops_status": resp.status_code,
-            "loops_body": resp.json(),
-        }
+        return {"loops_status": resp.status_code, "loops_body": resp.json(), "key_prefix": settings.loops_api_key[:8] + "..."}
     except Exception as e:
         return {"error": str(e)}
