@@ -103,13 +103,6 @@ async def subscribe(payload: SubscribeRequest):
     """
     settings = get_settings()
 
-    if not settings.loops_api_key:
-        logger.error("ASAM_LOOPS_API_KEY is not configured in environment variables")
-        raise HTTPException(
-            status_code=503,
-            detail="Newsletter service is not configured. Please contact info@arunachalasamudra.in."
-        )
-
     # Run synchronous requests call in a thread so we don't block the event loop
     loop = asyncio.get_event_loop()
     ok, message = await loop.run_in_executor(

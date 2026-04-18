@@ -1037,31 +1037,17 @@ function Footer() {
     setSubscribeState("loading");
     setErrorMsg("");
     try {
-      const res = await fetch("https://app.loops.so/api/v1/contacts/create", {
+      const res = await fetch("/api/newsletter/subscribe", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "ApiKey 34c57503fff70c6e2f3423db78b59606",
-        },
-        body: JSON.stringify({
-          email: trimmed,
-          subscribed: true,
-          source: "co.in website",
-          userGroup: "Newsletter",
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.success === true || data.id) {
+      if (res.ok) {
         setSubscribeState("success");
       } else {
-        // Loops returns success:false with a message for duplicates — treat as success
-        const msg = (data.message || "").toLowerCase();
-        if (msg.includes("already") || msg.includes("exist") || msg.includes("duplicate")) {
-          setSubscribeState("success");
-        } else {
-          setErrorMsg(data.message || "Something went wrong. Please try again.");
-          setSubscribeState("error");
-        }
+        setErrorMsg(data.detail || "Something went wrong. Please try again.");
+        setSubscribeState("error");
       }
     } catch {
       setErrorMsg("Network error. Please try again.");
