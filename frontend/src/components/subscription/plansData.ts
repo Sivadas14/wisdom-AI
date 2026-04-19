@@ -195,8 +195,7 @@ export const SUBSCRIPTION_PLANS: LocalPlan[] = [
       { "feature_text": "Audio meditation",                                  "plan_id": 104, "id": 315 },
       { "feature_text": "Video meditation",                                  "plan_id": 104, "id": 3151 },
       { "feature_text": "(combined limit of 60 minutes)",                    "plan_id": 104, "id": 3152 },
-      { "feature_text": "Resets every month",                                "plan_id": 104, "id": 316 },
-      { "feature_text": "Priority support",                                  "plan_id": 104, "id": 317 }
+      { "feature_text": "Resets every month",                                "plan_id": 104, "id": 316 }
     ],
     "polar_plan_id": "prod_pro_monthly_333333"
   },
@@ -223,8 +222,7 @@ export const SUBSCRIPTION_PLANS: LocalPlan[] = [
       { "feature_text": "Audio meditation",                                  "plan_id": 105, "id": 320 },
       { "feature_text": "Video meditation",                                  "plan_id": 105, "id": 3201 },
       { "feature_text": "(combined limit of 60 minutes)",                    "plan_id": 105, "id": 3202 },
-      { "feature_text": "Save 33% vs monthly billing",                      "plan_id": 105, "id": 321 },
-      { "feature_text": "Priority support",                                  "plan_id": 105, "id": 322 }
+      { "feature_text": "Save 33% vs monthly billing",                      "plan_id": 105, "id": 321 }
     ],
     "polar_plan_id": "d7e5a376-1f44-4c07-aaf9-6122e79de1ac"
   }

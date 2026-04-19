@@ -538,7 +538,6 @@ async def _update_plan_feature_texts(session: AsyncSession) -> None:
             'Video meditation',
             '(combined limit of 60 minutes)',
             'Resets every month',
-            'Priority support',
         ],
         ('PRO',   'YEARLY'):  [
             'Unlimited conversations',
@@ -547,7 +546,6 @@ async def _update_plan_feature_texts(session: AsyncSession) -> None:
             'Video meditation',
             '(combined limit of 60 minutes)',
             'Save 33% vs monthly billing',
-            'Priority support',
         ],
     }
 
