@@ -27,7 +27,6 @@ jobs:
 
       - name: Run health monitor
         id: monitor
-        # continue-on-error so the email step always runs even on failure
         continue-on-error: true
         run: |
           python scripts/monitor.py 2>&1 | tee /tmp/monitor_output.txt
@@ -38,61 +37,12 @@ jobs:
           GMAIL_USER: dassiv67@gmail.com
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           RECIPIENT: rsivadas@gmail.com
-        run: |
-          python - <<'PYEOF'
-          import os, smtplib, ssl
-          from email.mime.text import MIMEText
-          from email.mime.multipart import MIMEMultipart
-          from datetime import datetime, timezone
+          MONITOR_OUTPUT: /tmp/monitor_output.txt
+        run: python scripts/send_report.py
 
-          # Read monitor output
-          try:
-              with open("/tmp/monitor_output.txt") as f:
-                  body = f.read()
-          except Exception:
-              body = "(monitor output not available)"
-
-          exit_code = os.environ.get("MONITOR_EXIT", "1")
-          status    = "✅ ALL SYSTEMS OK" if exit_code == "0" else "❌ ISSUES FOUND"
-          now       = datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC")
-
-          subject = f"[Arunachala Samudra] Daily Health Report — {status} — {now}"
-
-          msg = MIMEMultipart("alternative")
-          msg["Subject"] = subject
-          msg["From"]    = os.environ["GMAIL_USER"]
-          msg["To"]      = os.environ["RECIPIENT"]
-
-          text = f"""Daily Health Monitor Report
-{now}
-
-Status: {status}
-
-{'='*60}
-{body}
-{'='*60}
-
-Quick links:
-  App:        https://www.arunachalasamudra.co.in
-  Health:     https://www.arunachalasamudra.co.in/health
-  App Runner: https://console.aws.amazon.com/apprunner
-"""
-          msg.attach(MIMEText(text, "plain"))
-
-          ctx = ssl.create_default_context()
-          with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
-              smtp.ehlo()
-              smtp.starttls(context=ctx)
-              smtp.login(os.environ["GMAIL_USER"], os.environ["GMAIL_APP_PASSWORD"])
-              smtp.sendmail(os.environ["GMAIL_USER"], os.environ["RECIPIENT"], msg.as_string())
-
-          print(f"Email sent to {os.environ['RECIPIENT']}")
-          PYEOF
-
-      # Fail the job if the monitor found issues (so GitHub also marks it red)
-      - name: Propagate monitor exit code
+      - name: Fail job if monitor found issues
         run: |
           if [ "${MONITOR_EXIT}" = "1" ]; then
-            echo "::error::One or more health checks failed. See email for details."
+            echo "::error::One or more health checks failed. Email sent to rsivadas@gmail.com."
             exit 1
           fi
