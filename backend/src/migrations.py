@@ -573,10 +573,14 @@ async def _update_plan_feature_texts(session: AsyncSession) -> None:
         )
 
         # 2. Insert desired features in order
-        for feature_text in desired:
+        # NOTE: `order` column is NOT NULL with no DB-level default — must be supplied.
+        for order_idx, feature_text in enumerate(desired):
             await session.execute(
-                text("INSERT INTO plan_features (feature_text, plan_id) VALUES (:txt, :pid)"),
-                {"txt": feature_text, "pid": plan_id}
+                text(
+                    "INSERT INTO plan_features (feature_text, plan_id, \"order\") "
+                    "VALUES (:txt, :pid, :ord)"
+                ),
+                {"txt": feature_text, "pid": plan_id, "ord": order_idx}
             )
 
         _log(f"Replaced features for {plan_type}/{billing_cycle} (id={plan_id}) → {len(desired)} rows")

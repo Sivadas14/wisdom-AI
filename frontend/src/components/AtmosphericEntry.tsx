@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
  * Shows at most once per browser session (sessionStorage key below).
  */
 
-const SESSION_KEY = "arunachala_entry_shown_v1";
+const SESSION_KEY = "arunachala_entry_shown_v2"; // bumped → forces re-show after 4 s timing update
 
 type Phase = "cream" | "mountain" | "tagline" | "fadeout" | "done";
 
