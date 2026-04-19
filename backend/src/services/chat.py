@@ -518,9 +518,9 @@ async def _llm_chat_streaming_optimized(
                 "The library does not currently have indexed passages that match your question. "
                 "This could mean the relevant book has not yet been uploaded to the knowledge base, "
                 "or the topic may be outside what Bhagavan's preserved texts address directly.\n\n"
-                "Please try rephrasing your question, or explore the full collection at "
-                "Ramanasramam.org. You are also welcome to ask about any other teaching from "
-                "the Ramana Maharshi library."
+                "Please try rephrasing your question. You are also welcome to explore further through "
+                "our digital library or continue the conversation by asking about any other teaching "
+                "from the Ramana Maharshi library."
             )
             yield ta.to_openai_chunk(tt.assistant(static_refusal))
             yield "[DONE]\n\n"
@@ -543,7 +543,8 @@ async def _llm_chat_streaming_optimized(
                         - You MUST ONLY use information from the passages provided above.
                         - You MUST NOT use any general knowledge, training data, or information from outside these passages.
                         - If the passages do not contain enough information to fully answer the question,
-                          respond warmly and humbly, suggest the seeker explore the library or Ramanasramam.org,
+                          respond warmly and humbly, invite the seeker to continue the conversation or
+                          explore the Arunachala Samudra digital library for deeper study,
                           and never use technical language or mention retrieval systems.
                         - NEVER make up information or use knowledge from your training data.
                         - NEVER use the word "chunks" or any technical retrieval term in your response.
@@ -936,8 +937,8 @@ async def chat_completions(
                         3. When you quote or paraphrase, always cite the source text given.
                         4. If the provided passages do not contain enough information to answer the question,
                            respond with warmth and humility — never mention technical terms — and gently
-                           invite the seeker to explore the topic in the Arunachala Samudra library or at
-                           Ramanasramam.org.
+                           invite the seeker to continue the conversation with a related question or
+                           explore our Arunachala Samudra digital library for deeper study.
                         5. NEVER speculate, NEVER hallucinate, NEVER present general Advaita or Neo-Advaita
                            content unless it is directly present in the retrieved passages.
                         6. You may respond warmly to greetings, but keep even conversational replies
