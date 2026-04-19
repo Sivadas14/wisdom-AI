@@ -90,50 +90,67 @@ async def _close_db(app: FastAPI):
 # The app itself
 
 
+async def _startup_tasks(app: FastAPI):
+    """
+    Run DB setup and migrations in the background AFTER the server has already
+    yielded.  This means App Runner's health check always sees the port open
+    immediately — no more silent reversions due to slow DB connections.
+    """
+    print("[TRACE] _startup_tasks() begin")
+
+    # ── Database setup ──────────────────────────────────────────────────────
+    try:
+        await _setup_db(app)
+        tu.logger.info("Database setup successfully.")
+        print("[TRACE] _startup_tasks(): DB ready")
+    except Exception as e:
+        print(f"[TRACE] WARNING: DB setup failed: {e}")
+        tu.logger.error(f"DB setup error (non-fatal): {e}")
+        app.state.db_engine = None
+        app.state.db_session_factory = None
+        return  # Can't run migrations without a DB
+
+    # ── Startup migrations ──────────────────────────────────────────────────
+    if getattr(app.state, "db_session_factory", None) is not None:
+        try:
+            await run_migrations(app.state.db_session_factory)
+            tu.logger.info("Startup migrations complete.")
+            print("[TRACE] _startup_tasks(): migrations done")
+        except Exception as e:
+            print(f"[TRACE] WARNING: Migrations failed (non-fatal): {e}")
+            tu.logger.error(f"Migration error (non-fatal): {e}")
+
+    print("[TRACE] _startup_tasks() done")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     deployed_sha = os.getenv("GIT_SHA", "unknown")
     print(f"[TRACE] lifespan() start  GIT_SHA={deployed_sha}")
     logger.info(f"=== DEPLOYED VERSION: {deployed_sha} ===")
 
-    # ── Database setup ──────────────────────────────────────────────────────
-    # Wrapped in its own try/except so a DB connection failure at startup does
-    # NOT crash uvicorn.  App Runner would otherwise revert to the old image
-    # and we'd never see the new code run.
-    try:
-        await _setup_db(app)
-        tu.logger.info("Database setup successfully.")
-    except Exception as e:
-        print(f"[TRACE] WARNING: DB setup failed — server still starting: {e}")
-        tu.logger.error(f"DB setup error (non-fatal): {e}")
-        app.state.db_engine = None
-        app.state.db_session_factory = None
+    # Pre-set state to None so request handlers can check gracefully
+    app.state.db_engine = None
+    app.state.db_session_factory = None
 
-    # ── Startup migrations ──────────────────────────────────────────────────
-    # Only attempt if DB setup succeeded.  Each individual migration is already
-    # wrapped in _safe_migration so per-migration errors are already non-fatal.
-    if getattr(app.state, "db_session_factory", None) is not None:
-        try:
-            await run_migrations(app.state.db_session_factory)
-            tu.logger.info("Startup migrations complete.")
-        except Exception as e:
-            print(f"[TRACE] WARNING: Migrations failed — server still starting: {e}")
-            tu.logger.error(f"Migration error (non-fatal): {e}")
-
-    # ── Background tasks ────────────────────────────────────────────────────
-    print("[TRACE] scheduling background_image_pregeneration")
+    # ── Yield FIRST — server is immediately ready for health checks ─────────
+    # DB setup and migrations run as background tasks so App Runner's health
+    # check always succeeds.  Previously, blocking on DB before yield was the
+    # root cause of every silent reversion.
+    asyncio.create_task(_startup_tasks(app))
     asyncio.create_task(background_image_pregeneration())
-    tu.logger.info("Background tasks scheduled.")
+    print("[TRACE] lifespan() yielding — server ready (startup runs in background)")
+    tu.logger.info("Background startup tasks scheduled. Server accepting requests.")
 
-    print("[TRACE] lifespan() yielding — server ready")
-    yield  # Server accepts requests from this point on
+    yield  # ← App Runner health check fires here and always succeeds
 
     # ── Shutdown ────────────────────────────────────────────────────────────
     print("[TRACE] lifespan() shutdown start")
     tu.logger.info("Shutting down application lifespan...")
     try:
-        await _close_db(app)
-        tu.logger.info("Database connections closed.")
+        if getattr(app.state, "db_engine", None) is not None:
+            await _close_db(app)
+            tu.logger.info("Database connections closed.")
     except Exception as e:
         tu.logger.error(f"Error during cleanup: {e}")
 
