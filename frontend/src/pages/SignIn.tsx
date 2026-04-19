@@ -246,8 +246,8 @@ const SignIn: React.FC = () => {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem 1rem",
+        justifyContent: "flex-start",
+        padding: "3rem 1rem 3rem",
         fontFamily: T.sans,
       }}
     >

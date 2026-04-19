@@ -64,7 +64,7 @@ const OnboardingGate = () => {
 const AppShell = () => (
     <div className="h-screen flex flex-col overflow-hidden">
         <AnnouncementBanner />
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-y-auto">
             <Outlet />
         </div>
     </div>
