@@ -240,8 +240,8 @@ const Sidebar = () => {
                 </div>
             </ScrollArea>
 
-            {/* Usage strip — shown for all plans (Free, Seeker, etc.) */}
-            {usage && (
+            {/* Usage strip — hidden for FREE plan (subscribe first, then see usage) */}
+            {usage && !isFree && (
                 <div
                     className="mx-3 mb-2 p-3 rounded-lg bg-[#FDF4EF] border border-[#ECE5DF] cursor-pointer hover:bg-[#F5E6DC] transition-colors"
                     onClick={() => navigate("/billing")}
