@@ -1084,12 +1084,11 @@ const Chat = () => {
               href="https://www.arunachalasamudra.in"
               style={{
                 fontFamily: T.serif,
-                fontSize: "0.95rem",
+                fontSize: "1rem",
                 color: T.muted,
                 textDecoration: "none",
-                letterSpacing: "0.06em",
+                letterSpacing: "-0.01em",
                 marginBottom: "0.5rem",
-                opacity: 0.85,
               }}
             >
               Arunachala Samudra
@@ -1181,8 +1180,8 @@ const Chat = () => {
                     (e.currentTarget as HTMLElement).style.backgroundColor = T.card;
                   }}
                   style={{
-                    padding: "0.35rem 0.85rem",
-                    borderRadius: "20px",
+                    padding: "0.38rem 0.9rem",
+                    borderRadius: "6px",
                     border: `1px solid ${T.border}`,
                     backgroundColor: T.card,
                     fontFamily: T.sans,
