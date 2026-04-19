@@ -1335,9 +1335,8 @@ const Chat = () => {
           questions={questions}
           onClose={() => setShowExploreMore(false)}
           onSelectQuestion={(q) => {
-            setCurrentInput(q);
             setShowExploreMore(false);
-            setTimeout(() => inputRef.current?.focus(), 100);
+            handleSendMessage(q);
           }}
           inline={true}
         />
