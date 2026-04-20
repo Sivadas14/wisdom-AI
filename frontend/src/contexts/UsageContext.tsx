@@ -111,6 +111,12 @@ export const UsageProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     useEffect(() => {
         if (user) {
+            // Set loading=true and clear stale usage BEFORE fetching.
+            // This ensures usageLoading=true during the in-flight window so
+            // Chat.tsx's isFree guard (usageLoading ? true : ...) fires and
+            // renders the FREE welcome screen instead of the wrong paid screen.
+            setLoading(true);
+            setUsage(null);
             console.log('🔵 [UsageContext] User ready, fetching usage and subscription...');
             fetchUsage();
             fetchSubscription();
