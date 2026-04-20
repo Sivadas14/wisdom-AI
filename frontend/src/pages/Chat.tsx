@@ -61,6 +61,13 @@ const Chat = () => {
   // the paid home — a barely-perceptible and acceptable transition.
   const isFree = usageLoading ? true : (usage?.plan_type === 'FREE');
   const paidExhausted = !isFree && typeof usage?.conversations?.remaining === 'number' && usage.conversations.remaining <= 0;
+
+  // Inside the app there is NO free-plan fallback. A user is blocked from all
+  // interactive features (chat, cards, audio, video) when:
+  //   • they are on the FREE plan (must subscribe), OR
+  //   • their paid plan quota is exhausted (must resubscribe)
+  // We only evaluate this once usage has loaded to avoid flickering.
+  const isBlocked = !usageLoading && (isFree || paidExhausted);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -1491,8 +1498,8 @@ const Chat = () => {
               </div>
             )}
 
-            {/* Action Buttons - Only show when there are messages */}
-            {messages.length > 0 && (
+            {/* Action Buttons - Only show when there are messages AND user has active quota */}
+            {messages.length > 0 && !isBlocked && (
               <div className="flex flex-nowrap md:flex-wrap gap-2 mb-3 md:mb-4 justify-start md:justify-center overflow-x-auto pb-2 md:pb-0 scrollbar-hide no-scrollbar">
                 <Button
                   onClick={() => setShowTopicPicker(v => !v)}
@@ -1556,23 +1563,24 @@ const Chat = () => {
                 Hidden entirely for FREE / unsubscribed users (they see the
                 Portal Welcome Screen instead and are directed to billing). */}
             {(() => {
-              // FREE users: no chat input — welcome screen handles everything
-              if (isFree) return null;
-
-              const chatRemaining = usage?.conversations?.remaining;
-              const chatExhausted = typeof chatRemaining === 'number' && chatRemaining <= 0;
-              if (chatExhausted) {
+              // Blocked users (FREE plan or exhausted quota):
+              // — on the home screen (no messages): empty-state already shows the
+              //   correct subscribe/upgrade prompt, so return null here.
+              // — inside a past conversation: show a subscribe banner so they can
+              //   read history but cannot use any interactive feature.
+              if (isBlocked) {
+                if (messages.length === 0) return null;
                 return (
                   <div className="max-w-2xl mx-auto w-full">
                     <div className="flex flex-col items-center gap-3 py-4 px-5 rounded-xl bg-[#FDF4EF] border border-[#ECE5DF]">
                       <p className="text-sm text-[#472b20]/70 text-center">
-                        You've used all <span className="font-semibold text-[#472b20]">10 free conversations</span>. Upgrade to keep the inquiry going.
+                        Your plan has ended. Subscribe to continue chatting, generating cards, and creating meditations.
                       </p>
                       <button
                         onClick={() => setShowPlansModal(true)}
                         className="px-5 py-2 rounded-full bg-[#D05E2D] hover:bg-[#B84E20] text-white text-sm font-semibold transition-colors"
                       >
-                        Upgrade plan →
+                        Subscribe →
                       </button>
                     </div>
                     <p className="text-center text-[10px] md:text-xs text-gray-400 mt-2 md:mt-3">
