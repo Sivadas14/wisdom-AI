@@ -787,6 +787,7 @@ function GuestChatSection() {
     }
     if (!question || !answer) return;
 
+    // Reset any previous result before starting a new generation
     setGenMode(mode);
     setGenStatus("pending");
     setGenUrl(null);
@@ -826,7 +827,6 @@ function GuestChatSection() {
   const hasQA = messages.length >= 2 && messages.some(m => m.role === "user") && messages.some(m => m.role === "assistant" && m.content.length > 10);
   const isGenerating = genStatus === "pending" || genStatus === "processing";
   const genDone = genStatus === "complete";
-  const canGenerate = contentCount < GUEST_CONTENT_LIMIT && !isGenerating && !genDone;
 
   return (
     <section id="try" style={{ backgroundColor: T.umber, position: "relative", overflow: "hidden" }} className="py-20 px-6">
@@ -969,50 +969,57 @@ function GuestChatSection() {
               <div style={{ flex: 1, height: "1px", backgroundColor: "rgba(255,255,255,0.1)" }} />
             </div>
 
-            {/* Three buttons */}
-            {!isGenerating && !genDone && (
-              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "0.75rem" }}>
-                {([
-                  { mode: "image" as const,  icon: <ImageIcon className="w-4 h-4" />,  label: "Card",  sub: "Contemplation image" },
-                  { mode: "audio" as const,  icon: <Volume2   className="w-4 h-4" />,  label: "Audio", sub: "3-min guided meditation" },
-                  { mode: "video" as const,  icon: <Video     className="w-4 h-4" />,  label: "Video", sub: "3-min meditation video"  },
-                ]).map(({ mode, icon, label, sub }) => (
-                  <button
-                    key={mode}
-                    onClick={() => handleGenerate(mode)}
-                    disabled={!canGenerate}
-                    style={{
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem",
-                      padding: "0.85rem 1.5rem",
-                      backgroundColor: canGenerate ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: "6px",
-                      cursor: canGenerate ? "pointer" : "not-allowed",
-                      minWidth: "120px",
-                      transition: "background-color 0.2s",
-                      opacity: canGenerate ? 1 : 0.45,
-                    }}
-                    onMouseEnter={e => { if (canGenerate) (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(255,255,255,0.12)"; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = canGenerate ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)"; }}
-                  >
-                    <span style={{ color: T.accent }}>{icon}</span>
-                    <span style={{ fontFamily: T.sans, color: "#F5F0EC", fontSize: "0.88rem", fontWeight: 600 }}>{label}</span>
-                    <span style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.72rem" }}>{sub}</span>
-                  </button>
-                ))}
+            {/* ── Three format buttons — shown when idle and quota remains ── */}
+            {!isGenerating && !genDone && contentCount < GUEST_CONTENT_LIMIT && (
+              <>
+                <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+                  {([
+                    { mode: "image" as const, icon: <ImageIcon className="w-4 h-4" />, label: "Card",  sub: "Contemplation image"     },
+                    { mode: "audio" as const, icon: <Volume2   className="w-4 h-4" />, label: "Audio", sub: "3-min guided meditation"  },
+                    { mode: "video" as const, icon: <Video     className="w-4 h-4" />, label: "Video", sub: "3-min meditation video"   },
+                  ]).map(({ mode, icon, label, sub }) => (
+                    <button
+                      key={mode}
+                      onClick={() => handleGenerate(mode)}
+                      style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: "0.3rem",
+                        padding: "0.85rem 1.5rem",
+                        backgroundColor: "rgba(255,255,255,0.07)",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        borderRadius: "6px", cursor: "pointer",
+                        minWidth: "120px", transition: "background-color 0.2s",
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(255,255,255,0.13)"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = "rgba(255,255,255,0.07)"; }}
+                    >
+                      <span style={{ color: T.accent }}>{icon}</span>
+                      <span style={{ fontFamily: T.sans, color: "#F5F0EC", fontSize: "0.88rem", fontWeight: 600 }}>{label}</span>
+                      <span style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.72rem" }}>{sub}</span>
+                    </button>
+                  ))}
+                </div>
+                <p style={{ fontFamily: T.sans, color: "rgba(154,128,112,0.7)", fontSize: "0.75rem", textAlign: "center" }}>
+                  {GUEST_CONTENT_LIMIT - contentCount} free generation{GUEST_CONTENT_LIMIT - contentCount !== 1 ? "s" : ""} remaining today
+                </p>
+              </>
+            )}
+
+            {/* ── Quota exhausted — clear sign-up prompt, no disabled buttons ── */}
+            {!isGenerating && !genDone && contentCount >= GUEST_CONTENT_LIMIT && (
+              <div style={{ backgroundColor: "rgba(184,90,45,0.1)", border: "1px solid rgba(184,90,45,0.25)", borderRadius: "8px", padding: "1.25rem 1.5rem", textAlign: "center" }}>
+                <p style={{ fontFamily: T.sans, color: "#F5F0EC", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.4rem" }}>
+                  You've used your 3 free generations
+                </p>
+                <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.82rem", lineHeight: 1.6, marginBottom: "1rem" }}>
+                  Sign up free to get unlimited cards, audio meditations and videos for every question you ask.
+                </p>
+                <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.85rem", padding: "0.6rem 1.5rem" }}>
+                  Create free account →
+                </Link>
               </div>
             )}
 
-            {/* Quota note */}
-            {!isGenerating && !genDone && (
-              <p style={{ fontFamily: T.sans, color: "rgba(154,128,112,0.7)", fontSize: "0.75rem", textAlign: "center" }}>
-                {contentCount < GUEST_CONTENT_LIMIT
-                  ? `${GUEST_CONTENT_LIMIT - contentCount} free generation${GUEST_CONTENT_LIMIT - contentCount !== 1 ? "s" : ""} remaining today — generate from your question above`
-                  : "You've used all free generations today. Sign up for unlimited access."}
-              </p>
-            )}
-
-            {/* Loading spinner — exact same style as live product */}
+            {/* ── Loading spinner ── */}
             {isGenerating && (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "2rem 0" }}>
                 <div style={{ position: "relative", width: "4rem", height: "4rem", marginBottom: "1rem" }}>
@@ -1029,15 +1036,20 @@ function GuestChatSection() {
               </div>
             )}
 
-            {/* Error */}
+            {/* ── Error with retry ── */}
             {genStatus === "failed" && genError && (
               <div style={{ backgroundColor: "rgba(200,60,60,0.12)", border: "1px solid rgba(200,60,60,0.25)", borderRadius: "6px", padding: "1rem", textAlign: "center", marginBottom: "0.75rem" }}>
                 <p style={{ fontFamily: T.sans, color: "#e88888", fontSize: "0.88rem" }}>{genError}</p>
-                <button onClick={() => setGenStatus("idle")} style={{ ...btn, marginTop: "0.75rem", fontSize: "0.8rem", padding: "0.45rem 1rem" }}>Try again</button>
+                <button
+                  onClick={() => { setGenStatus("idle"); setGenMode(null); setGenUrl(null); setGenError(null); }}
+                  style={{ ...btn, marginTop: "0.75rem", fontSize: "0.8rem", padding: "0.45rem 1rem" }}
+                >
+                  Try again
+                </button>
               </div>
             )}
 
-            {/* ── Result display ─────────────────────────────────────────── */}
+            {/* ── Result: image card ── */}
             {genDone && genUrl && genType === "image" && (
               <div style={{ textAlign: "center" }}>
                 <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.72rem", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>
@@ -1056,12 +1068,26 @@ function GuestChatSection() {
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem" }}>
                   Subscribers get a new card for every question they ask.
                 </p>
-                <button onClick={() => { setGenStatus("idle"); setGenMode(null); setGenUrl(null); }} style={{ ...btn, marginTop: "1rem", fontSize: "0.8rem", padding: "0.45rem 1rem", backgroundColor: "transparent", border: `1px solid ${T.accent}`, color: T.accent }}>
-                  Generate another
-                </button>
+                {/* Try other formats or back */}
+                {contentCount < GUEST_CONTENT_LIMIT ? (
+                  <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
+                    <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Also try from your question:</p>
+                    <button onClick={() => handleGenerate("audio")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <Volume2 className="w-3.5 h-3.5" /> Generate Audio
+                    </button>
+                    <button onClick={() => handleGenerate("video")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <Video className="w-3.5 h-3.5" /> Generate Video
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "1rem" }}>
+                    <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.5rem 1.25rem" }}>Sign up for unlimited →</Link>
+                  </div>
+                )}
               </div>
             )}
 
+            {/* ── Result: audio ── */}
             {genDone && genUrl && genType === "audio" && (
               <div>
                 <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.72rem", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", textAlign: "center" }}>
@@ -1084,14 +1110,25 @@ function GuestChatSection() {
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem", textAlign: "center" }}>
                   Subscribers get personalised meditations for every question they ask.
                 </p>
-                <div style={{ textAlign: "center" }}>
-                  <button onClick={() => { setGenStatus("idle"); setGenMode(null); setGenUrl(null); }} style={{ ...btn, marginTop: "0.75rem", fontSize: "0.8rem", padding: "0.45rem 1rem", backgroundColor: "transparent", border: `1px solid ${T.accent}`, color: T.accent }}>
-                    Generate another
-                  </button>
-                </div>
+                {contentCount < GUEST_CONTENT_LIMIT ? (
+                  <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
+                    <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
+                    <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <ImageIcon className="w-3.5 h-3.5" /> Generate Card
+                    </button>
+                    <button onClick={() => handleGenerate("video")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <Video className="w-3.5 h-3.5" /> Generate Video
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "1rem", textAlign: "center" }}>
+                    <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.5rem 1.25rem" }}>Sign up for unlimited →</Link>
+                  </div>
+                )}
               </div>
             )}
 
+            {/* ── Result: video ── */}
             {genDone && genUrl && genType === "video" && (
               <div>
                 <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.72rem", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem", textAlign: "center" }}>
@@ -1105,11 +1142,21 @@ function GuestChatSection() {
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem", textAlign: "center" }}>
                   Subscribers get personalised meditation videos for every question they ask.
                 </p>
-                <div style={{ textAlign: "center" }}>
-                  <button onClick={() => { setGenStatus("idle"); setGenMode(null); setGenUrl(null); }} style={{ ...btn, marginTop: "0.75rem", fontSize: "0.8rem", padding: "0.45rem 1rem", backgroundColor: "transparent", border: `1px solid ${T.accent}`, color: T.accent }}>
-                    Generate another
-                  </button>
-                </div>
+                {contentCount < GUEST_CONTENT_LIMIT ? (
+                  <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
+                    <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
+                    <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <ImageIcon className="w-3.5 h-3.5" /> Generate Card
+                    </button>
+                    <button onClick={() => handleGenerate("audio")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                      <Volume2 className="w-3.5 h-3.5" /> Generate Audio
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "1rem", textAlign: "center" }}>
+                    <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.5rem 1.25rem" }}>Sign up for unlimited →</Link>
+                  </div>
+                )}
               </div>
             )}
           </div>

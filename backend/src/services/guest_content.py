@@ -1,34 +1,45 @@
 """
 Guest content generation — card, audio, video — for unauthenticated landing-page visitors.
 
-Each session (session_id from browser sessionStorage) may generate up to
-GUEST_CONTENT_LIMIT items per day.  Status is tracked in an in-memory dict;
-the actual files are stored in Supabase storage exactly like the authenticated pipeline.
+Rate limiting (both dimensions must pass):
+  • session_id  — browser sessionStorage UUID, max GUEST_CONTENT_LIMIT per day
+  • IP hash     — SHA-256 of client IP, max GUEST_CONTENT_LIMIT per day
+
+Using both prevents:
+  - Multiple tabs / incognito windows  → same IP hash, blocked
+  - VPN per-request cycling            → each exit node gets its own counter
+
+Counters are in-memory (reset on restart); content files go to Supabase storage.
 """
 
 import asyncio
+import hashlib
 import uuid
 import time
 import re
 import random
 from io import BytesIO
 
-from fastapi import BackgroundTasks, HTTPException
+from fastapi import HTTPException
+from fastapi import Request as FastAPIRequest
 from pydantic import BaseModel
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-GUEST_CONTENT_LIMIT   = 3     # max total items per session per day
-GUEST_AUDIO_LENGTH    = "3 min"
-GUEST_VIDEO_LENGTH    = "3 min"
+GUEST_CONTENT_LIMIT = 3      # max items per session AND per IP per day
+GUEST_AUDIO_LENGTH  = "3 min"
+GUEST_VIDEO_LENGTH  = "3 min"
 
 
 # ── In-memory stores ───────────────────────────────────────────────────────────
 # { content_id: { status, content_url, content_type, error, created_at } }
 _STORE: dict[str, dict] = {}
 
-# { session_id: { date_str: int } }
-_RATE: dict[str, dict] = {}
+# { session_id:  { "YYYY-MM-DD": count } }
+_SESSION_RATE: dict[str, dict] = {}
+
+# { ip_hash:     { "YYYY-MM-DD": count } }
+_IP_RATE: dict[str, dict] = {}
 
 
 # ── Wire models ────────────────────────────────────────────────────────────────
@@ -57,14 +68,30 @@ def _today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def _rate_ok(sid: str) -> bool:
-    return _RATE.setdefault(sid, {}).get(_today(), 0) < GUEST_CONTENT_LIMIT
+def _rate_ok(key: str, store: dict) -> bool:
+    """Return True if the key is under the daily limit."""
+    return store.setdefault(key, {}).get(_today(), 0) < GUEST_CONTENT_LIMIT
 
 
-def _rate_bump(sid: str):
-    counts = _RATE.setdefault(sid, {})
+def _rate_bump(key: str, store: dict):
+    """Increment the daily counter for key in store."""
+    counts = store.setdefault(key, {})
     today = _today()
     counts[today] = counts.get(today, 0) + 1
+
+
+def _get_client_ip(http_request: FastAPIRequest) -> str:
+    """Return the real client IP, respecting App Runner's X-Forwarded-For."""
+    forwarded = http_request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if forwarded:
+        return forwarded
+    if http_request.client:
+        return http_request.client.host
+    return "unknown"
+
+
+def _hash_ip(ip: str) -> str:
+    return hashlib.sha256(ip.encode()).hexdigest()
 
 
 def _short_quote(answer: str, max_chars: int = 160) -> str:
@@ -158,7 +185,7 @@ async def _gen_audio(content_id: str, question: str, answer: str):
 async def _gen_video(content_id: str, question: str, answer: str):
     _STORE[content_id]["status"] = "processing"
     try:
-        import tempfile, os
+        import os
         from src.content.audio import (
             generate_meditation_transcript_optimized,
             generate_audio_from_transcript_optimized,
@@ -186,7 +213,6 @@ async def _gen_video(content_id: str, question: str, answer: str):
             pil_image  = await _generate_image(random.choice(CONTEMPLATION_PROMPTS))
             video_path = await parallel_generator._create_video_streaming_parallel(pil_image, transcript)
 
-        # Upload manually (avoid parallel_generator.spb_client coupling)
         with open(video_path, "rb") as f:
             video_data = f.read()
         try:
@@ -205,8 +231,8 @@ async def _gen_video(content_id: str, question: str, answer: str):
 
 
 # ── Route handlers ─────────────────────────────────────────────────────────────
-async def create_guest_content(request: GuestContentRequest):
-    """POST /api/content/guest"""
+async def create_guest_content(http_request: FastAPIRequest, request: GuestContentRequest):
+    """POST /api/content/guest — rate-limited by session_id AND IP hash."""
     sid  = (request.session_id or "").strip()
     mode = request.mode.strip().lower()
 
@@ -216,19 +242,34 @@ async def create_guest_content(request: GuestContentRequest):
         raise HTTPException(400, "mode must be image, audio, or video.")
     if not request.question.strip() or not request.answer.strip():
         raise HTTPException(400, "question and answer are required.")
-    if not _rate_ok(sid):
+
+    # ── Rate check: session_id ─────────────────────────────────────────────────
+    if not _rate_ok(sid, _SESSION_RATE):
         raise HTTPException(
             429,
             f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
             "Sign up for unlimited access."
         )
 
-    _rate_bump(sid)
+    # ── Rate check: IP hash ────────────────────────────────────────────────────
+    ip      = _get_client_ip(http_request)
+    ip_hash = _hash_ip(ip)
+    if not _rate_ok(ip_hash, _IP_RATE):
+        raise HTTPException(
+            429,
+            f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
+            "Sign up for unlimited access."
+        )
+
+    # ── Both passed — bump counters and launch background task ─────────────────
+    _rate_bump(sid,     _SESSION_RATE)
+    _rate_bump(ip_hash, _IP_RATE)
+
     cid = str(uuid.uuid4())
     _STORE[cid] = {
         "status":       "pending",
         "content_url":  None,
-        "content_type": "image" if mode == "image" else mode,
+        "content_type": mode,
         "error":        None,
         "created_at":   time.time(),
     }
