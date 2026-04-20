@@ -8,10 +8,11 @@
  *
  * Auto-shown once per browser (localStorage flag "ramana_intro_v1_seen").
  * Can always be re-triggered by clicking "New to Ramana?" in the nav.
- * No auth required — fetches portrait from /api/ramana-portrait (public).
+ * Portrait: cycles through a curated set of public-domain Ramana Maharshi
+ * photos (Wikimedia Commons, pre-1950). Falls back to ॥ if all fail.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, ArrowRight, ArrowLeft, MessageCircle, Image as ImageIcon, Headphones } from "lucide-react";
 
 // ── Design tokens (match Landing.tsx exactly) ──────────────────────────────
@@ -28,8 +29,40 @@ const T = {
   sans:    "'Figtree', sans-serif",
 };
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string || "/api").replace(/\/$/, "");
 const SEEN_KEY = "ramana_intro_v1_seen";
+
+/**
+ * Public-domain photographs of Sri Ramana Maharshi (1879–1950).
+ * All sourced from Wikimedia Commons — PD because Ramana passed in 1950
+ * and these photos pre-date modern copyright law in India and globally.
+ * A different photo is shown on each modal open (random pick).
+ * If the browser fails to load an image, the next is tried automatically.
+ */
+const RAMANA_PHOTOS = [
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Ramana_Maharshi_-_1948.jpg/300px-Ramana_Maharshi_-_1948.jpg",
+    label: "Sri Ramana Maharshi, 1948",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Sri_Ramana_Maharshi_-_Portrait_-_G._G_Welling_-_1948.jpg/300px-Sri_Ramana_Maharshi_-_Portrait_-_G._G_Welling_-_1948.jpg",
+    label: "Portrait by G. G. Welling, 1948",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Sri_Ramana_Maharshi_in_1902.jpg/300px-Sri_Ramana_Maharshi_in_1902.jpg",
+    label: "Sri Ramana Maharshi, 1902",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Ramana-Maharshi-sit-1.jpg/300px-Ramana-Maharshi-sit-1.jpg",
+    label: "Sri Ramana Maharshi seated in inquiry",
+  },
+  {
+    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Ramana-Maharshi-walk.jpg/300px-Ramana-Maharshi-walk.jpg",
+    label: "Sri Ramana Maharshi walking",
+  },
+];
+
+/** Pick a random starting index, different each time the modal opens */
+const randomStartIndex = () => Math.floor(Math.random() * RAMANA_PHOTOS.length);
 
 interface Props {
   onClose: () => void;
@@ -37,24 +70,27 @@ interface Props {
 
 // ── Individual screen components ───────────────────────────────────────────
 
-function Screen1({ portraitUrl }: { portraitUrl: string | null }) {
+function Screen1({ photoIndex, onPhotoError }: { photoIndex: number; onPhotoError: () => void }) {
+  const photo = RAMANA_PHOTOS[photoIndex % RAMANA_PHOTOS.length];
   return (
     <div>
-      {/* Portrait */}
+      {/* Portrait — public-domain Ramana photo, cycles on error */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5rem" }}>
         <div style={{
-          width: 120, height: 120, borderRadius: "50%",
+          width: 130, height: 155, borderRadius: "12px",
           border: `3px solid ${T.warmBorder}`,
           boxShadow: `0 0 0 6px ${T.warm}, 0 0 0 8px ${T.warmBorder}`,
           overflow: "hidden", backgroundColor: T.warm,
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0,
         }}>
-          {portraitUrl ? (
+          {photo ? (
             <img
-              src={portraitUrl}
-              alt="Sri Ramana Maharshi"
-              style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }}
+              src={photo.url}
+              alt={photo.label}
+              title={photo.label}
+              onError={onPhotoError}
+              style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
             />
           ) : (
             <div style={{ fontFamily: T.serif, fontSize: "2.5rem", color: T.accent, lineHeight: 1 }}>॥</div>
@@ -241,16 +277,19 @@ function Screen3({ onBegin }: { onBegin: () => void }) {
 
 const RamanaOnboardingModal = ({ onClose }: Props) => {
   const [screen, setScreen] = useState(0); // 0, 1, 2
-  const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
   const [sliding, setSliding] = useState<"left" | "right" | null>(null);
 
-  // Fetch portrait on mount (best-effort — modal works fine without it)
-  useEffect(() => {
-    fetch(`${API_BASE}/ramana-portrait`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.url) setPortraitUrl(data.url); })
-      .catch(() => {});
-  }, []);
+  // Pick a random photo on mount; advance index if image fails to load
+  const [photoIndex, setPhotoIndex] = useState(() => randomStartIndex());
+  const [photoFailCount, setPhotoFailCount] = useState(0);
+
+  const handlePhotoError = () => {
+    // Try the next photo in the list; give up after cycling through all
+    if (photoFailCount < RAMANA_PHOTOS.length - 1) {
+      setPhotoFailCount(c => c + 1);
+      setPhotoIndex(i => (i + 1) % RAMANA_PHOTOS.length);
+    }
+  };
 
   const handleClose = () => {
     localStorage.setItem(SEEN_KEY, "1");
@@ -327,7 +366,7 @@ const RamanaOnboardingModal = ({ onClose }: Props) => {
 
         {/* Screen content */}
         <div style={slideStyle}>
-          {screen === 0 && <Screen1 portraitUrl={portraitUrl} />}
+          {screen === 0 && <Screen1 photoIndex={photoIndex} onPhotoError={handlePhotoError} />}
           {screen === 1 && <Screen2 />}
           {screen === 2 && <Screen3 onBegin={handleBegin} />}
         </div>
