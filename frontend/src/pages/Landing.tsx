@@ -364,9 +364,6 @@ function HeroSection({ isAuthenticated }: { isAuthenticated: boolean }) {
 
       {/* Content */}
       <div style={{ position: "relative", zIndex: 10, textAlign: "center", padding: "0 1.5rem", maxWidth: "860px", margin: "0 auto" }}>
-        <p style={{ fontFamily: T.sans, color: "rgba(245,200,160,0.65)", fontSize: "0.75rem", letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1.5rem" }}>
-          Wisdom Portal · arunachalasamudra.co.in
-        </p>
         <h1 style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "clamp(2.2rem, 6vw, 4rem)", lineHeight: 1.18, marginBottom: "1.5rem" }}>
           The complete teachings of
           <br />Sri Ramana Maharshi,
