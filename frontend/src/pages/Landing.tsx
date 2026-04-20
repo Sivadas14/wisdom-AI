@@ -2,7 +2,7 @@
  * Landing.tsx — Public landing page for Arunachala Samudra (.co.in)
  *
  * Entry experience:
- *   • IntroScreen — atmospheric overlay, "Who Am I?" holds 5.5s then fades 1s.
+ *   • IntroScreen — atmospheric overlay, "Who Am I?" holds 3s then fades 0.8s.
  *     Shown once per browser session (sessionStorage flag).
  *   • Landing — full page matching arunachalasamudra.in look & feel.
  *
@@ -87,9 +87,9 @@ function IntroScreen({ onDone }: { onDone: () => void }) {
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    // Start fade-out at 5.5s, fully gone at 6.5s
-    const t1 = setTimeout(() => setFading(true), 5500);
-    const t2 = setTimeout(() => onDone(), 6500);
+    // Start fade-out at 3s, fully gone at 3.8s
+    const t1 = setTimeout(() => setFading(true), 3000);
+    const t2 = setTimeout(() => onDone(), 3800);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onDone]);
 
@@ -100,7 +100,7 @@ function IntroScreen({ onDone }: { onDone: () => void }) {
         inset: 0,
         zIndex: 9999,
         opacity: fading ? 0 : 1,
-        transition: "opacity 1s ease-in-out",
+        transition: "opacity 0.8s ease-in-out",
         pointerEvents: fading ? "none" : "all",
         display: "flex",
         flexDirection: "column",
@@ -1157,7 +1157,7 @@ function Footer() {
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
-const INTRO_SESSION_KEY = "as_intro_seen";
+const INTRO_SESSION_KEY = "as_intro_seen_v2"; // bumped → forces re-show after timing fix (3s→3.8s)
 
 export default function Landing() {
   const { isAuthenticated } = useAuth();
