@@ -8,11 +8,13 @@
  *
  * Auto-shown once per browser (localStorage flag "ramana_intro_v1_seen").
  * Can always be re-triggered by clicking "New to Ramana?" in the nav.
- * Portrait: cycles through a curated set of public-domain Ramana Maharshi
- * photos (Wikimedia Commons, pre-1950). Falls back to ॥ if all fail.
+ *
+ * Portrait: picks a random public-domain Ramana photo from Wikimedia Commons.
+ * URLs are resolved via the Wikimedia API at runtime (not hardcoded) so they
+ * never break if files move. Falls back to ॥ symbol if all fetches fail.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, ArrowRight, ArrowLeft, MessageCircle, Image as ImageIcon, Headphones } from "lucide-react";
 
 // ── Design tokens (match Landing.tsx exactly) ──────────────────────────────
@@ -32,37 +34,42 @@ const T = {
 const SEEN_KEY = "ramana_intro_v1_seen";
 
 /**
- * Public-domain photographs of Sri Ramana Maharshi (1879–1950).
- * All sourced from Wikimedia Commons — PD because Ramana passed in 1950
- * and these photos pre-date modern copyright law in India and globally.
- * A different photo is shown on each modal open (random pick).
- * If the browser fails to load an image, the next is tried automatically.
+ * Public-domain Ramana Maharshi photo filenames on Wikimedia Commons.
+ * We resolve the actual URLs via the Wikimedia API at runtime so we
+ * never need to hardcode MD5-derived path prefixes (which break silently).
+ *
+ * Correct MD5 thumb paths for reference (computed from filename):
+ *   Ramana_Maharshi_-_1948.jpg                          → d/df
+ *   Sri_Ramana_Maharshi_in_1902.jpg                     → 1/13
+ *   Ramana-Maharshi-sit-1.jpg                           → c/c0
+ *   Ramana-Maharshi-walk.jpg                            → 4/4b
+ *   Sri_Ramana_Maharshi_-_Portrait_-_G._G_Welling_-_1948.jpg → 4/4c
  */
-const RAMANA_PHOTOS = [
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Ramana_Maharshi_-_1948.jpg/300px-Ramana_Maharshi_-_1948.jpg",
-    label: "Sri Ramana Maharshi, 1948",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Sri_Ramana_Maharshi_-_Portrait_-_G._G_Welling_-_1948.jpg/300px-Sri_Ramana_Maharshi_-_Portrait_-_G._G_Welling_-_1948.jpg",
-    label: "Portrait by G. G. Welling, 1948",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Sri_Ramana_Maharshi_in_1902.jpg/300px-Sri_Ramana_Maharshi_in_1902.jpg",
-    label: "Sri Ramana Maharshi, 1902",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Ramana-Maharshi-sit-1.jpg/300px-Ramana-Maharshi-sit-1.jpg",
-    label: "Sri Ramana Maharshi seated in inquiry",
-  },
-  {
-    url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Ramana-Maharshi-walk.jpg/300px-Ramana-Maharshi-walk.jpg",
-    label: "Sri Ramana Maharshi walking",
-  },
+const RAMANA_FILENAMES = [
+  "Ramana_Maharshi_-_1948.jpg",
+  "Sri_Ramana_Maharshi_in_1902.jpg",
+  "Ramana-Maharshi-sit-1.jpg",
+  "Ramana-Maharshi-walk.jpg",
+  "Sri_Ramana_Maharshi_-_Portrait_-_G._G_Welling_-_1948.jpg",
 ];
 
-/** Pick a random starting index, different each time the modal opens */
-const randomStartIndex = () => Math.floor(Math.random() * RAMANA_PHOTOS.length);
+/**
+ * Resolve a Wikimedia Commons filename to its actual image URL via the API.
+ * Uses origin=* for CORS. Returns null on any failure.
+ */
+async function resolveWikimediaUrl(filename: string): Promise<string | null> {
+  try {
+    const api = `https://commons.wikimedia.org/w/api.php?action=query&titles=${encodeURIComponent("File:" + filename)}&prop=imageinfo&iiprop=url&iilimit=1&format=json&origin=*`;
+    const res = await fetch(api, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const pages = data?.query?.pages ?? {};
+    const page  = Object.values(pages)[0] as any;
+    return (page?.imageinfo?.[0]?.url as string) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 interface Props {
   onClose: () => void;
@@ -70,11 +77,10 @@ interface Props {
 
 // ── Individual screen components ───────────────────────────────────────────
 
-function Screen1({ photoIndex, onPhotoError }: { photoIndex: number; onPhotoError: () => void }) {
-  const photo = RAMANA_PHOTOS[photoIndex % RAMANA_PHOTOS.length];
+function Screen1({ portraitUrl }: { portraitUrl: string | null }) {
   return (
     <div>
-      {/* Portrait — public-domain Ramana photo, cycles on error */}
+      {/* Portrait — public-domain Ramana photo fetched via Wikimedia API */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5rem" }}>
         <div style={{
           width: 130, height: 155, borderRadius: "12px",
@@ -84,12 +90,10 @@ function Screen1({ photoIndex, onPhotoError }: { photoIndex: number; onPhotoErro
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0,
         }}>
-          {photo ? (
+          {portraitUrl ? (
             <img
-              src={photo.url}
-              alt={photo.label}
-              title={photo.label}
-              onError={onPhotoError}
+              src={portraitUrl}
+              alt="Sri Ramana Maharshi"
               style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
             />
           ) : (
@@ -278,18 +282,29 @@ function Screen3({ onBegin }: { onBegin: () => void }) {
 const RamanaOnboardingModal = ({ onClose }: Props) => {
   const [screen, setScreen] = useState(0); // 0, 1, 2
   const [sliding, setSliding] = useState<"left" | "right" | null>(null);
+  const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
 
-  // Pick a random photo on mount; advance index if image fails to load
-  const [photoIndex, setPhotoIndex] = useState(() => randomStartIndex());
-  const [photoFailCount, setPhotoFailCount] = useState(0);
+  // On mount: pick a random filename, resolve its URL via the Wikimedia API.
+  // If that file doesn't resolve, try the next one — cycles through all 5.
+  useEffect(() => {
+    let cancelled = false;
+    const startIdx = Math.floor(Math.random() * RAMANA_FILENAMES.length);
 
-  const handlePhotoError = () => {
-    // Try the next photo in the list; give up after cycling through all
-    if (photoFailCount < RAMANA_PHOTOS.length - 1) {
-      setPhotoFailCount(c => c + 1);
-      setPhotoIndex(i => (i + 1) % RAMANA_PHOTOS.length);
-    }
-  };
+    (async () => {
+      for (let i = 0; i < RAMANA_FILENAMES.length; i++) {
+        const filename = RAMANA_FILENAMES[(startIdx + i) % RAMANA_FILENAMES.length];
+        const url = await resolveWikimediaUrl(filename);
+        if (cancelled) return;
+        if (url) {
+          setPortraitUrl(url);
+          return;
+        }
+      }
+      // All failed — leave portraitUrl null, ॥ fallback shows
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
 
   const handleClose = () => {
     localStorage.setItem(SEEN_KEY, "1");
@@ -366,7 +381,7 @@ const RamanaOnboardingModal = ({ onClose }: Props) => {
 
         {/* Screen content */}
         <div style={slideStyle}>
-          {screen === 0 && <Screen1 photoIndex={photoIndex} onPhotoError={handlePhotoError} />}
+          {screen === 0 && <Screen1 portraitUrl={portraitUrl} />}
           {screen === 1 && <Screen2 />}
           {screen === 2 && <Screen3 onBegin={handleBegin} />}
         </div>
