@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Plus, MessageSquare, BookOpen, User, Settings, LogOut, MoreHorizontal, Layout, History, CreditCard } from "lucide-react";
+import { Plus, MessageSquare, BookOpen, User, Settings, LogOut, MoreHorizontal, Layout, History, CreditCard, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -202,6 +202,16 @@ const Sidebar = () => {
                             <BookOpen className="h-4 w-4" />
                             Library
                         </Button>
+
+                        <a
+                            href="https://www.arunachalasamudra.in"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 h-9 px-2 w-full rounded-md text-[#472B20] hover:bg-[#ECE5DF] transition-colors text-sm font-normal"
+                        >
+                            <ExternalLink className="h-4 w-4 shrink-0" />
+                            Sacred Teachings
+                        </a>
                     </div>
 
                     <div>
