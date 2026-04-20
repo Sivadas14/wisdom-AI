@@ -622,11 +622,14 @@ type GMsg = { role: "user" | "assistant"; content: string };
 type GenStatus = "idle" | "pending" | "processing" | "complete" | "failed";
 
 function getGuestSessionId(): string {
+  // localStorage persists across tab/window close — critical for rate limiting.
+  // sessionStorage resets on close, which would allow users to bypass limits
+  // by simply reopening the browser.
   try {
-    let id = sessionStorage.getItem(GUEST_SESSION_ID_KEY);
+    let id = localStorage.getItem(GUEST_SESSION_ID_KEY);
     if (!id) {
       id = `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      sessionStorage.setItem(GUEST_SESSION_ID_KEY, id);
+      localStorage.setItem(GUEST_SESSION_ID_KEY, id);
     }
     return id;
   } catch { return `g_${Date.now()}`; }
@@ -634,13 +637,14 @@ function getGuestSessionId(): string {
 
 function GuestChatSection() {
   const [messages, setMessages] = useState<GMsg[]>(() => {
-    try { return JSON.parse(sessionStorage.getItem(GUEST_MESSAGES_KEY) || "[]"); }
+    // localStorage so conversation persists across tab close/reopen
+    try { return JSON.parse(localStorage.getItem(GUEST_MESSAGES_KEY) || "[]"); }
     catch { return []; }
   });
   const [input, setInput]   = useState("");
   const [loading, setLoading] = useState(false);
   const [count, setCount]   = useState<number>(() => {
-    try { return parseInt(sessionStorage.getItem(GUEST_MSG_COUNT_KEY) || "0", 10); }
+    try { return parseInt(localStorage.getItem(GUEST_MSG_COUNT_KEY) || "0", 10); }
     catch { return 0; }
   });
   const [showModal, setShowModal] = useState(false);
@@ -655,7 +659,7 @@ function GuestChatSection() {
   const [genType,      setGenType]      = useState<string|null>(null);
   const [genError,     setGenError]     = useState<string|null>(null);
   const [contentCount, setContentCount] = useState<number>(() => {
-    try { return parseInt(sessionStorage.getItem(GUEST_CONTENT_COUNT_KEY) || "0", 10); }
+    try { return parseInt(localStorage.getItem(GUEST_CONTENT_COUNT_KEY) || "0", 10); }
     catch { return 0; }
   });
 
@@ -692,7 +696,7 @@ function GuestChatSection() {
   }, [messages]);
 
   const saveMsgs = (msgs: GMsg[]) => {
-    try { sessionStorage.setItem(GUEST_MESSAGES_KEY, JSON.stringify(msgs.slice(-20))); } catch {}
+    try { localStorage.setItem(GUEST_MESSAGES_KEY, JSON.stringify(msgs.slice(-20))); } catch {}
   };
 
   const handleSend = async () => {
@@ -703,7 +707,7 @@ function GuestChatSection() {
     const sid       = getGuestSessionId();
     const newCount  = count + 1;
     setCount(newCount);
-    try { sessionStorage.setItem(GUEST_MSG_COUNT_KEY, String(newCount)); } catch {}
+    try { localStorage.setItem(GUEST_MSG_COUNT_KEY, String(newCount)); } catch {}
 
     const userMsg: GMsg = { role: "user", content: q };
     const prev = [...messages, userMsg];
@@ -769,7 +773,7 @@ function GuestChatSection() {
       const NO_PASSAGE_MARKER = "The passages available do not yet cover";
       if (aiText.startsWith(NO_PASSAGE_MARKER)) {
         setCount(count);  // revert to pre-send value
-        try { sessionStorage.setItem(GUEST_MSG_COUNT_KEY, String(count)); } catch {}
+        try { localStorage.setItem(GUEST_MSG_COUNT_KEY, String(count)); } catch {}
       }
 
       const finalMsgs: GMsg[] = [...prev, { role: "assistant", content: aiText || "…" }];
@@ -836,7 +840,7 @@ function GuestChatSection() {
       setGenStatus("processing");
       const newCount = contentCount + 1;
       setContentCount(newCount);
-      try { sessionStorage.setItem(GUEST_CONTENT_COUNT_KEY, String(newCount)); } catch {}
+      try { localStorage.setItem(GUEST_CONTENT_COUNT_KEY, String(newCount)); } catch {}
     } catch {
       setGenError("Network error. Please try again.");
       setGenStatus("failed");
@@ -1258,23 +1262,22 @@ function FeaturesSection() {
 }
 
 // ─── 8. Pricing — dual USD + INR ──────────────────────────────────────────────
+// Seeker = BASIC plan: 150 conversations/month, unlimited cards, 60 min audio+video/month
 const PLAN_SEEKER: { text: string; highlight?: boolean }[] = [
-  { text: "Unlimited conversations per month" },
+  { text: "150 conversations per month" },
   { text: "Unlimited daily contemplation" },
-  { text: "10 Contextual Contemplation Cards per month" },
-  { text: "Guided meditation — text-based, rooted in your inquiry" },
+  { text: "Unlimited Contextual Contemplation Cards" },
+  { text: "Up to 60 min of personalised guided meditation per month (audio + video)", highlight: true },
   { text: "Pre-built inquiry queries for every level" },
-  { text: "Priority answers from the full Ramana library" },
+  { text: "Full Ramana library access" },
   { text: "Email support" },
 ];
 
+// Devotee = PRO plan: unlimited conversations, unlimited cards, 200 min audio+video/month
 const PLAN_DEVOTEE: { text: string; highlight?: boolean }[] = [
-  { text: "Everything in Seeker" },
-  { text: "Unlimited Contemplation Cards — no monthly cap", highlight: true },
-  { text: "Voice-guided audio meditation for every question", highlight: true },
-  { text: "Personalised meditation video for every question", highlight: true },
-  { text: "Deeper library access — rare & unpublished texts" },
-  { text: "Priority email & community support" },
+  { text: "Everything in Seeker, plus:" },
+  { text: "Unlimited conversations — no monthly cap", highlight: true },
+  { text: "Up to 200 min of personalised guided meditation per month (audio + video)", highlight: true },
 ];
 
 function PricingSection() {

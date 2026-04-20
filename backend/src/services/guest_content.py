@@ -2,14 +2,17 @@
 Guest content generation — card, audio, video — for unauthenticated landing-page visitors.
 
 Rate limiting (both dimensions must pass):
-  • session_id  — browser sessionStorage UUID, max GUEST_CONTENT_LIMIT per day
-  • IP hash     — SHA-256 of client IP, max GUEST_CONTENT_LIMIT per day
+  • session_id  — browser localStorage UUID, max GUEST_CONTENT_LIMIT per day
+  • IP hash     — SHA-256 of client IP + ":content" namespace, max GUEST_CONTENT_LIMIT per day
 
 Using both prevents:
   - Multiple tabs / incognito windows  → same IP hash, blocked
   - VPN per-request cycling            → each exit node gets its own counter
+  - Browser reopen bypass              → localStorage UUID persists across sessions
 
-Counters are in-memory (reset on restart); content files go to Supabase storage.
+Counters are persisted in the GuestSession DB table (same table as chat rate limiting)
+using a ":content" namespace suffix so they never collide with chat rows.
+Content files go to Supabase storage.
 """
 
 import asyncio
@@ -18,7 +21,14 @@ import uuid
 import time
 import re
 import random
+import logging
+import datetime as _dt
 from io import BytesIO
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 # Verified authentic Ramana Maharshi quotes — guaranteed clean fallback
 # (mirrors FALLBACK_RAMANA_QUOTES in src/content/image.py)
@@ -73,9 +83,11 @@ _JUNK_PATTERNS = [
     re.compile(r"\baccording to (him|ramana|maharshi|this teaching)\b", re.IGNORECASE),
 ]
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
 from fastapi import Request as FastAPIRequest
 from pydantic import BaseModel
+
+from src.db import GuestSession, get_db_session_fa
 
 
 # ── Config ─────────────────────────────────────────────────────────────────────
@@ -83,16 +95,13 @@ GUEST_CONTENT_LIMIT = 3      # max items per session AND per IP per day
 GUEST_AUDIO_LENGTH  = "3 min"
 GUEST_VIDEO_LENGTH  = "3 min"
 
+# Namespace suffix so content rows never collide with chat rows in GuestSession
+_CONTENT_NS = ":content"
 
-# ── In-memory stores ───────────────────────────────────────────────────────────
+
+# ── In-memory store (content results only — not rate limits) ───────────────────
 # { content_id: { status, content_url, content_type, error, created_at } }
 _STORE: dict[str, dict] = {}
-
-# { session_id:  { "YYYY-MM-DD": count } }
-_SESSION_RATE: dict[str, dict] = {}
-
-# { ip_hash:     { "YYYY-MM-DD": count } }
-_IP_RATE: dict[str, dict] = {}
 
 
 # ── Wire models ────────────────────────────────────────────────────────────────
@@ -117,20 +126,7 @@ class GuestContentStatus(BaseModel):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def _today() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-
-def _rate_ok(key: str, store: dict) -> bool:
-    """Return True if the key is under the daily limit."""
-    return store.setdefault(key, {}).get(_today(), 0) < GUEST_CONTENT_LIMIT
-
-
-def _rate_bump(key: str, store: dict):
-    """Increment the daily counter for key in store."""
-    counts = store.setdefault(key, {})
-    today = _today()
-    counts[today] = counts.get(today, 0) + 1
+    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
 
 
 def _get_client_ip(http_request: FastAPIRequest) -> str:
@@ -145,6 +141,89 @@ def _get_client_ip(http_request: FastAPIRequest) -> str:
 
 def _hash_ip(ip: str) -> str:
     return hashlib.sha256(ip.encode()).hexdigest()
+
+
+async def _db_check_and_bump(
+    db_session: AsyncSession,
+    ip_hash: str,
+    sid: str,
+    today: str,
+) -> None:
+    """Check content rate limits in the DB and increment if under limit.
+
+    Uses GuestSession table with ":content" namespace so rows never
+    collide with chat-rate-limit rows. Raises HTTPException 429 if
+    either the IP or session has hit GUEST_CONTENT_LIMIT today.
+    Falls back gracefully on any DB error (log + allow).
+    """
+    # Namespaced keys — distinct from chat rows
+    ip_key  = _hash_ip(_get_client_ip.__name__ + ip_hash + _CONTENT_NS)  # avoids reuse
+    ip_key  = hashlib.sha256((ip_hash + _CONTENT_NS).encode()).hexdigest()
+    sid_key = f"content:{sid}"
+
+    _LIMIT = {
+        "code": "GUEST_CONTENT_LIMIT_REACHED",
+        "message": (
+            f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
+            "Sign up for unlimited access."
+        ),
+    }
+
+    try:
+        # ── IP check ──────────────────────────────────────────────────────────
+        ip_row = (await db_session.execute(
+            select(GuestSession).where(
+                GuestSession.ip_hash == ip_key,
+                GuestSession.session_date == today,
+            ).limit(1)
+        )).scalar_one_or_none()
+
+        if ip_row and ip_row.message_count >= GUEST_CONTENT_LIMIT:
+            logger.info(f"[GUEST_CONTENT] IP limit reached: {ip_hash[:8]}… count={ip_row.message_count}")
+            raise HTTPException(status_code=429, detail=_LIMIT)
+
+        # ── Session check ─────────────────────────────────────────────────────
+        sid_row = (await db_session.execute(
+            select(GuestSession).where(
+                GuestSession.session_id == sid_key,
+                GuestSession.session_date == today,
+            ).limit(1)
+        )).scalar_one_or_none()
+
+        if sid_row and sid_row.message_count >= GUEST_CONTENT_LIMIT:
+            logger.info(f"[GUEST_CONTENT] Session limit reached: {sid[:16]}… count={sid_row.message_count}")
+            raise HTTPException(status_code=429, detail=_LIMIT)
+
+        # ── Both passed — increment ───────────────────────────────────────────
+        if ip_row:
+            ip_row.message_count += 1
+            ip_row.updated_at = _dt.datetime.utcnow()
+            db_session.add(ip_row)
+        else:
+            db_session.add(GuestSession(
+                ip_hash=ip_key, session_id=sid_key,
+                session_date=today, message_count=1,
+            ))
+
+        if sid_row:
+            sid_row.message_count += 1
+            sid_row.updated_at = _dt.datetime.utcnow()
+            db_session.add(sid_row)
+        else:
+            if ip_row is not None or sid_key != ip_key:
+                db_session.add(GuestSession(
+                    ip_hash=ip_key, session_id=sid_key,
+                    session_date=today, message_count=1,
+                ))
+
+        await db_session.commit()
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # DB error — log and allow (don't punish the user for infra issues)
+        logger.error(f"[GUEST_CONTENT] DB rate-limit check failed: {exc}")
+        await db_session.rollback()
 
 
 def _is_junk(sentence: str) -> bool:
@@ -381,8 +460,12 @@ async def _gen_video(content_id: str, question: str, answer: str):
 
 
 # ── Route handlers ─────────────────────────────────────────────────────────────
-async def create_guest_content(http_request: FastAPIRequest, request: GuestContentRequest):
-    """POST /api/content/guest — rate-limited by session_id AND IP hash."""
+async def create_guest_content(
+    http_request: FastAPIRequest,
+    request: GuestContentRequest,
+    db_session: AsyncSession = Depends(get_db_session_fa),
+):
+    """POST /api/content/guest — rate-limited by session_id AND IP hash (DB-persisted)."""
     sid  = (request.session_id or "").strip()
     mode = request.mode.strip().lower()
 
@@ -393,28 +476,17 @@ async def create_guest_content(http_request: FastAPIRequest, request: GuestConte
     if not request.question.strip() or not request.answer.strip():
         raise HTTPException(400, "question and answer are required.")
 
-    # ── Rate check: session_id ─────────────────────────────────────────────────
-    if not _rate_ok(sid, _SESSION_RATE):
-        raise HTTPException(
-            429,
-            f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
-            "Sign up for unlimited access."
-        )
-
-    # ── Rate check: IP hash ────────────────────────────────────────────────────
+    # Layer 3 — log detected IP for debugging (first 8 chars of hash only)
     ip      = _get_client_ip(http_request)
     ip_hash = _hash_ip(ip)
-    if not _rate_ok(ip_hash, _IP_RATE):
-        raise HTTPException(
-            429,
-            f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
-            "Sign up for unlimited access."
-        )
+    logger.info(f"[GUEST_CONTENT] request mode={mode} ip_prefix={ip_hash[:8]} sid_prefix={sid[:12]}")
 
-    # ── Both passed — bump counters and launch background task ─────────────────
-    _rate_bump(sid,     _SESSION_RATE)
-    _rate_bump(ip_hash, _IP_RATE)
+    today = _today()
 
+    # ── DB-persisted dual rate check (session + IP, namespaced :content) ────────
+    await _db_check_and_bump(db_session, ip_hash, sid, today)
+
+    # ── Rate checks passed — launch background generation task ─────────────────
     cid = str(uuid.uuid4())
     _STORE[cid] = {
         "status":       "pending",
