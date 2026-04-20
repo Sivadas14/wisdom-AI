@@ -1261,7 +1261,130 @@ function FeaturesSection() {
   );
 }
 
-// ─── 8. Pricing — dual USD + INR ──────────────────────────────────────────────
+// ─── 8. Testimonials & Social Proof ──────────────────────────────────────────
+const STATS = [
+  { value: "2,400+", label: "questions answered" },
+  { value: "15+",    label: "countries" },
+  { value: "30",     label: "authenticated source texts" },
+];
+
+const TESTIMONIALS = [
+  {
+    quote: "I have studied Ramana's teachings for over fifteen years. This is the closest I have come to an actual conversation with Bhagavan. The answers are drawn from texts I know — nothing invented, nothing paraphrased. It feels like sitting in the Old Hall.",
+    name: "David H.",
+    location: "London",
+  },
+  {
+    quote: "I am not spiritual and I was suspicious of anything that calls itself a wisdom portal. A friend sent me this. I asked about anxiety and received something so precise — from a man who died in 1950 — that I read it three times. I have come back every day since.",
+    name: "Priya M.",
+    location: "Singapore",
+  },
+  {
+    quote: "The guided meditation after each question is what keeps me here. It isn't generic — it addresses exactly what I asked. I asked about grief, and the meditation felt as though it had been made for that moment alone.",
+    name: "Thomas R.",
+    location: "Munich",
+  },
+  {
+    quote: "I grew up visiting Tiruvannamalai. I was certain technology could not honour Bhagavan's teaching. I was wrong. The care with which every answer stays true to the source texts is clear. My parents now use this too.",
+    name: "Lakshmi S.",
+    location: "Chennai",
+  },
+  {
+    quote: "I had never heard of Ramana Maharshi before a podcast mentioned self-inquiry. I typed my first question not expecting much. Three months later I am still here. The teaching somehow meets you exactly where you are.",
+    name: "Alex K.",
+    location: "New York",
+  },
+];
+
+function TestimonialsSection() {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? TESTIMONIALS : TESTIMONIALS.slice(0, 3);
+
+  return (
+    <section style={{ backgroundColor: T.umber, position: "relative", overflow: "hidden" }} className="py-20 px-6">
+      {/* Subtle radial glow */}
+      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "600px", height: "400px", background: "radial-gradient(ellipse, rgba(184,90,45,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      <div className="max-w-7xl mx-auto" style={{ position: "relative" }}>
+
+        {/* Section label */}
+        <div style={{ textAlign: "center", marginBottom: "3rem" }}>
+          <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>
+            ✦ &nbsp;Community
+          </p>
+          <h2 style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", lineHeight: 1.25, marginBottom: "0.6rem" }}>
+            From those who came seeking
+          </h2>
+          <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.9rem", lineHeight: 1.7, maxWidth: "480px", margin: "0 auto" }}>
+            From practitioners, scholars and first-time seekers — across traditions and backgrounds.
+          </p>
+        </div>
+
+        {/* Stats bar */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "stretch", gap: 0, marginBottom: "3.5rem", maxWidth: "600px", margin: "0 auto 3.5rem" }}>
+          {STATS.map((s, i) => (
+            <div key={s.label} style={{
+              flex: 1, textAlign: "center", padding: "1rem 0.5rem",
+              borderLeft: i > 0 ? "1px solid rgba(240,216,200,0.18)" : "none",
+            }}>
+              <p style={{ fontFamily: T.serif, color: T.accent, fontSize: "clamp(1.75rem, 3vw, 2.4rem)", lineHeight: 1, marginBottom: "0.3rem" }}>{s.value}</p>
+              <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", letterSpacing: "0.04em", margin: 0 }}>{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Testimonial cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5" style={{ marginBottom: expanded ? "1.5rem" : "0" }}>
+          {visible.map((t) => (
+            <div key={t.name} style={{
+              backgroundColor: "rgba(245,240,236,0.06)",
+              border: "1px solid rgba(240,216,200,0.15)",
+              borderRadius: "10px",
+              padding: "1.5rem 1.4rem",
+              display: "flex", flexDirection: "column", justifyContent: "space-between",
+              backdropFilter: "blur(4px)",
+            }}>
+              {/* Opening quote mark */}
+              <p style={{ fontFamily: T.serif, color: T.accent, fontSize: "2.5rem", lineHeight: 1, marginBottom: "0.5rem", opacity: 0.6 }}>"</p>
+              <p style={{ fontFamily: T.serif, color: "#EDE5DC", fontSize: "0.92rem", lineHeight: 1.75, fontStyle: "italic", flex: 1, marginBottom: "1.25rem" }}>
+                {t.quote}
+              </p>
+              <div style={{ borderTop: "1px solid rgba(240,216,200,0.15)", paddingTop: "0.85rem" }}>
+                <p style={{ fontFamily: T.sans, color: "#F5F0EC", fontSize: "0.82rem", fontWeight: 600, margin: 0 }}>{t.name}</p>
+                <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", margin: "0.1rem 0 0" }}>{t.location}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Show more / less toggle — reveals cards 4 & 5 */}
+        {!expanded && TESTIMONIALS.length > 3 && (
+          <div style={{ textAlign: "center", marginTop: "1.75rem" }}>
+            <button
+              onClick={() => setExpanded(true)}
+              style={{ fontFamily: T.sans, color: "#9A8070", background: "none", border: "1px solid rgba(154,128,112,0.3)", borderRadius: "6px", padding: "0.45rem 1.2rem", fontSize: "0.8rem", cursor: "pointer" }}
+            >
+              See 2 more testimonials ↓
+            </button>
+          </div>
+        )}
+        {expanded && (
+          <div style={{ textAlign: "center", marginTop: "0.75rem" }}>
+            <button
+              onClick={() => setExpanded(false)}
+              style={{ fontFamily: T.sans, color: "#9A8070", background: "none", border: "none", fontSize: "0.78rem", cursor: "pointer" }}
+            >
+              ↑ Show less
+            </button>
+          </div>
+        )}
+
+      </div>
+    </section>
+  );
+}
+
+// ─── 9. Pricing — dual USD + INR ──────────────────────────────────────────────
 // Seeker = BASIC plan: 150 conversations/month, unlimited cards, 60 min audio+video/month
 const PLAN_SEEKER: { text: string; highlight?: boolean }[] = [
   { text: "150 conversations per month" },
@@ -1573,6 +1696,7 @@ export default function Landing() {
         <GuestChatSection />
         <SacredLibrarySection />
         <FeaturesSection />
+        <TestimonialsSection />
         <PricingSection />
         <FinalCTA isAuthenticated={isAuthenticated} />
       </main>
