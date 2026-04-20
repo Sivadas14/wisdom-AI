@@ -20,6 +20,48 @@ import re
 import random
 from io import BytesIO
 
+# Verified authentic Ramana Maharshi quotes — guaranteed clean fallback
+# (mirrors FALLBACK_RAMANA_QUOTES in src/content/image.py)
+_RAMANA_FALLBACK_QUOTES = [
+    "Your own Self-Realization is the greatest service you can render the world.",
+    "The mind is nothing but a bundle of thoughts. The thought 'I' is the root of all thoughts.",
+    "Silence is also conversation.",
+    "Happiness is the very nature of the Self; happiness and the Self are not different.",
+    "The degree of freedom from unwanted thoughts and the degree of concentration on a single thought are the measures to gauge spiritual progress.",
+    "Whatever is destined not to happen will not happen, try as you may. Whatever is destined to happen will happen, do what you may to prevent it.",
+    "There is neither creation nor destruction, neither destiny nor free will, neither path nor achievement. This is the final truth.",
+    "Realization is not acquisition of anything new nor is it a new faculty. It is only removal of all camouflage.",
+    "Mind is consciousness which has put on limitations. You are originally unlimited and perfect. Later you take on limitations and become the mind.",
+    "Be still. It is the wind that makes the water ripple. The Self remains unchanging in the midst of all activities.",
+    "Turn your vision inward and then the whole world will be full of supreme Spirit.",
+    "No one succeeds without effort. Those who succeed owe their success to perseverance.",
+    "To know the Self is to be the Self, for the Self is consciousness.",
+]
+
+# Phrases that indicate AI meta-commentary, not a genuine teaching sentence.
+# Any sentence whose lowercased text STARTS WITH one of these is discarded.
+_JUNK_PREFIXES = (
+    "here are", "these are", "the following", "below are", "here is",
+    "let me", "i will", "i have", "i am", "i'm ", "i'd ",
+    "based on", "according to", "in summary", "in conclusion",
+    "to summarize", "to answer", "in response", "in short",
+    "in essence", "for example", "for instance", "additionally",
+    "furthermore", "moreover", "however", "nevertheless",
+    "some insights", "some key", "key insights", "key points",
+    "key takeaways", "important points",
+    "first,", "second,", "third,", "finally,", "lastly,",
+    "note that", "please note", "it is important", "it's important",
+    "it should be", "one should", "one must",
+)
+
+# Regex patterns that mark a sentence as junk regardless of where they appear.
+_JUNK_PATTERNS = [
+    re.compile(r"^\s*\d+[\.\)]\s"),          # numbered list: "1. " or "1) "
+    re.compile(r":\s*$"),                     # ends with colon (intro sentence)
+    re.compile(r"\d+[\.\)]\s+\w"),            # inline numbered list mid-sentence
+    re.compile(r"^[-•*]\s"),                  # bullet point
+]
+
 from fastapi import HTTPException
 from fastapi import Request as FastAPIRequest
 from pydantic import BaseModel
@@ -94,14 +136,97 @@ def _hash_ip(ip: str) -> str:
     return hashlib.sha256(ip.encode()).hexdigest()
 
 
+def _is_junk(sentence: str) -> bool:
+    """Return True if the sentence is AI meta-commentary rather than a teaching."""
+    low = sentence.lower().strip()
+    # Check blacklisted prefixes
+    if any(low.startswith(p) for p in _JUNK_PREFIXES):
+        return True
+    # Check regex patterns
+    for pat in _JUNK_PATTERNS:
+        if pat.search(sentence):
+            return True
+    # Reject sentences with question marks (not quotable as card text)
+    if sentence.strip().endswith("?"):
+        return True
+    return False
+
+
 def _short_quote(answer: str, max_chars: int = 160) -> str:
-    """Extract the most quotable sentence from the AI answer."""
+    """Extract a clean, quotable sentence from the AI answer.
+
+    Strategy (in order):
+      1. Split into sentences and find the first one that:
+           • is 40–max_chars characters long
+           • passes the junk filter (no AI preamble, no numbered lists, etc.)
+      2. If nothing passes, fall back to a verified authentic Ramana quote.
+    """
     sentences = re.split(r'(?<=[.!?])\s+', answer.strip())
     for s in sentences:
-        clean = s.strip().strip('"').strip("'")
-        if 40 <= len(clean) <= max_chars:
+        clean = s.strip().strip('"').strip("'").strip()
+        if 40 <= len(clean) <= max_chars and not _is_junk(clean):
             return clean
-    return (answer[:max_chars].rsplit(' ', 1)[0] + '…') if len(answer) > max_chars else answer
+    # Nothing clean found — use a verified Ramana quote as the card caption
+    return random.choice(_RAMANA_FALLBACK_QUOTES)
+
+
+async def _generate_guest_meditation_transcript(question: str, answer: str, length: str = "3 min") -> str:
+    """Generate a meditation transcript laser-focused on the user's specific question.
+
+    Unlike the general `generate_meditation_transcript_optimized` which treats source
+    as generic spiritual text, this function explicitly tells the LLM to center every
+    breath, every pause, every reflection on the exact question the seeker asked.
+    This is the USP of the service: fully personalised content.
+    """
+    from textwrap import dedent
+    from tuneapi import tt
+    from src.settings import get_llm
+
+    try:
+        minutes = int(str(length).split()[0])
+    except Exception:
+        minutes = 3
+    target_words = f"{minutes * 200}–{minutes * 220}"
+    target_duration = f"{minutes}-minute"
+
+    prompt = dedent(f"""
+        You are writing a personalised guided meditation for a seeker.
+
+        THEIR EXACT QUESTION:
+        "{question}"
+
+        RAMANA MAHARSHI'S TEACHING IN RESPONSE:
+        "{answer}"
+
+        TASK: Write a {target_duration} spoken meditation script (~{target_words} words) that is
+        ENTIRELY built around the seeker's question above. Every line must connect back to
+        their specific concern. Do NOT make this a generic meditation.
+
+        STRUCTURE (do NOT write these labels in the script):
+        1. Opening (first 20%): Name the seeker's concern directly. Invite them to bring their
+           question into the body. Set the scene with stillness.
+        2. Core (middle 60%): Dwell in the teaching above. Use vivid sensory language.
+           Return to the specific theme of "{question[:60]}" at least three times.
+           Expand every insight into breath, sensation, inner experience.
+        3. Closing (final 20%): Draw the answer back to their heart. End with stillness
+           and a sense of resolution or rest in the question itself.
+
+        REQUIREMENTS:
+        - Use [pause] and [breathing] tags frequently for natural pacing.
+        - Speak directly to the seeker as "you".
+        - Calm, unhurried, devotional tone.
+        - Pure spoken script — no section headings, no labels, no asterisks.
+        - Start immediately with spoken words (no preamble like "Here is your meditation").
+    """).strip()
+
+    model = get_llm("gpt-4o")
+    thread = tt.Thread(
+        tt.system("You write deeply personalised guided meditations. Every word serves the seeker's specific question."),
+        id="guest_meditation",
+    )
+    thread.append(tt.Message(prompt, "user"))
+    response = await model.chat_async(thread, max_tokens=2500)
+    return response.content if hasattr(response, "content") else str(response)
 
 
 def _signed_url(spb_client, path: str) -> str | None:
@@ -159,16 +284,15 @@ async def _gen_audio(content_id: str, question: str, answer: str):
     _STORE[content_id]["status"] = "processing"
     try:
         from src.content.audio import (
-            generate_meditation_transcript_optimized,
             generate_audio_from_transcript_optimized,
             compress_audio_to_mp3_optimized,
         )
         from src.settings import get_supabase_admin_client, get_settings
 
         spb = get_supabase_admin_client(get_settings())
-        source = f"Question from seeker: {question}\n\nTeaching from Bhagavan: {answer}"
 
-        transcript  = await generate_meditation_transcript_optimized(source, GUEST_AUDIO_LENGTH)
+        # Use the guest-specific, question-centric transcript generator
+        transcript  = await _generate_guest_meditation_transcript(question, answer, GUEST_AUDIO_LENGTH)
         audio_bytes = await generate_audio_from_transcript_optimized(transcript)
         compressed  = await compress_audio_to_mp3_optimized(audio_bytes)
 
@@ -187,7 +311,6 @@ async def _gen_video(content_id: str, question: str, answer: str):
     try:
         import os
         from src.content.audio import (
-            generate_meditation_transcript_optimized,
             generate_audio_from_transcript_optimized,
         )
         from src.content.parallel_video import parallel_generator
@@ -195,9 +318,9 @@ async def _gen_video(content_id: str, question: str, answer: str):
         from src.settings import get_supabase_admin_client, get_settings
 
         spb = get_supabase_admin_client(get_settings())
-        source = f"Question from seeker: {question}\n\nTeaching from Bhagavan: {answer}"
 
-        transcript  = await generate_meditation_transcript_optimized(source, GUEST_VIDEO_LENGTH)
+        # Use the guest-specific, question-centric transcript generator
+        transcript  = await _generate_guest_meditation_transcript(question, answer, GUEST_VIDEO_LENGTH)
         audio_bytes = await generate_audio_from_transcript_optimized(transcript)
         quote       = parallel_generator._extract_quote_from_transcript(transcript)
 

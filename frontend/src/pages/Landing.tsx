@@ -764,10 +764,20 @@ function GuestChatSection() {
         }
       }
 
+      // If the backend returned a "no passages found" message, it wasn't a real
+      // answer — roll back the count so the user doesn't lose a free message.
+      const NO_PASSAGE_MARKER = "The passages available do not yet cover";
+      if (aiText.startsWith(NO_PASSAGE_MARKER)) {
+        setCount(count);  // revert to pre-send value
+        try { sessionStorage.setItem(GUEST_MSG_COUNT_KEY, String(count)); } catch {}
+      }
+
       const finalMsgs: GMsg[] = [...prev, { role: "assistant", content: aiText || "…" }];
       setMessages(finalMsgs);
       saveMsgs(finalMsgs);
-      if (newCount >= GUEST_LIMIT) setTimeout(() => setShowModal(true), 1800);
+      if (newCount >= GUEST_LIMIT && !aiText.startsWith(NO_PASSAGE_MARKER)) {
+        setTimeout(() => setShowModal(true), 1800);
+      }
     } catch {
       const errMsgs: GMsg[] = [...prev, { role: "assistant", content: "Unable to respond right now. Please try again." }];
       setMessages(errMsgs);
@@ -775,6 +785,16 @@ function GuestChatSection() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Reset result view — go back to chat + format buttons ─────────────────
+  const resetResult = () => {
+    setGenStatus("idle");
+    setGenContentId(null);
+    setGenUrl(null);
+    setGenType(null);
+    setGenError(null);
+    setGenMode(null);
   };
 
   // ── Generate content from last Q&A ────────────────────────────────────────
@@ -852,7 +872,7 @@ function GuestChatSection() {
                 Create free account
               </Link>
               <Link to="/register?plan=seeker" style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.85rem", textDecoration: "underline" }}>
-                Or upgrade to Seeker — $5.99 / ₹499 per month
+                Or subscribe — Seeker $5.99 · Devotee $12.99 / month
               </Link>
             </div>
           </div>
@@ -1068,8 +1088,8 @@ function GuestChatSection() {
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem" }}>
                   Subscribers get a new card for every question they ask.
                 </p>
-                {/* Try other formats or back */}
-                {contentCount < GUEST_CONTENT_LIMIT ? (
+                {/* Format switch buttons — only when quota remains */}
+                {contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("audio")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1079,11 +1099,14 @@ function GuestChatSection() {
                       <Video className="w-3.5 h-3.5" /> Generate Video
                     </button>
                   </div>
-                ) : (
-                  <div style={{ marginTop: "1rem" }}>
-                    <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.5rem 1.25rem" }}>Sign up for unlimited →</Link>
-                  </div>
                 )}
+                {/* Always-visible navigation row */}
+                <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={resetResult} style={{ fontFamily: T.sans, color: "#9A8070", background: "none", border: "1px solid rgba(154,128,112,0.35)", borderRadius: "6px", padding: "0.4rem 1rem", fontSize: "0.8rem", cursor: "pointer" }}>
+                    ← Back to chat
+                  </button>
+                  <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.4rem 1.1rem" }}>Sign up for unlimited →</Link>
+                </div>
               </div>
             )}
 
@@ -1110,7 +1133,8 @@ function GuestChatSection() {
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem", textAlign: "center" }}>
                   Subscribers get personalised meditations for every question they ask.
                 </p>
-                {contentCount < GUEST_CONTENT_LIMIT ? (
+                {/* Format switch buttons — only when quota remains */}
+                {contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1120,11 +1144,14 @@ function GuestChatSection() {
                       <Video className="w-3.5 h-3.5" /> Generate Video
                     </button>
                   </div>
-                ) : (
-                  <div style={{ marginTop: "1rem", textAlign: "center" }}>
-                    <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.5rem 1.25rem" }}>Sign up for unlimited →</Link>
-                  </div>
                 )}
+                {/* Always-visible navigation row */}
+                <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={resetResult} style={{ fontFamily: T.sans, color: "#9A8070", background: "none", border: "1px solid rgba(154,128,112,0.35)", borderRadius: "6px", padding: "0.4rem 1rem", fontSize: "0.8rem", cursor: "pointer" }}>
+                    ← Back to chat
+                  </button>
+                  <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.4rem 1.1rem" }}>Sign up for unlimited →</Link>
+                </div>
               </div>
             )}
 
@@ -1142,7 +1169,8 @@ function GuestChatSection() {
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem", textAlign: "center" }}>
                   Subscribers get personalised meditation videos for every question they ask.
                 </p>
-                {contentCount < GUEST_CONTENT_LIMIT ? (
+                {/* Format switch buttons — only when quota remains */}
+                {contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1152,11 +1180,14 @@ function GuestChatSection() {
                       <Volume2 className="w-3.5 h-3.5" /> Generate Audio
                     </button>
                   </div>
-                ) : (
-                  <div style={{ marginTop: "1rem", textAlign: "center" }}>
-                    <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.5rem 1.25rem" }}>Sign up for unlimited →</Link>
-                  </div>
                 )}
+                {/* Always-visible navigation row */}
+                <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap", alignItems: "center" }}>
+                  <button onClick={resetResult} style={{ fontFamily: T.sans, color: "#9A8070", background: "none", border: "1px solid rgba(154,128,112,0.35)", borderRadius: "6px", padding: "0.4rem 1rem", fontSize: "0.8rem", cursor: "pointer" }}>
+                    ← Back to chat
+                  </button>
+                  <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.4rem 1.1rem" }}>Sign up for unlimited →</Link>
+                </div>
               </div>
             )}
           </div>
@@ -1227,22 +1258,23 @@ function FeaturesSection() {
 }
 
 // ─── 8. Pricing — dual USD + INR ──────────────────────────────────────────────
-// Free tier: no login required — chat widget on landing page + daily card
-const PLAN_FREE   = [
-  "5 AI wisdom questions — no account needed",
-  "Today's Contemplation Card — free forever, no login",
-  "Sacred Library introductions",
-  "No audio / video (paid feature)",
+const PLAN_SEEKER: { text: string; highlight?: boolean }[] = [
+  { text: "Unlimited conversations per month" },
+  { text: "Unlimited daily contemplation" },
+  { text: "10 Contextual Contemplation Cards per month" },
+  { text: "Guided meditation — text-based, rooted in your inquiry" },
+  { text: "Pre-built inquiry queries for every level" },
+  { text: "Priority answers from the full Ramana library" },
+  { text: "Email support" },
 ];
-// Seeker tier: login required, full suite
-const PLAN_SEEKER = [
-  "30 conversations per month",
-  "Unlimited daily contemplation",
-  "10 Contextual Contemplation Cards per month",
-  "Guided meditation — text-based, rooted in your inquiry",
-  "Pre-built inquiry queries for every level",
-  "Priority answers from the full Ramana library",
-  "Email support",
+
+const PLAN_DEVOTEE: { text: string; highlight?: boolean }[] = [
+  { text: "Everything in Seeker" },
+  { text: "Unlimited Contemplation Cards — no monthly cap", highlight: true },
+  { text: "Voice-guided audio meditation for every question", highlight: true },
+  { text: "Personalised meditation video for every question", highlight: true },
+  { text: "Deeper library access — rare & unpublished texts" },
+  { text: "Priority email & community support" },
 ];
 
 function PricingSection() {
@@ -1252,42 +1284,14 @@ function PricingSection() {
         <div className="mb-14">
           <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>Transparent Pricing</p>
           <h2 style={{ fontFamily: T.serif, color: T.brown, fontSize: "clamp(2rem, 4vw, 3rem)", lineHeight: 1.2, marginBottom: "1rem" }}>
-            Start free.<br />Go deeper when you're ready.
+            Go deeper when you're ready.
           </h2>
           <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.95rem", lineHeight: 1.7, maxWidth: "480px" }}>
             The teachings themselves are boundless. We simply ask for support to keep the library alive and growing.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl">
-          {/* Free plan */}
-          <div style={{ backgroundColor: "#FBF7F3", border: `1px solid ${T.border}`, borderRadius: "4px", padding: "2.25rem" }}>
-            <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.74rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.5rem" }}>Free</p>
-            <div className="flex items-end gap-1.5 mb-1">
-              <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "2.75rem", lineHeight: 1 }}>$0</span>
-              <span style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.88rem", marginBottom: "0.35rem" }}>/&nbsp;month</span>
-            </div>
-            <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-              ₹0 / month
-            </p>
-            <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.77rem", fontWeight: 600, marginBottom: "1.5rem" }}>
-              No account required
-            </p>
-            <ul className="space-y-3 mb-8">
-              {PLAN_FREE.map(item => (
-                <li key={item} className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: T.accent }} />
-                  <span style={{ fontFamily: T.sans, color: "#5C3D30", fontSize: "0.88rem" }}>{item}</span>
-                </li>
-              ))}
-            </ul>
-            <a href="#try"
-              style={{ ...btn, display: "block", textAlign: "center", backgroundColor: "transparent", color: T.brown, border: `1.5px solid ${T.border}` }}
-              className="hover:bg-[#EDE5DC] transition-colors"
-            >
-              Try it now — no login
-            </a>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl">
 
           {/* Seeker plan */}
           <div style={{ backgroundColor: T.umber, borderRadius: "4px", padding: "2.25rem", position: "relative", overflow: "hidden" }}>
@@ -1302,20 +1306,49 @@ function PricingSection() {
             </p>
             <ul className="space-y-3 mb-8">
               {PLAN_SEEKER.map(item => (
-                <li key={item} className="flex items-start gap-2.5">
+                <li key={item.text} className="flex items-start gap-2.5">
                   <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: T.accent }} />
-                  <span style={{ fontFamily: T.sans, color: "#E8DCD4", fontSize: "0.88rem" }}>{item}</span>
+                  <span style={{ fontFamily: T.sans, color: "#E8DCD4", fontSize: "0.88rem" }}>{item.text}</span>
                 </li>
               ))}
             </ul>
-            <Link to="/register" style={{ ...btn, display: "block", textAlign: "center", borderRadius: "4px" }}>
+            <Link to="/register?plan=seeker" style={{ ...btn, display: "block", textAlign: "center", borderRadius: "4px" }}>
               Begin as Seeker
             </Link>
           </div>
+
+          {/* Devotee plan */}
+          <div style={{ backgroundColor: T.umber, borderRadius: "4px", padding: "2.25rem", position: "relative", overflow: "hidden", border: `2px solid ${T.accent}` }}>
+            {/* "Most popular" badge */}
+            <div style={{ position: "absolute", top: "1.1rem", right: "1.1rem", backgroundColor: T.accent, color: "#fff", fontFamily: T.sans, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", padding: "0.25rem 0.65rem", borderRadius: "3px" }}>
+              Most Popular
+            </div>
+            <div style={{ position: "absolute", top: 0, right: 0, width: "200px", height: "200px", background: "radial-gradient(circle, rgba(184,90,45,0.38) 0%, transparent 70%)", transform: "translate(30%, -30%)", pointerEvents: "none" }} />
+            <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.5rem" }}>Devotee</p>
+            <div className="flex items-end gap-1.5 mb-1">
+              <span style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "2.75rem", lineHeight: 1 }}>$12.99</span>
+              <span style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.88rem", marginBottom: "0.35rem" }}>/&nbsp;month</span>
+            </div>
+            <p style={{ fontFamily: T.sans, color: "#8A6D5E", fontSize: "0.8rem", marginBottom: "1.5rem" }}>
+              ₹999 / month
+            </p>
+            <ul className="space-y-3 mb-8">
+              {PLAN_DEVOTEE.map(item => (
+                <li key={item.text} className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: item.highlight ? "#F5C58A" : T.accent }} />
+                  <span style={{ fontFamily: T.sans, color: item.highlight ? "#F5C58A" : "#E8DCD4", fontSize: "0.88rem", fontWeight: item.highlight ? 500 : 400 }}>{item.text}</span>
+                </li>
+              ))}
+            </ul>
+            <Link to="/register?plan=devotee" style={{ ...btn, display: "block", textAlign: "center", borderRadius: "4px", backgroundColor: "#C96A3A" }}>
+              Begin as Devotee
+            </Link>
+          </div>
+
         </div>
 
         <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.78rem", marginTop: "1.5rem" }}>
-          All plans include the free daily contemplation · Cancel anytime · Indian pricing in ₹ · International pricing in $
+          Try 5 free questions — no account needed · Cancel anytime · Indian pricing in ₹ · International pricing in $
         </p>
       </div>
     </section>
