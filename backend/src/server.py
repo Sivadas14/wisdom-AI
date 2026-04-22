@@ -55,6 +55,7 @@ from src.dependencies import check_ffmpeg, get_api_token
 from src.content.parallel_video import pre_generate_common_images
 
 from src.services.user import router as user_profile_router
+from src.routers.mobile_api import router as mobile_api_router
 from src.services.dashboard import router as dashboard_router
 from src.services.ramana_images import router as ramana_images_router
 from src.migrations import run_migrations
@@ -263,6 +264,7 @@ def get_app() -> FastAPI:
     app.include_router(newsletter_router)
     app.include_router(feature_router)
     app.include_router(plan_feature_v1_router)
+    app.include_router(mobile_api_router)
     print("[TRACE] API routers included.")
 
     # app.add_api_route("/api/auth/register", auth_svc.new_user, methods=["POST"], tags=["auth"])
