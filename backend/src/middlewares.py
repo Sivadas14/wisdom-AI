@@ -556,6 +556,11 @@ async def jwt_auth_middleware(request: Request, call_next):
     """
     tu.logger.info(f"[JWT_AUTH] Processing request: {request.method} {request.url.path}")
     public_paths = [
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/auth/refresh",
+        "/api/v1/auth/apple",
+        "/api/v1/auth/google",
         "/api/auth/login",
         "/api/auth/register",
         "/api/auth/verify-otp",
