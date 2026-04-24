@@ -585,6 +585,8 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/chat/guest",        # Public guest chat — rate-limited by IP in the endpoint itself
         "/api/content/guest",     # Public guest content (card/audio/video) — rate-limited by session_id
         "/api/ramana-portrait",   # Public portrait for landing-page onboarding modal
+        "/api/v1/teachings",      # Public teachings list — no auth required
+        "/api/v1/topics",         # Public topics list — no auth required
     ]
 
     if any(request.url.path.startswith(path) for path in public_paths):
