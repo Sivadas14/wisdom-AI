@@ -5,6 +5,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy import text
 from src.settings import get_settings, get_supabase_client
 
 router = APIRouter(prefix="/api/v1", tags=["Mobile API"])
@@ -48,6 +49,8 @@ def _build_auth_response(supabase_user, session, name_override: str = "") -> dic
             "avatar": None
         }
     }
+
+# ── Public Auth Endpoints ─────────────────────────────────────────────────────
 
 @router.post("/auth/register")
 def mobile_register(request: MobileRegisterRequest):
@@ -146,6 +149,99 @@ def mobile_google_auth(request: MobileGoogleAuthRequest):
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+# ── Public Content Endpoints ──────────────────────────────────────────────────
+
+@router.get("/topics")
+async def mobile_topics(request: Request):
+    """Get all topics — public, no auth required."""
+    session = None
+    try:
+        session = request.app.state.db_session_factory()
+        result = await session.execute(
+            text("SELECT id, name, description, icon_url as image_url FROM topics ORDER BY order_index NULLS LAST, name")
+        )
+        topics = []
+        for row in result.fetchall():
+            topics.append({
+                "id": str(row.id),
+                "name": row.name,
+                "description": row.description,
+                "image_url": row.image_url
+            })
+        return topics
+    except Exception:
+        return []
+    finally:
+        if session:
+            await session.close()
+
+@router.get("/teachings")
+async def mobile_teachings(
+    request: Request,
+    page: int = 1,
+    topic_id: Optional[str] = None,
+    search: Optional[str] = None
+):
+    """Get teachings — public, no auth required."""
+    page_size = 20
+    offset = (page - 1) * page_size
+    session = None
+    try:
+        session = request.app.state.db_session_factory()
+        where_parts = ["is_published = true"]
+        params: dict = {"limit": page_size, "offset": offset}
+        if topic_id:
+            where_parts.append("topic_id = :topic_id::uuid")
+            params["topic_id"] = topic_id
+        if search:
+            where_parts.append("(title ILIKE :search OR excerpt ILIKE :search)")
+            params["search"] = f"%{search}%"
+        where = " AND ".join(where_parts)
+
+        count_result = await session.execute(
+            text(f"SELECT COUNT(*) FROM teachings WHERE {where}"), params
+        )
+        total = count_result.scalar() or 0
+
+        rows = await session.execute(
+            text(f"""
+                SELECT id, title, excerpt, content, author, source_text,
+                       topic_id, tags, reading_time_mins, created_at
+                FROM teachings
+                WHERE {where}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """), params
+        )
+        teachings = []
+        for row in rows.fetchall():
+            teachings.append({
+                "id": str(row.id),
+                "title": row.title,
+                "excerpt": row.excerpt or "",
+                "content": row.content,
+                "author": row.author or "Ramana Maharshi",
+                "source_text": row.source_text,
+                "topic_id": str(row.topic_id) if row.topic_id else "",
+                "tags": list(row.tags) if row.tags else [],
+                "reading_time_mins": row.reading_time_mins or 5,
+                "created_at": row.created_at.isoformat() if row.created_at else None
+            })
+        return {
+            "items": teachings,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_more": (offset + page_size) < total
+        }
+    except Exception as e:
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "has_more": False}
+    finally:
+        if session:
+            await session.close()
+
+# ── Protected Endpoints ───────────────────────────────────────────────────────
+
 @router.get("/auth/me")
 async def mobile_get_me(request: Request):
     user = getattr(request.state, "user", None)
@@ -154,10 +250,6 @@ async def mobile_get_me(request: Request):
     email = getattr(user, "email_id", None) or getattr(user, "email", "")
     name = getattr(user, "name", "") or ""
     return {"id": str(user.id), "email": email, "name": name, "avatar": None}
-
-@router.get("/teachings")
-async def mobile_teachings(request: Request, page: int = 1, topic_id: Optional[str] = None, search: Optional[str] = None):
-    return {"teachings": [], "total": 0, "page": page, "per_page": 20, "has_more": False}
 
 @router.post("/devices/register")
 async def mobile_register_device(request: Request):
