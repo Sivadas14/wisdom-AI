@@ -23,6 +23,15 @@ from src.services.usage import get_usage
 from src.db import OptimizedQueries
 from src.utils.profiler import profile_operation, get_profiler, print_profiler_summary
 from src.db import DocumentChunk, SourceDocument
+# === Translation system imports (added 2026-05-01) ===
+from src.translation.chat_lang_wrapper import (
+    detect_user_lang,
+    translate_user_message_to_english,
+    translate_assistant_response,
+    translate_follow_up_questions,
+)
+from src.translation import INDIC_LANGS, PHASE_1_LANGS
+# === END ADD ===
 
 
 def generate_citation_url(filename: str, spb_client: Client) -> str:
@@ -964,6 +973,24 @@ async def chat_completions(
     # user = {"id": "b6c3f667-7c8d-4c4b-b3fd-0be55e3ce0ad"}  # Example user
 
     request_id = f"chat_{conversation_id}_{int(time.time())}"
+
+    # === Translation system: language detection + input translation (added 2026-05-01) ===
+    user_lang = await detect_user_lang(
+        session,
+        request_lang=getattr(request, "lang", None),
+        user_id=str(user.id),
+    )
+    is_non_english = user_lang != "en" and user_lang in PHASE_1_LANGS
+    original_user_message = request.message  # preserved for storage in DB
+    if is_non_english:
+        try:
+            request.message = await translate_user_message_to_english(
+                session, request.message, user_lang
+            )
+            tu.logger.info(f"[CHAT_LANG] Translated user msg {user_lang} -> en")
+        except Exception as e:
+            tu.logger.warning(f"[CHAT_LANG] Input translation failed; using source: {e}")
+    # === END translation system addition ===
 
     # Load conversation
     try:

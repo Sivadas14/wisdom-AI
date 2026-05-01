@@ -587,6 +587,8 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/ramana-portrait",   # Public portrait for landing-page onboarding modal
         "/api/v1/teachings",      # Public teachings list — no auth required
         "/api/v1/topics",         # Public topics list — no auth required
+        "/api/translate",         # Public translation gateway (added 2026-05-01)
+        "/api/page/",             # Public page-content resolver (added 2026-05-01)
     ]
 
     if any(request.url.path.startswith(path) for path in public_paths):

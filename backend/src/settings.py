@@ -41,6 +41,17 @@ class Settings(BaseSettings):
 
     # model settings
     openai_token: str = "dummy_token"
+    # translation system — providers (added: 2026-05-01)
+    sarvam_api_key: str = "dummy_sarvam_key"
+    azure_translator_key: str = "dummy_azure_key"
+    azure_translator_region: str = "centralindia"
+    google_translate_key: str | None = None
+
+    # translation system — budget caps (chars/day per provider)
+    translation_daily_sarvam_cap: int = 60_000
+    translation_daily_azure_cap:  int = 60_000
+    translation_daily_google_cap: int = 15_000
+
     # supabase settings
     supabase_url: str = "https://placeholder.supabase.co"
     supabase_key: str = "placeholder_key"

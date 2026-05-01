@@ -1,0 +1,108 @@
+{
+  "_meta": {
+    "language": "hi",
+    "language_native": "हिन्दी",
+    "version": "1.0",
+    "last_updated": "2026-05-01",
+    "_note": "Hand-curated baseline. Run scripts/seed_ui_strings.py to refresh from /api/translate. Strings flagged 'manual_override=true' in admin panel will be preserved."
+  },
+  "app": {
+    "name": "अरुणाचल समुद्र",
+    "tagline": "श्री रमण महर्षि का ज्ञान",
+    "loading": "लोड हो रहा है…",
+    "thinking": "विचार कर रहे हैं…",
+    "error_generic": "कुछ गलत हो गया। कृपया पुनः प्रयास करें।",
+    "retry": "फिर से प्रयास करें",
+    "close": "बंद करें",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "continue": "जारी रखें",
+    "back": "वापस",
+    "next": "आगे"
+  },
+  "nav": {
+    "home": "मुख्य पृष्ठ",
+    "library": "ग्रंथालय",
+    "chat": "ज्ञान पोर्टल",
+    "subscription": "सदस्यता",
+    "billing": "बिलिंग",
+    "profile": "प्रोफ़ाइल",
+    "logout": "लॉग आउट",
+    "signin": "साइन इन",
+    "register": "खाता बनाएँ",
+    "admin": "व्यवस्थापक"
+  },
+  "auth": {
+    "signin_title": "पुनः स्वागत है",
+    "signin_subtitle": "अपनी आंतरिक यात्रा जारी रखें",
+    "register_title": "अपना अभ्यास आरंभ करें",
+    "register_subtitle": "AI ज्ञान साथी से वार्तालाप के लिए खाता बनाएँ",
+    "email": "ईमेल",
+    "password": "पासवर्ड",
+    "phone": "फ़ोन नंबर",
+    "name": "नाम",
+    "otp": "एक-बार का कोड",
+    "send_otp": "कोड भेजें",
+    "verify_otp": "कोड सत्यापित करें",
+    "forgot_password": "पासवर्ड भूल गए?",
+    "reset_password": "पासवर्ड रीसेट करें",
+    "google_signin": "Google से जारी रखें",
+    "apple_signin": "Apple से जारी रखें",
+    "have_account": "क्या आपके पास पहले से खाता है?",
+    "no_account": "अभी तक खाता नहीं है?",
+    "sign_in_link": "साइन इन करें",
+    "sign_up_link": "साइन अप करें"
+  },
+  "chat": {
+    "title": "ज्ञान पोर्टल",
+    "placeholder": "किसी उपदेश, अभ्यास, या अपनी आंतरिक यात्रा के बारे में पूछें…",
+    "send": "भेजें",
+    "regenerate": "पुनः उत्पन्न करें",
+    "thinking": "विचार कर रहे हैं…",
+    "translating": "उत्तर का अनुवाद हो रहा है…",
+    "new_conversation": "नई वार्तालाप",
+    "your_conversations": "आपकी वार्तालाप",
+    "no_conversations": "अभी तक कोई वार्तालाप नहीं। ऊपर से एक आरंभ करें।",
+    "depth_reached": "यह वार्तालाप अपनी सीमा तक पहुँच गई है। आगे बढ़ने के लिए कृपया एक नई वार्तालाप आरंभ करें।",
+    "follow_up_questions": "आप यह भी पूछ सकते हैं",
+    "feedback_helpful": "सहायक",
+    "feedback_not_helpful": "बिल्कुल सही नहीं",
+    "feedback_thanks": "आपकी प्रतिक्रिया के लिए धन्यवाद।",
+    "delete_confirm": "इस वार्तालाप को हटाएँ?",
+    "delete_warning": "यह वापस नहीं किया जा सकता।"
+  },
+  "subscription": {
+    "current_plan": "वर्तमान योजना",
+    "upgrade": "अपग्रेड करें",
+    "manage": "सदस्यता प्रबंधित करें",
+    "cancel": "सदस्यता रद्द करें",
+    "billing_history": "बिलिंग इतिहास",
+    "free_plan": "नि:शुल्क",
+    "seeker_plan": "साधक",
+    "sage_plan": "ऋषि",
+    "monthly": "मासिक",
+    "yearly": "वार्षिक",
+    "per_month": "/माह",
+    "per_year": "/वर्ष"
+  },
+  "library": {
+    "title": "उपदेशों का संग्रह",
+    "subtitle": "श्री रमण महर्षि के चयनित पाठ",
+    "topics": "विषय",
+    "all_topics": "सभी",
+    "search_placeholder": "उपदेश खोजें…",
+    "reading_time_minutes": "{{min}} मिनट का पाठ",
+    "no_results": "आपकी खोज से कोई उपदेश मेल नहीं खाता।"
+  },
+  "language_switcher": {
+    "label": "भाषा",
+    "current_language": "वर्तमान भाषा: {{name}}"
+  },
+  "footer": {
+    "about": "हमारे बारे में",
+    "privacy": "गोपनीयता",
+    "terms": "नियम",
+    "contact": "संपर्क",
+    "rights": "© 2026 अरुणाचल समुद्र। सर्वाधिकार सुरक्षित।"
+  }
+}

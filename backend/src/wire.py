@@ -243,6 +243,7 @@ class ChatCompletionRequest(tt.BM):
     message: str = tt.F("Message to send to the model")
     stream: bool = tt.F("Whether to stream the response")
     mock: bool = tt.F("Whether to use a mock response", False)
+    lang: str | None = tt.F("User's preferred language for this chat turn (en/hi/ta/te/bn/ml/es/fr/ar)", None)
 
 
 class ChatCompletionResponse(tt.BM):

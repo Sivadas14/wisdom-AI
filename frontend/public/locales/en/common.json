@@ -1,0 +1,107 @@
+{
+  "_meta": {
+    "language": "en",
+    "language_native": "English",
+    "version": "1.0",
+    "last_updated": "2026-05-01"
+  },
+  "app": {
+    "name": "Arunachala Samudra",
+    "tagline": "Wisdom of Sri Ramana Maharshi",
+    "loading": "Loading…",
+    "thinking": "Thinking…",
+    "error_generic": "Something went wrong. Please try again.",
+    "retry": "Try again",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "continue": "Continue",
+    "back": "Back",
+    "next": "Next"
+  },
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "chat": "Wisdom Portal",
+    "subscription": "Subscription",
+    "billing": "Billing",
+    "profile": "Profile",
+    "logout": "Sign out",
+    "signin": "Sign in",
+    "register": "Create account",
+    "admin": "Admin"
+  },
+  "auth": {
+    "signin_title": "Welcome back",
+    "signin_subtitle": "Continue your inner journey",
+    "register_title": "Begin your practice",
+    "register_subtitle": "Create an account to converse with the AI Wisdom Companion",
+    "email": "Email",
+    "password": "Password",
+    "phone": "Phone number",
+    "name": "Name",
+    "otp": "One-time code",
+    "send_otp": "Send code",
+    "verify_otp": "Verify code",
+    "forgot_password": "Forgot password?",
+    "reset_password": "Reset password",
+    "google_signin": "Continue with Google",
+    "apple_signin": "Continue with Apple",
+    "have_account": "Already have an account?",
+    "no_account": "Don't have an account yet?",
+    "sign_in_link": "Sign in",
+    "sign_up_link": "Sign up"
+  },
+  "chat": {
+    "title": "Wisdom Portal",
+    "placeholder": "Ask about a teaching, a practice, or your own inner journey…",
+    "send": "Send",
+    "regenerate": "Regenerate",
+    "thinking": "Thinking…",
+    "translating": "Translating response…",
+    "new_conversation": "New conversation",
+    "your_conversations": "Your conversations",
+    "no_conversations": "No conversations yet. Begin one above.",
+    "depth_reached": "This conversation has reached its depth. Please start a new one to continue exploring.",
+    "follow_up_questions": "You might also ask",
+    "feedback_helpful": "Helpful",
+    "feedback_not_helpful": "Not quite right",
+    "feedback_thanks": "Thank you for the feedback.",
+    "delete_confirm": "Delete this conversation?",
+    "delete_warning": "This cannot be undone."
+  },
+  "subscription": {
+    "current_plan": "Current plan",
+    "upgrade": "Upgrade",
+    "manage": "Manage subscription",
+    "cancel": "Cancel subscription",
+    "billing_history": "Billing history",
+    "free_plan": "Free",
+    "seeker_plan": "Seeker",
+    "sage_plan": "Sage",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "per_month": "/month",
+    "per_year": "/year"
+  },
+  "library": {
+    "title": "Library of Teachings",
+    "subtitle": "Curated readings from Sri Ramana Maharshi",
+    "topics": "Topics",
+    "all_topics": "All",
+    "search_placeholder": "Search teachings…",
+    "reading_time_minutes": "{{min}} min read",
+    "no_results": "No teachings match your search."
+  },
+  "language_switcher": {
+    "label": "Language",
+    "current_language": "Current language: {{name}}"
+  },
+  "footer": {
+    "about": "About",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "contact": "Contact",
+    "rights": "© 2026 Arunachala Samudra. All rights reserved."
+  }
+}
