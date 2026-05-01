@@ -1,0 +1,105 @@
+{
+  "_meta": {
+    "language": "ta",
+    "language_native": "தமிழ்",
+    "version": "1.0",
+    "_note": "Hand-curated baseline. Run scripts/seed_ui_strings.py to refresh missing keys via /api/translate."
+  },
+  "app": {
+    "name": "அருணாசல சமுத்திரம்",
+    "tagline": "ஸ்ரீ ரமண மகரிஷியின் ஞானம்",
+    "loading": "ஏற்றுகிறது…",
+    "thinking": "சிந்திக்கிறேன்…",
+    "error_generic": "ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.",
+    "retry": "மீண்டும் முயற்சி",
+    "close": "மூடு",
+    "save": "சேமி",
+    "cancel": "ரத்து",
+    "continue": "தொடரவும்",
+    "back": "பின்",
+    "next": "அடுத்து"
+  },
+  "nav": {
+    "home": "முகப்பு",
+    "library": "நூலகம்",
+    "chat": "ஞான வாயில்",
+    "subscription": "சந்தா",
+    "billing": "கட்டணம்",
+    "profile": "சுயவிவரம்",
+    "logout": "வெளியேறு",
+    "signin": "உள்நுழை",
+    "register": "கணக்கு தொடங்கு",
+    "admin": "நிர்வாகம்"
+  },
+  "auth": {
+    "signin_title": "மீண்டும் வரவேற்கிறோம்",
+    "signin_subtitle": "உங்கள் உள்மன பயணத்தை தொடரவும்",
+    "register_title": "உங்கள் பயிற்சியை தொடங்குங்கள்",
+    "register_subtitle": "AI ஞான துணைவருடன் உரையாட கணக்கு தொடங்குங்கள்",
+    "email": "மின்னஞ்சல்",
+    "password": "கடவுச்சொல்",
+    "phone": "தொலைபேசி எண்",
+    "name": "பெயர்",
+    "otp": "ஒரு முறை குறியீடு",
+    "send_otp": "குறியீடு அனுப்பு",
+    "verify_otp": "குறியீடு சரிபார்",
+    "forgot_password": "கடவுச்சொல் மறந்தீர்களா?",
+    "google_signin": "Google உடன் தொடரவும்",
+    "apple_signin": "Apple உடன் தொடரவும்",
+    "have_account": "ஏற்கனவே கணக்கு உள்ளதா?",
+    "no_account": "இன்னும் கணக்கு இல்லையா?",
+    "sign_in_link": "உள்நுழைய",
+    "sign_up_link": "பதிவு செய்ய"
+  },
+  "chat": {
+    "title": "ஞான வாயில்",
+    "placeholder": "ஓர் உபதேசம், பயிற்சி, அல்லது உங்கள் உள்மன பயணம் பற்றி கேளுங்கள்…",
+    "send": "அனுப்பு",
+    "thinking": "சிந்திக்கிறேன்…",
+    "translating": "பதிலை மொழிபெயர்க்கிறேன்…",
+    "new_conversation": "புதிய உரையாடல்",
+    "your_conversations": "உங்கள் உரையாடல்கள்",
+    "no_conversations": "இன்னும் உரையாடல் இல்லை. மேலே ஒன்றை தொடங்குங்கள்.",
+    "depth_reached": "இந்த உரையாடல் அதன் ஆழத்தை எட்டியுள்ளது. தொடர புதிய உரையாடலை தொடங்குங்கள்.",
+    "follow_up_questions": "இவற்றையும் கேட்கலாம்",
+    "feedback_helpful": "உதவியாக",
+    "feedback_not_helpful": "சரியாக இல்லை",
+    "feedback_thanks": "உங்கள் கருத்துக்கு நன்றி.",
+    "delete_confirm": "இந்த உரையாடலை நீக்கவா?",
+    "delete_warning": "இதை மாற்ற முடியாது."
+  },
+  "subscription": {
+    "current_plan": "தற்போதைய திட்டம்",
+    "upgrade": "மேம்படுத்து",
+    "manage": "சந்தாவை நிர்வகி",
+    "cancel": "சந்தாவை ரத்து செய்",
+    "billing_history": "கட்டண வரலாறு",
+    "free_plan": "இலவசம்",
+    "seeker_plan": "தேடுபவர்",
+    "sage_plan": "முனிவர்",
+    "monthly": "மாதாந்திர",
+    "yearly": "ஆண்டு",
+    "per_month": "/மாதம்",
+    "per_year": "/ஆண்டு"
+  },
+  "library": {
+    "title": "உபதேசங்களின் நூலகம்",
+    "subtitle": "ஸ்ரீ ரமண மகரிஷியின் தேர்ந்தெடுக்கப்பட்ட பாடங்கள்",
+    "topics": "தலைப்புகள்",
+    "all_topics": "அனைத்தும்",
+    "search_placeholder": "உபதேசங்களை தேடு…",
+    "reading_time_minutes": "{{min}} நிமிட வாசிப்பு",
+    "no_results": "உங்கள் தேடலுக்கு எந்த உபதேசமும் பொருந்தவில்லை."
+  },
+  "language_switcher": {
+    "label": "மொழி",
+    "current_language": "தற்போதைய மொழி: {{name}}"
+  },
+  "footer": {
+    "about": "பற்றி",
+    "privacy": "தனியுரிமை",
+    "terms": "நிபந்தனைகள்",
+    "contact": "தொடர்பு",
+    "rights": "© 2026 அருணாசல சமுத்திரம். அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை."
+  }
+}
