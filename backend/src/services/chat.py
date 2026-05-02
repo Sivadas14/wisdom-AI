@@ -489,8 +489,16 @@ async def _llm_chat_streaming_optimized(
     conversation: db.Conversation,
     spb_client: Client,
     user_message: str,
+    user_lang: str = "en",
+    original_user_message: str = None,
 ):
-    """Real LLM chat with TRUE STREAMING and parallel processing"""
+    """Real LLM chat with TRUE STREAMING and parallel processing.
+
+    PHASE-1B: When user_lang != "en", the response is collected fully (not
+    streamed token-by-token), translated via the cached translation gateway,
+    then yielded as synthetic word chunks for visual streaming feel. English
+    users keep the original token-by-token streaming behavior unchanged.
+    """
 
     # ------------------------------------------------------------------ #
     # STEP 1: Intent pre-classification — fast gate before any vector work #
@@ -531,6 +539,17 @@ async def _llm_chat_streaming_optimized(
                 "our digital library or continue the conversation by asking about any other teaching "
                 "from the Ramana Maharshi library."
             )
+            # === PHASE 1B: translate refusal for non-English users ===
+            if user_lang != "en":
+                try:
+                    static_refusal = await translate_assistant_response(
+                        session, static_refusal, user_lang
+                    )
+                except Exception as e:
+                    tu.logger.warning(
+                        f"[CHAT_LANG] Static refusal translation failed; serving English: {e}"
+                    )
+            # === END PHASE 1B addition ===
             yield ta.to_openai_chunk(tt.assistant(static_refusal))
             yield "[DONE]\n\n"
             return
@@ -578,43 +597,83 @@ async def _llm_chat_streaming_optimized(
     # NOW start streaming LLM response with chunks in context
     async with profile_operation("streaming_llm_response") as op:
         response_content = ""
-        
-        # Try different streaming approaches
-        try:
-            # Method 1: Try if model supports streaming directly
-            if hasattr(model, 'chat_stream'):
-                async for chunk in model.chat_stream(master_thread):
-                    content = chunk.content if hasattr(chunk, 'content') else str(chunk)
-                    response_content += content
-                    yield ta.to_openai_chunk(tt.assistant(content))
-            else:
-                # Method 2: Use the regular chat method and simulate streaming
+
+        if user_lang != "en":
+            # === PHASE 1B: collect full English response, translate, yield translated ===
+            # We do NOT yield English tokens to the client. Get the full response first,
+            # translate via cached gateway, then yield the translated text in synthetic
+            # word chunks so the UI still feels like streaming.
+            try:
+                if hasattr(model, 'chat_stream'):
+                    async for chunk in model.chat_stream(master_thread):
+                        content = chunk.content if hasattr(chunk, 'content') else str(chunk)
+                        response_content += content
+                else:
+                    response = await model.chat_async(master_thread)
+                    response_content = response.content if hasattr(response, 'content') else str(response)
+            except Exception as e:
                 response = await model.chat_async(master_thread)
                 response_content = response.content if hasattr(response, 'content') else str(response)
-                
-                # Stream the response word by word
-                words = response_content.split()
-                for i, word in enumerate(words):
-                    if i == 0:
-                        yield ta.to_openai_chunk(tt.assistant(word))
-                    else:
-                        yield ta.to_openai_chunk(tt.assistant(" " + word))
-                    await asyncio.sleep(0.03)  # Faster streaming
-        
-        except Exception as e:
-            # Fallback: Get full response and stream it
-            response = await model.chat_async(master_thread)
-            response_content = response.content if hasattr(response, 'content') else str(response)
-            
-            # Stream word by word
-            words = response_content.split()
+
+            # Translate the full English response into user's language
+            try:
+                translated_content = await translate_assistant_response(
+                    session, response_content, user_lang
+                )
+            except Exception as e:
+                tu.logger.warning(
+                    f"[CHAT_LANG] Output translation failed; serving English: {e}"
+                )
+                translated_content = response_content
+
+            # Yield the translated text as synthetic word-chunks for visual streaming feel
+            words = translated_content.split()
             for i, word in enumerate(words):
                 if i == 0:
                     yield ta.to_openai_chunk(tt.assistant(word))
                 else:
                     yield ta.to_openai_chunk(tt.assistant(" " + word))
                 await asyncio.sleep(0.02)
-        
+            # === END PHASE 1B addition ===
+
+        else:
+            # === ENGLISH PATH — unchanged from pre-Phase-1B behavior ===
+            # Try different streaming approaches
+            try:
+                # Method 1: Try if model supports streaming directly
+                if hasattr(model, 'chat_stream'):
+                    async for chunk in model.chat_stream(master_thread):
+                        content = chunk.content if hasattr(chunk, 'content') else str(chunk)
+                        response_content += content
+                        yield ta.to_openai_chunk(tt.assistant(content))
+                else:
+                    # Method 2: Use the regular chat method and simulate streaming
+                    response = await model.chat_async(master_thread)
+                    response_content = response.content if hasattr(response, 'content') else str(response)
+
+                    # Stream the response word by word
+                    words = response_content.split()
+                    for i, word in enumerate(words):
+                        if i == 0:
+                            yield ta.to_openai_chunk(tt.assistant(word))
+                        else:
+                            yield ta.to_openai_chunk(tt.assistant(" " + word))
+                        await asyncio.sleep(0.03)  # Faster streaming
+
+            except Exception as e:
+                # Fallback: Get full response and stream it
+                response = await model.chat_async(master_thread)
+                response_content = response.content if hasattr(response, 'content') else str(response)
+
+                # Stream word by word
+                words = response_content.split()
+                for i, word in enumerate(words):
+                    if i == 0:
+                        yield ta.to_openai_chunk(tt.assistant(word))
+                    else:
+                        yield ta.to_openai_chunk(tt.assistant(" " + word))
+                    await asyncio.sleep(0.02)
+
         op.finish(response_length=len(response_content))
     
     # BATCH database operations - single commit
@@ -652,8 +711,11 @@ async def _llm_chat_streaming_optimized(
         ai_message.follow_up_questions = follow_up
         
         # Generate title from the user's own words — no API call needed
+        # PHASE 1B: prefer the original (untranslated) message so the sidebar
+        # shows the conversation title in the user's language, not English.
         if not conversation.title:
-            words = user_message.strip().split()
+            title_source = original_user_message if original_user_message else user_message
+            words = title_source.strip().split()
             conversation.title = " ".join(words[:7]) + ("…" if len(words) > 7 else "")
 
         # SINGLE BATCH COMMIT
@@ -663,19 +725,30 @@ async def _llm_chat_streaming_optimized(
     await session.refresh(ai_message)
 
     op.finish(commits_count=1, citations_count=len(citations))
-    
+
     # Yield metadata after streaming is complete
     yield ta.to_openai_chunk(tt.assistant(f"<message_id>{ai_message.id}</message_id>"))
-    
+
     # Yield citations
     yield ta.to_openai_chunk(tt.assistant(f"<citations>"))
     for c in citations:
         yield ta.to_openai_chunk(tt.assistant(tu.to_json(c.model_dump(), tight=True)))
     yield ta.to_openai_chunk(tt.assistant("</citations>"))
-    
+
     # Yield questions
+    # PHASE 1B: translate follow-up questions for non-English users
+    questions_to_yield = follow_up.questions
+    if user_lang != "en":
+        try:
+            questions_to_yield = await translate_follow_up_questions(
+                session, follow_up.questions, user_lang
+            )
+        except Exception as e:
+            tu.logger.warning(
+                f"[CHAT_LANG] Follow-up translation failed; serving English: {e}"
+            )
     yield ta.to_openai_chunk(tt.assistant("<questions>"))
-    for q in follow_up.questions:
+    for q in questions_to_yield:
         yield ta.to_openai_chunk(tt.assistant(q))
     yield ta.to_openai_chunk(tt.assistant("</questions>"))
 
@@ -1134,8 +1207,15 @@ async def chat_completions(
     try:
         async with profile_operation("streaming_llm_processing") as op:
             model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
+            # PHASE 1B: pass user_lang and original_user_message so the streaming
+            # generator can translate the assistant response + follow-up questions
+            # back into the user's language before yielding.
             response = StreamingResponse(
-                _llm_chat_streaming_optimized(session, model, master_thread, conversation, spb_client, request.message),
+                _llm_chat_streaming_optimized(
+                    session, model, master_thread, conversation, spb_client, request.message,
+                    user_lang=user_lang,
+                    original_user_message=original_user_message,
+                ),
                 media_type="text/plain",
             )
             op.finish()
