@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import UserMenu from "@/components/UserMenu";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -43,7 +44,8 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                         </Sheet>
                         <span className="font-heading text-[#472B20] font-bold">Wisdom AI</span>
                     </div>
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
+                        <LanguageSwitcher variant="compact" />
                         <UserMenu />
                     </div>
                 </header>

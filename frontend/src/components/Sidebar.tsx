@@ -15,6 +15,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Sidebar = () => {
     const navigate = useNavigate();
@@ -305,7 +306,10 @@ const Sidebar = () => {
                 </div>
             )}
 
-            <div className="p-3 border-t border-[#ECE5DF] shrink-0">
+            <div className="p-3 border-t border-[#ECE5DF] shrink-0 space-y-2">
+                <div className="flex justify-end">
+                    <LanguageSwitcher variant="full" />
+                </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="w-full justify-start h-auto p-2 hover:bg-[#ECE5DF]">
