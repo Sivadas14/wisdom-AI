@@ -26,12 +26,15 @@ const MainLayout = ({ children }: MainLayoutProps) => {
             </div>
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-[#F5F0EC]">
-                {/* Mobile Header */}
-                <header className="flex md:hidden items-center justify-between px-4 h-14 border-b border-[#ECE5DF] bg-[#F5F0EC]/80 backdrop-blur-sm sticky top-0 z-50">
-                    <div className="flex items-center gap-2">
+                {/* Top Header — always visible. Mobile shows menu+title+UserMenu;
+                    desktop shows only the LanguageSwitcher pinned to the right
+                    (UserMenu stays in the sidebar on desktop so it isn't duplicated). */}
+                <header className="flex items-center justify-between px-4 h-14 border-b border-[#ECE5DF] bg-[#F5F0EC]/80 backdrop-blur-sm sticky top-0 z-50">
+                    {/* Left: mobile-only menu button + app title */}
+                    <div className="flex items-center gap-2 md:invisible">
                         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                             <SheetTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-[#472B20]">
+                                <Button variant="ghost" size="icon" className="text-[#472B20] md:hidden">
                                     <Menu className="h-5 w-5" />
                                 </Button>
                             </SheetTrigger>
@@ -42,11 +45,12 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                                 </div>
                             </SheetContent>
                         </Sheet>
-                        <span className="font-heading text-[#472B20] font-bold">Wisdom AI</span>
+                        <span className="font-heading text-[#472B20] font-bold md:hidden">Wisdom AI</span>
                     </div>
+                    {/* Right: LanguageSwitcher always; UserMenu mobile-only (sidebar already has it on desktop) */}
                     <div className="flex items-center gap-2">
-                        <LanguageSwitcher variant="compact" />
-                        <UserMenu />
+                        <LanguageSwitcher variant="full" />
+                        <div className="md:hidden"><UserMenu /></div>
                     </div>
                 </header>
                 {/* Main Content Area */}
