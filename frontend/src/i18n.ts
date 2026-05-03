@@ -40,6 +40,39 @@ export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
 export const SUPPORTED_LNG_CODES: LanguageCode[] = SUPPORTED_LANGUAGES.map(l => l.code);
 export const RTL_LANGS = new Set(SUPPORTED_LANGUAGES.filter(l => l.rtl).map(l => l.code));
 
+/**
+ * One-time bootstrap sync: when the user picked a language via the GTranslate
+ * widget on the public Landing page, that choice lives in the `googtrans`
+ * cookie (`/auto/hi`, `/en/ta`, etc.). The post-login react-i18next system
+ * reads from our `pref_lang` cookie. Without bridging the two, the user's
+ * Landing-language choice would not carry into the in-app experience.
+ *
+ * This runs at module load, BEFORE i18n.init() — so the LanguageDetector's
+ * cookie lookup naturally picks up the synced value. We only seed pref_lang
+ * if it isn't already set, so an explicit in-app choice (made via
+ * LanguageSwitcher.tsx) always wins over GTranslate's choice.
+ */
+function bootstrapLanguageFromGoogtrans() {
+  if (typeof document === "undefined") return;
+  // If user already has an explicit pref_lang, do nothing.
+  if (/(^|;\s*)pref_lang=/.test(document.cookie)) return;
+
+  const m = document.cookie.match(/googtrans=\/[^/]+\/([a-zA-Z-]+)/);
+  if (!m || !m[1]) return;
+
+  const raw = m[1].toLowerCase();
+  const code: string =
+    raw === "zh-cn" ? "zh-CN" :
+    raw === "zh-tw" ? "zh-TW" :
+    raw;
+
+  if (!(SUPPORTED_LNG_CODES as readonly string[]).includes(code)) return;
+
+  document.cookie = `pref_lang=${code}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax; Secure`;
+  try { localStorage.setItem("preferredLang", code); } catch { /* private browsing */ }
+}
+bootstrapLanguageFromGoogtrans();
+
 i18n
   .use(HttpBackend)
   .use(LanguageDetector)

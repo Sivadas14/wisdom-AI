@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import i18n, { SUPPORTED_LNG_CODES, RTL_LANGS } from "@/i18n";
 import { TEACHINGS } from "@/data/teachings";
 import {
   BookOpen, Sparkles, MessageCircle, Music,
@@ -1733,6 +1734,45 @@ export default function Landing() {
         .forEach(el => el.remove());
       try { delete (window as any).gtranslateSettings; } catch { /* ignore */ }
     };
+  }, []);
+
+  // ── Cross-route language sync ────────────────────────────────────────────
+  // GTranslate sets `googtrans` (e.g. "/auto/hi") whenever the user changes
+  // language on Landing. Without this sync, the user's Landing-page choice
+  // doesn't carry into the post-login react-i18next world (which reads
+  // `pref_lang`). Poll once per second while Landing is mounted; mirror to
+  // pref_lang + localStorage + live i18next state. The live changeLanguage
+  // call ensures the running React tree updates immediately rather than
+  // waiting for a page reload.
+  useEffect(() => {
+    const sync = () => {
+      const m = document.cookie.match(/googtrans=\/[^/]+\/([a-zA-Z-]+)/);
+      if (!m || !m[1]) return;
+
+      const raw = m[1].toLowerCase();
+      const code: string =
+        raw === "zh-cn" ? "zh-CN" :
+        raw === "zh-tw" ? "zh-TW" :
+        raw;
+
+      if (!(SUPPORTED_LNG_CODES as readonly string[]).includes(code)) return;
+
+      // Already in sync? skip the writes.
+      const cur = document.cookie.match(/pref_lang=([^;]+)/);
+      if (cur && cur[1] === code) return;
+
+      document.cookie = `pref_lang=${code}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax; Secure`;
+      try { localStorage.setItem("preferredLang", code); } catch { /* ignore */ }
+      try {
+        i18n.changeLanguage(code);
+        document.documentElement.lang = code;
+        document.documentElement.dir = (RTL_LANGS as Set<string>).has(code) ? "rtl" : "ltr";
+      } catch { /* i18n not ready yet — bootstrap will catch it later */ }
+    };
+
+    sync(); // immediate first-pass
+    const id = window.setInterval(sync, 1000);
+    return () => window.clearInterval(id);
   }, []);
 
   return (
