@@ -1246,6 +1246,10 @@ class GuestChatRequest(BaseModel):
     message: str
     session_id: str
     history: List[GuestChatMessage] = []
+    # Phase 1B (guest): language code from the Landing page's GTranslate widget
+    # cookie. Defaults to English to preserve backward compatibility with any
+    # client that doesn't yet send it.
+    lang: str = "en"
 
 
 async def _guest_chat_stream(
@@ -1253,13 +1257,30 @@ async def _guest_chat_stream(
     model: tt.ModelInterface,
     user_message: str,
     history: List[GuestChatMessage],
+    user_lang: str = "en",
 ):
     """Stateless RAG streaming chat for unauthenticated visitors.
 
     Runs the same embedding → LLM pipeline as the authenticated endpoint but
     writes nothing to the database and includes no DB-linked metadata
     (message IDs, titles, etc.).
+
+    PHASE-1B (guest): when user_lang != "en", input is translated to English
+    before RAG, refusals are translated, and the final assistant response is
+    collected fully then translated to user_lang and yielded as synthetic
+    word-chunks. English path is identical to pre-Phase-1B behavior.
     """
+    # === PHASE 1B (guest): translate user input to English so RAG works ===
+    is_non_english = user_lang != "en" and user_lang in PHASE_1_LANGS
+    if is_non_english:
+        try:
+            user_message = await translate_user_message_to_english(
+                session, user_message, user_lang
+            )
+            tu.logger.info(f"[GUEST_CHAT_LANG] Translated input {user_lang}->en")
+        except Exception as e:
+            tu.logger.warning(f"[GUEST_CHAT_LANG] Input translation failed; using source: {e}")
+    # === END PHASE 1B input translation ===
 
     SYSTEM_PROMPT = dedent(
         f"""
@@ -1296,6 +1317,13 @@ async def _guest_chat_stream(
             "any other teaching from Bhagavan's wisdom — and do explore the chat further "
             "with follow-up questions."
         )
+        # === PHASE 1B (guest): translate refusal for non-English users ===
+        if is_non_english:
+            try:
+                refusal = await translate_assistant_response(session, refusal, user_lang)
+            except Exception as e:
+                tu.logger.warning(f"[GUEST_CHAT_LANG] Off-topic refusal translation failed: {e}")
+        # === END ===
         yield ta.to_openai_chunk(tt.assistant(refusal))
         yield "[DONE]\n\n"
         return
@@ -1313,6 +1341,13 @@ async def _guest_chat_stream(
             "Please try rephrasing your inquiry, or explore the chat further — "
             "follow-up questions often open a new thread of insight."
         )
+        # === PHASE 1B (guest): translate no-chunks refusal for non-English users ===
+        if is_non_english:
+            try:
+                no_chunks = await translate_assistant_response(session, no_chunks, user_lang)
+            except Exception as e:
+                tu.logger.warning(f"[GUEST_CHAT_LANG] No-chunks refusal translation failed: {e}")
+        # === END ===
         yield ta.to_openai_chunk(tt.assistant(no_chunks))
         yield "[DONE]\n\n"
         return
@@ -1356,21 +1391,59 @@ async def _guest_chat_stream(
     # Stream LLM response
     response_content = ""
     try:
-        if hasattr(model, "chat_stream"):
-            async for chunk in model.chat_stream(master_thread):
-                content = chunk.content if hasattr(chunk, "content") else str(chunk)
-                response_content += content
-                yield ta.to_openai_chunk(tt.assistant(content))
-        else:
-            response = await model.chat_async(master_thread)
-            response_content = response.content if hasattr(response, "content") else str(response)
-            words = response_content.split()
+        if is_non_english:
+            # === PHASE 1B (guest): collect full English response, translate, yield translated ===
+            if hasattr(model, "chat_stream"):
+                async for chunk in model.chat_stream(master_thread):
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    response_content += content
+                    # NOTE: do NOT yield English tokens; we need full text to translate
+            else:
+                response = await model.chat_async(master_thread)
+                response_content = response.content if hasattr(response, "content") else str(response)
+
+            # Translate the full English response into user_lang
+            try:
+                translated_content = await translate_assistant_response(
+                    session, response_content, user_lang
+                )
+            except Exception as e:
+                tu.logger.warning(
+                    f"[GUEST_CHAT_LANG] Output translation failed; serving English: {e}"
+                )
+                translated_content = response_content
+
+            # Yield translated text as synthetic word-chunks for streaming feel
+            words = translated_content.split()
             for i, word in enumerate(words):
                 yield ta.to_openai_chunk(tt.assistant(word if i == 0 else " " + word))
                 await asyncio.sleep(0.025)
+            # === END PHASE 1B addition ===
+
+        else:
+            # === ENGLISH PATH — unchanged from pre-Phase-1B behavior ===
+            if hasattr(model, "chat_stream"):
+                async for chunk in model.chat_stream(master_thread):
+                    content = chunk.content if hasattr(chunk, "content") else str(chunk)
+                    response_content += content
+                    yield ta.to_openai_chunk(tt.assistant(content))
+            else:
+                response = await model.chat_async(master_thread)
+                response_content = response.content if hasattr(response, "content") else str(response)
+                words = response_content.split()
+                for i, word in enumerate(words):
+                    yield ta.to_openai_chunk(tt.assistant(word if i == 0 else " " + word))
+                    await asyncio.sleep(0.025)
     except Exception as e:
         tu.logger.error(f"Guest chat LLM error: {e}")
-        yield ta.to_openai_chunk(tt.assistant("An error occurred. Please try again."))
+        # Translate the error message too if non-English
+        err_msg = "An error occurred. Please try again."
+        if is_non_english:
+            try:
+                err_msg = await translate_assistant_response(session, err_msg, user_lang)
+            except Exception:
+                pass
+        yield ta.to_openai_chunk(tt.assistant(err_msg))
 
     yield "[DONE]\n\n"
 
@@ -1474,8 +1547,12 @@ async def guest_chat_completion(
 
     model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
 
+    # PHASE 1B (guest): pass user_lang from request so the streaming generator
+    # can translate input + output. Defaults to "en" if client didn't send it.
+    user_lang = (request.lang or "en").strip().lower()
+
     return StreamingResponse(
-        _guest_chat_stream(session, model, request.message, request.history),
+        _guest_chat_stream(session, model, request.message, request.history, user_lang=user_lang),
         media_type="text/plain",
     )
 

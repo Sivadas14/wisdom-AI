@@ -718,6 +718,22 @@ function GuestChatSection() {
     setLoading(true);
 
     try {
+      // PHASE 1B (guest): read GTranslate's googtrans cookie to determine the
+      // user's selected language. Format is "/auto/hi" or "/en/hi". Falls back
+      // to our pref_lang cookie (set by post-login switcher) or "en".
+      const detectLang = (): string => {
+        const gt = document.cookie.match(/googtrans=\/[^/]+\/([a-zA-Z-]+)/);
+        if (gt && gt[1]) {
+          const code = gt[1];
+          // GTranslate emits "zh-CN" already in Chrome's pattern; normalize casing
+          if (code.toLowerCase() === "zh-cn") return "zh-CN";
+          if (code.toLowerCase() === "zh-tw") return "zh-TW";
+          return code.toLowerCase();
+        }
+        const pref = document.cookie.match(/pref_lang=([^;]+)/);
+        return (pref && pref[1]) ? pref[1] : "en";
+      };
+
       const res = await fetch(`${API_BASE}/chat/guest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -725,6 +741,7 @@ function GuestChatSection() {
           message: q,
           session_id: sid,
           history: messages.slice(-6).map(m => ({ role: m.role, content: m.content })),
+          lang: detectLang(),
         }),
       });
 
@@ -1684,10 +1701,45 @@ export default function Landing() {
   const handleOnboardingClose = () => setShowOnboarding(false);
   const openOnboarding = () => setShowOnboarding(true);
 
+  // ── GTranslate widget — scoped to Landing route only ────────────────────
+  // Translates page DOM at runtime via Google Translate. Sets a `googtrans`
+  // cookie that GuestChatSection reads to send the correct `lang` to
+  // /api/chat/guest. After the user signs in and leaves Landing, the cleanup
+  // function below removes the widget so it doesn't conflict with the
+  // post-login react-i18next switcher in MainLayout.
+  useEffect(() => {
+    // Guard against StrictMode double-mount in dev
+    if (document.querySelector('script[data-scope="landing-gtranslate"]')) return;
+
+    (window as any).gtranslateSettings = {
+      default_language: "en",
+      languages: ["en","hi","ta","te","bn","ml","es","fr","de","nl","sv","da","no","fi","ar","zh-CN"],
+      wrapper_selector: ".gtranslate_wrapper",
+      switcher_horizontal_position: "right",
+      switcher_vertical_position: "top",
+      float_switcher_open_direction: "bottom",
+      flag_size: 24,
+      flag_style: "3d",
+    };
+    const script = document.createElement("script");
+    script.src = "https://cdn.gtranslate.net/widgets/latest/float.js";
+    script.defer = true;
+    script.dataset.scope = "landing-gtranslate";
+    document.body.appendChild(script);
+
+    return () => {
+      script.remove();
+      document.querySelectorAll(".gt_float_switcher, .gtranslate_wrapper, .gt-current-lang, .gt_widget_wrapper")
+        .forEach(el => el.remove());
+      try { delete (window as any).gtranslateSettings; } catch { /* ignore */ }
+    };
+  }, []);
+
   return (
     <div style={{ backgroundColor: T.cream, scrollBehavior: "smooth" }} className="min-h-screen overflow-x-hidden">
       {showIntro && <IntroScreen onDone={handleIntroDone} />}
       {showOnboarding && <RamanaOnboardingModal onClose={handleOnboardingClose} />}
+      <div className="gtranslate_wrapper" />
       <PublicHeader isAuthenticated={isAuthenticated} onNewToRamana={openOnboarding} />
       <main>
         <HeroSection isAuthenticated={isAuthenticated} onNewToRamana={openOnboarding} />
