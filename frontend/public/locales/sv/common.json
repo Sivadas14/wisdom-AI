@@ -1,1 +1,107 @@
-{"_meta":{"language":"sv","version":"1.0","note":"Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages."}}
+{
+  "_meta": {
+    "language": "sv",
+    "version": "1.0",
+    "note": "Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages.",
+    "last_updated": "2026-05-03"
+  },
+  "app": {
+    "name": "Arunachala Samudra",
+    "tagline": "Sri Ramana Maharshis visdom",
+    "loading": "Laddar...",
+    "thinking": "Tänker...",
+    "error_generic": "Något gick fel. Försök igen, tack.",
+    "retry": "Försök igen",
+    "close": "Stäng",
+    "save": "Spara",
+    "cancel": "Avbryt",
+    "continue": "Fortsätt",
+    "back": "Tillbaka",
+    "next": "Nästa"
+  },
+  "nav": {
+    "home": "Hem",
+    "library": "Bibliotek",
+    "chat": "Visdomsportalen",
+    "subscription": "Prenumeration",
+    "billing": "Fakturering",
+    "profile": "Profil",
+    "logout": "Logga ut",
+    "signin": "Logga in",
+    "register": "Skapa konto",
+    "admin": "Administration"
+  },
+  "auth": {
+    "signin_title": "Välkommen tillbaka",
+    "signin_subtitle": "Fortsätt din inre resa",
+    "register_title": "Börja din praktik",
+    "register_subtitle": "Skapa ett konto för att samtala med AI Wisdom Companion",
+    "email": "E-post",
+    "password": "Lösenord",
+    "phone": "Telefonnummer",
+    "name": "Namn",
+    "otp": "Engångskod",
+    "send_otp": "Skicka kod",
+    "verify_otp": "Verifiera koden",
+    "forgot_password": "Glömt lösenord?",
+    "reset_password": "Återställ lösenordet",
+    "google_signin": "Fortsätt med Google",
+    "apple_signin": "Fortsätt med Apple",
+    "have_account": "Har du redan ett konto?",
+    "no_account": "Har du inget konto än?",
+    "sign_in_link": "Logga in",
+    "sign_up_link": "Anmäl dig"
+  },
+  "chat": {
+    "title": "Visdomsportalen",
+    "placeholder": "Fråga om en lära, en praktik eller din egen inre resa...",
+    "send": "Skicka",
+    "regenerate": "Regenerera",
+    "thinking": "Tänker...",
+    "translating": "Översätter svar...",
+    "new_conversation": "Ny konversation",
+    "your_conversations": "Era samtal",
+    "no_conversations": "Inga samtal än. Börja på en ovan.",
+    "depth_reached": "Denna konversation har nått sin djuppunkt. Var snäll och starta en ny för att fortsätta utforska.",
+    "follow_up_questions": "Du kanske också frågar",
+    "feedback_helpful": "Hjälpsamt",
+    "feedback_not_helpful": "Inte riktigt rätt",
+    "feedback_thanks": "Tack för återkopplingen.",
+    "delete_confirm": "Radera den här konversationen?",
+    "delete_warning": "Detta kan inte göras ogjort."
+  },
+  "subscription": {
+    "current_plan": "Nuvarande plan",
+    "upgrade": "Uppgradering",
+    "manage": "Hantera prenumeration",
+    "cancel": "Avbryt prenumerationen",
+    "billing_history": "Faktureringshistorik",
+    "free_plan": "Gratis",
+    "seeker_plan": "Sökare",
+    "sage_plan": "Sage",
+    "monthly": "Månadstidning",
+    "yearly": "Årligen",
+    "per_month": "/månad",
+    "per_year": "/år"
+  },
+  "library": {
+    "title": "Biblioteket för läror",
+    "subtitle": "Kuraterade läsningar från Sri Ramana Maharshi",
+    "topics": "Ämnen",
+    "all_topics": "Alla",
+    "search_placeholder": "Sök läror...",
+    "reading_time_minutes": "{{min}} min read",
+    "no_results": "Inga lärdomar matchar din sökning."
+  },
+  "language_switcher": {
+    "label": "Språk",
+    "current_language": "Nuvarande språk: {{name}}"
+  },
+  "footer": {
+    "about": "Om",
+    "privacy": "Integritet",
+    "terms": "Villkor",
+    "contact": "Kontakt",
+    "rights": "© 2026 Arunachala Samudra. Alla rättigheter förbehållna."
+  }
+}

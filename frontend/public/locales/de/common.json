@@ -1,1 +1,107 @@
-{"_meta":{"language":"de","version":"1.0","note":"Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages."}}
+{
+  "_meta": {
+    "language": "de",
+    "version": "1.0",
+    "note": "Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages.",
+    "last_updated": "2026-05-03"
+  },
+  "app": {
+    "name": "Arunachala Samudra",
+    "tagline": "Weisheit von Sri Ramana Maharshi",
+    "loading": "Lädt...",
+    "thinking": "Ich denke...",
+    "error_generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+    "retry": "Versuchen Sie es nochmal",
+    "close": "Schließen",
+    "save": "Speichern",
+    "cancel": "Stornieren",
+    "continue": "Weitermachen",
+    "back": "Zurück",
+    "next": "Als Nächstes"
+  },
+  "nav": {
+    "home": "Zuhause",
+    "library": "Bibliothek",
+    "chat": "Weisheitsportal",
+    "subscription": "Abonnement",
+    "billing": "Abrechnung",
+    "profile": "Profil",
+    "logout": "Abmelden",
+    "signin": "Anmelden",
+    "register": "Konto erstellen",
+    "admin": "Verwaltung"
+  },
+  "auth": {
+    "signin_title": "Willkommen zurück",
+    "signin_subtitle": "Setze deine innere Reise fort",
+    "register_title": "Beginnen Sie mit Ihrer Praxis",
+    "register_subtitle": "Erstelle ein Konto, um mit dem KI-Weisheitsbegleiter zu sprechen",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "phone": "Telefonnummer",
+    "name": "Name",
+    "otp": "Einmalcode",
+    "send_otp": "Code senden",
+    "verify_otp": "Code überprüfen",
+    "forgot_password": "Passwort vergessen?",
+    "reset_password": "Passwort zurücksetzen",
+    "google_signin": "Fahren Sie mit Google fort",
+    "apple_signin": "Weiter mit Apple",
+    "have_account": "Haben Sie bereits ein Konto?",
+    "no_account": "Hast du noch kein Konto?",
+    "sign_in_link": "Anmelden",
+    "sign_up_link": "Melden Sie sich an"
+  },
+  "chat": {
+    "title": "Weisheitsportal",
+    "placeholder": "Fragen Sie nach einer Lehre, einer Praxis oder Ihrer eigenen inneren Reise...",
+    "send": "Senden",
+    "regenerate": "Regenerieren",
+    "thinking": "Ich denke...",
+    "translating": "Antwort übersetzen...",
+    "new_conversation": "Neues Gespräch",
+    "your_conversations": "Eure Gespräche",
+    "no_conversations": "Noch keine Gespräche. Beginnen Sie mit einer oben.",
+    "depth_reached": "Dieses Gespräch hat seine Tiefe erreicht. Bitte beginnt ein neues, um weiter zu erkunden.",
+    "follow_up_questions": "Du könntest auch fragen",
+    "feedback_helpful": "Hilfreich",
+    "feedback_not_helpful": "Nicht ganz richtig",
+    "feedback_thanks": "Danke für das Feedback.",
+    "delete_confirm": "Dieses Gespräch löschen?",
+    "delete_warning": "Das lässt sich nicht rückgängig machen."
+  },
+  "subscription": {
+    "current_plan": "Aktueller Plan",
+    "upgrade": "Aufrüstung",
+    "manage": "Abonnement verwalten",
+    "cancel": "Abo kündigen",
+    "billing_history": "Abrechnungshistorie",
+    "free_plan": "Kostenlos",
+    "seeker_plan": "Sucher",
+    "sage_plan": "Sage",
+    "monthly": "Monatlich",
+    "yearly": "Jährlich",
+    "per_month": "/Monat",
+    "per_year": "/Jahr"
+  },
+  "library": {
+    "title": "Lehrbibliothek",
+    "subtitle": "Kuratierte Lesungen von Sri Ramana Maharshi",
+    "topics": "Themen",
+    "all_topics": "Alle",
+    "search_placeholder": "Suche Lehren...",
+    "reading_time_minutes": "{{min}} min read",
+    "no_results": "Keine Lehren passen zu deiner Suche."
+  },
+  "language_switcher": {
+    "label": "Sprache",
+    "current_language": "Aktuelle Sprache: {{name}}"
+  },
+  "footer": {
+    "about": "Über uns",
+    "privacy": "Privatsphäre",
+    "terms": "Begriffe",
+    "contact": "Kontakt",
+    "rights": "© 2026 Arunachala Samudra. Alle Rechte vorbehalten."
+  }
+}

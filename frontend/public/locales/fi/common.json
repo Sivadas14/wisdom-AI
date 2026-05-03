@@ -1,1 +1,107 @@
-{"_meta":{"language":"fi","version":"1.0","note":"Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages."}}
+{
+  "_meta": {
+    "language": "fi",
+    "version": "1.0",
+    "note": "Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages.",
+    "last_updated": "2026-05-03"
+  },
+  "app": {
+    "name": "Arunachala Samudra",
+    "tagline": "Sri Ramana Maharshin viisaus",
+    "loading": "Ladataan...",
+    "thinking": "Ajattelen...",
+    "error_generic": "Jokin meni pieleen. Ole hyvä ja yritä uudelleen.",
+    "retry": "Yritä uudestaan",
+    "close": "Sulje",
+    "save": "Tallenna",
+    "cancel": "Peruuta",
+    "continue": "Jatka",
+    "back": "Takaisin",
+    "next": "Seuraavaksi"
+  },
+  "nav": {
+    "home": "Koti",
+    "library": "Kirjasto",
+    "chat": "Viisauden portaali",
+    "subscription": "Tilaus",
+    "billing": "Laskutus",
+    "profile": "Profiili",
+    "logout": "Kirjautuu ulos",
+    "signin": "Kirjaudu sisään",
+    "register": "Luo tili",
+    "admin": "Hallinto"
+  },
+  "auth": {
+    "signin_title": "Tervetuloa takaisin",
+    "signin_subtitle": "Jatka sisäistä matkaasi",
+    "register_title": "Aloita harjoituksesi",
+    "register_subtitle": "Luo tili keskustellaksesi tekoälyn viisauden kumppanin kanssa",
+    "email": "Sähköposti",
+    "password": "Salasana",
+    "phone": "Puhelinnumero",
+    "name": "Nimi",
+    "otp": "Kertakäyttökoodi",
+    "send_otp": "Lähetä koodi",
+    "verify_otp": "Vahvista koodi",
+    "forgot_password": "Unohditko salasanan?",
+    "reset_password": "Nollaa salasana",
+    "google_signin": "Jatka Googlella",
+    "apple_signin": "Jatka Applen kanssa",
+    "have_account": "Onko sinulla jo tili?",
+    "no_account": "Eikö sinulla ole vielä tiliä?",
+    "sign_in_link": "Kirjaudu sisään",
+    "sign_up_link": "Kiinnittää"
+  },
+  "chat": {
+    "title": "Viisauden portaali",
+    "placeholder": "Kysy opetuksesta, harjoituksesta tai omasta sisäisestä matkastasi...",
+    "send": "Lähetä",
+    "regenerate": "Regeneraatio",
+    "thinking": "Ajattelen...",
+    "translating": "Vastauksen kääntäminen...",
+    "new_conversation": "Uusi keskustelu",
+    "your_conversations": "Keskustelunne",
+    "no_conversations": "Ei vielä keskusteluja. Aloita yksi yllä.",
+    "depth_reached": "Tämä keskustelu on saavuttanut syvyyttään. Aloita uusi sivusto jatkaaksesi tutkimista.",
+    "follow_up_questions": "Voisit myös kysyä",
+    "feedback_helpful": "Hyödyllistä",
+    "feedback_not_helpful": "Ei ihan oikein",
+    "feedback_thanks": "Kiitos palautteesta.",
+    "delete_confirm": "Poistaa tämä keskustelu?",
+    "delete_warning": "Tätä ei voi perua."
+  },
+  "subscription": {
+    "current_plan": "Nykyinen suunnitelma",
+    "upgrade": "Päivitys",
+    "manage": "Hallinnoi tilausta",
+    "cancel": "Peruuta tilaus",
+    "billing_history": "Laskutushistoria",
+    "free_plan": "Vapaa",
+    "seeker_plan": "Seeker",
+    "sage_plan": "Sage",
+    "monthly": "Kuukausi",
+    "yearly": "Vuosittain",
+    "per_month": "/kuukausi",
+    "per_year": "/vuosi"
+  },
+  "library": {
+    "title": "Opetuskirjasto",
+    "subtitle": "Kuratoituja lukemisia Sri Ramana Maharshilta",
+    "topics": "Aiheet",
+    "all_topics": "Kaikki",
+    "search_placeholder": "Etsintä opetuksista...",
+    "reading_time_minutes": "{{min}} min read",
+    "no_results": "Mikään opetus ei vastaa hakuasi."
+  },
+  "language_switcher": {
+    "label": "Kieli",
+    "current_language": "Nykyinen kieli: {{name}}"
+  },
+  "footer": {
+    "about": "Tietoa",
+    "privacy": "Yksityisyys",
+    "terms": "Termit",
+    "contact": "Yhteystiedot",
+    "rights": "© 2026 Arunachala Samudra. Kaikki oikeudet pidätetään."
+  }
+}

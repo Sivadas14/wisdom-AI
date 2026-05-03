@@ -1,1 +1,107 @@
-{"_meta":{"language":"zh-CN","version":"1.0","note":"Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages."}}
+{
+  "_meta": {
+    "language": "zh-CN",
+    "version": "1.0",
+    "note": "Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages.",
+    "last_updated": "2026-05-03"
+  },
+  "app": {
+    "name": "阿鲁纳查拉·萨穆德拉",
+    "tagline": "斯里·拉玛纳·马哈希的智慧",
+    "loading": "加载中......",
+    "thinking": "思考......",
+    "error_generic": "出了点问题。请再试一次。",
+    "retry": "再试一次",
+    "close": "结束",
+    "save": "保存",
+    "cancel": "取消",
+    "continue": "继续",
+    "back": "返回",
+    "next": "下一个"
+  },
+  "nav": {
+    "home": "首页",
+    "library": "图书馆",
+    "chat": "智慧门户",
+    "subscription": "订阅",
+    "billing": "账单",
+    "profile": "简介",
+    "logout": "签出",
+    "signin": "登录",
+    "register": "创建账户",
+    "admin": "行政"
+  },
+  "auth": {
+    "signin_title": "欢迎回来",
+    "signin_subtitle": "继续你的内心旅程",
+    "register_title": "开始你的练习",
+    "register_subtitle": "创建一个账户与AI智慧伴侣交流",
+    "email": "电子邮件",
+    "password": "密码",
+    "phone": "电话号码",
+    "name": "名称",
+    "otp": "一次性代码",
+    "send_otp": "发送代码",
+    "verify_otp": "验证代码",
+    "forgot_password": "忘记密码了吗？",
+    "reset_password": "重置密码",
+    "google_signin": "继续用谷歌",
+    "apple_signin": "继续用苹果",
+    "have_account": "已经有账号了吗？",
+    "no_account": "还没有账户？",
+    "sign_in_link": "登录",
+    "sign_up_link": "注册"
+  },
+  "chat": {
+    "title": "智慧门户",
+    "placeholder": "询问关于某种教导、一种实践，或者你自己的内心旅程......",
+    "send": "发送",
+    "regenerate": "再生",
+    "thinking": "思考......",
+    "translating": "翻译回应......",
+    "new_conversation": "新对话",
+    "your_conversations": "你们的对话",
+    "no_conversations": "还没有对话。从上面开始。",
+    "depth_reached": "这场对话已经进入了深渊。请重新开一个新账户继续探索。",
+    "follow_up_questions": "你也可以问",
+    "feedback_helpful": "很有帮助",
+    "feedback_not_helpful": "不太对劲",
+    "feedback_thanks": "谢谢你的反馈。",
+    "delete_confirm": "删除这段对话？",
+    "delete_warning": "这无法挽回。"
+  },
+  "subscription": {
+    "current_plan": "当前计划",
+    "upgrade": "升级",
+    "manage": "管理订阅",
+    "cancel": "取消订阅",
+    "billing_history": "计费历史",
+    "free_plan": "免费",
+    "seeker_plan": "寻球手",
+    "sage_plan": "智者",
+    "monthly": "月刊",
+    "yearly": "每年",
+    "per_month": "/月",
+    "per_year": "/年份"
+  },
+  "library": {
+    "title": "教义图书馆",
+    "subtitle": "斯里·拉玛纳·马哈希的策划朗读",
+    "topics": "主题",
+    "all_topics": "全部",
+    "search_placeholder": "搜寻教义......",
+    "reading_time_minutes": "{{min}} 分钟阅读",
+    "no_results": "没有任何教导能与你的寻找相符。"
+  },
+  "language_switcher": {
+    "label": "语言",
+    "current_language": "当前语言：{{name}}"
+  },
+  "footer": {
+    "about": "关于",
+    "privacy": "隐私",
+    "terms": "条款",
+    "contact": "联系方式",
+    "rights": "© 2026年阿鲁纳查拉·萨穆德拉。版权所有。"
+  }
+}

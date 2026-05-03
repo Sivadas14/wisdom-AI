@@ -1,1 +1,107 @@
-{"_meta":{"language":"nl","version":"1.0","note":"Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages."}}
+{
+  "_meta": {
+    "language": "nl",
+    "version": "1.0",
+    "note": "Placeholder — populate via scripts/seed_ui_strings.py once backend deploys with new languages.",
+    "last_updated": "2026-05-03"
+  },
+  "app": {
+    "name": "Arunachala Samudra",
+    "tagline": "Wijsheid van Sri Ramana Maharshi",
+    "loading": "Laden...",
+    "thinking": "Denken...",
+    "error_generic": "Er ging iets mis. Probeer het alsjeblieft opnieuw.",
+    "retry": "Probeer het nog eens",
+    "close": "Sluit",
+    "save": "Sla op",
+    "cancel": "Annuleren",
+    "continue": "Ga verder",
+    "back": "Achteruit",
+    "next": "Volgende"
+  },
+  "nav": {
+    "home": "Home",
+    "library": "Bibliotheek",
+    "chat": "Wijsheidsportaal",
+    "subscription": "Abonnement",
+    "billing": "Facturering",
+    "profile": "Profiel",
+    "logout": "Uitloggen",
+    "signin": "Inloggen",
+    "register": "Account aanmaken",
+    "admin": "Administratie"
+  },
+  "auth": {
+    "signin_title": "Welkom terug",
+    "signin_subtitle": "Ga verder met je innerlijke reis",
+    "register_title": "Begin met je oefening",
+    "register_subtitle": "Maak een account aan om te communiceren met de AI Wisdom Companion",
+    "email": "E-mail",
+    "password": "Wachtwoord",
+    "phone": "Telefoonnummer",
+    "name": "Naam",
+    "otp": "Eenmalige code",
+    "send_otp": "Code verzenden",
+    "verify_otp": "Verifieer de code",
+    "forgot_password": "Wachtwoord vergeten?",
+    "reset_password": "Wachtwoord resetten",
+    "google_signin": "Ga verder met Google",
+    "apple_signin": "Ga door met Apple",
+    "have_account": "Heb je al een account?",
+    "no_account": "Heb je nog geen account?",
+    "sign_in_link": "Inloggen",
+    "sign_up_link": "Aanmelden"
+  },
+  "chat": {
+    "title": "Wijsheidsportaal",
+    "placeholder": "Vraag naar een leerstelling, een praktijk, of je eigen innerlijke reis...",
+    "send": "Verzenden",
+    "regenerate": "Regenereer",
+    "thinking": "Denken...",
+    "translating": "Antwoord vertalen...",
+    "new_conversation": "Nieuw gesprek",
+    "your_conversations": "Jullie gesprekken",
+    "no_conversations": "Nog geen gesprekken. Begin er een hierboven.",
+    "depth_reached": "Dit gesprek heeft zijn diepte bereikt. Begin alsjeblieft een nieuwe om verder te verkennen.",
+    "follow_up_questions": "Je zou het ook kunnen vragen",
+    "feedback_helpful": "Behulpzaam",
+    "feedback_not_helpful": "Niet helemaal goed",
+    "feedback_thanks": "Bedankt voor de feedback.",
+    "delete_confirm": "Dit gesprek verwijderen?",
+    "delete_warning": "Dit kan niet ongedaan worden gemaakt."
+  },
+  "subscription": {
+    "current_plan": "Huidig plan",
+    "upgrade": "Upgrade",
+    "manage": "Beheer van abonnementen",
+    "cancel": "Abonnement annuleren",
+    "billing_history": "Facturatiegeschiedenis",
+    "free_plan": "Gratis",
+    "seeker_plan": "Zoeker",
+    "sage_plan": "Sage",
+    "monthly": "Maandelijks",
+    "yearly": "Jaarlijks",
+    "per_month": "/maand",
+    "per_year": "/jaar"
+  },
+  "library": {
+    "title": "Bibliotheek van Leerstellingen",
+    "subtitle": "Gecureerde lezingen van Sri Ramana Maharshi",
+    "topics": "Onderwerpen",
+    "all_topics": "Allemaal",
+    "search_placeholder": "Zoek leringen...",
+    "reading_time_minutes": "{{min}} min lezen",
+    "no_results": "Geen enkele leer past bij jouw zoektocht."
+  },
+  "language_switcher": {
+    "label": "Taal",
+    "current_language": "Huidige taal: {{name}}"
+  },
+  "footer": {
+    "about": "Over",
+    "privacy": "Privacy",
+    "terms": "Voorwaarden",
+    "contact": "Contact",
+    "rights": "© 2026 Arunachala Samudra. Alle rechten voorbehouden."
+  }
+}
