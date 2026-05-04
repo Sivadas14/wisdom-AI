@@ -259,6 +259,15 @@ def get_app() -> FastAPI:
             result["embedding_ok"] = False
             result["embedding_error"] = str(e)
 
+        # 5. Test full-text search fallback
+        try:
+            from src.services.chat import _fulltext_search_fallback
+            fts_rows = await _fulltext_search_fallback(session, "Who am I? Self inquiry Ramana")
+            result["fts_fallback_chunks"] = len(fts_rows)
+            result["fts_sample"] = fts_rows[0][0][:120] if fts_rows else None
+        except Exception as e:
+            result["fts_fallback_error"] = str(e)
+
         return result
 
     def custom_openapi():

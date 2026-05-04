@@ -1017,33 +1017,111 @@ async def _get_embedding_with_retry(model: tt.ModelInterface, text: str) -> list
     raise last_exc  # type: ignore[misc]
 
 
+async def _fulltext_search_fallback(
+    session: AsyncSession,
+    query: str,
+    limit: int = 10,
+) -> list[tuple[str, str]]:
+    """PostgreSQL full-text search fallback when embedding API is unavailable.
+
+    Uses plainto_tsquery which is safe with arbitrary user input (no
+    need to escape special characters). Falls back to a LIKE search if
+    the query produces no ts_rank results (e.g. single-character query).
+    Requires no external API calls.
+    """
+    from sqlalchemy import text as sql_text
+
+    # Build a sanitised list of significant keywords (>= 3 chars)
+    stop_words = {"the", "and", "for", "not", "but", "are", "was", "you",
+                  "that", "this", "with", "have", "from", "they", "will"}
+    keywords = [
+        w.strip("?.,!;:")
+        for w in query.lower().split()
+        if len(w.strip("?.,!;:")) >= 3 and w.strip("?.,!;:") not in stop_words
+    ]
+    tsquery_str = " & ".join(keywords) if keywords else query.split()[0]
+
+    try:
+        result = await session.execute(
+            sql_text(
+                """
+                SELECT dc.content, sd.filename
+                FROM document_chunks dc
+                JOIN source_documents sd ON dc.source_document_id = sd.id
+                WHERE sd.active = true
+                  AND to_tsvector('english', dc.content) @@ plainto_tsquery('english', :q)
+                ORDER BY ts_rank(to_tsvector('english', dc.content), plainto_tsquery('english', :q)) DESC
+                LIMIT :lim
+                """
+            ),
+            {"q": query, "lim": limit},
+        )
+        rows = result.all()
+        if rows:
+            tu.logger.info(f"[FTS_FALLBACK] Found {len(rows)} chunks via full-text search")
+            return rows
+    except Exception as e:
+        tu.logger.warning(f"[FTS_FALLBACK] ts_rank search failed: {e}")
+
+    # Last resort: simple keyword LIKE search
+    try:
+        first_kw = keywords[0] if keywords else query[:20]
+        result = await session.execute(
+            sql_text(
+                """
+                SELECT dc.content, sd.filename
+                FROM document_chunks dc
+                JOIN source_documents sd ON dc.source_document_id = sd.id
+                WHERE sd.active = true
+                  AND dc.content ILIKE :pattern
+                LIMIT :lim
+                """
+            ),
+            {"pattern": f"%{first_kw}%", "lim": limit},
+        )
+        rows = result.all()
+        tu.logger.info(f"[FTS_FALLBACK] LIKE fallback found {len(rows)} chunks")
+        return rows
+    except Exception as e:
+        tu.logger.warning(f"[FTS_FALLBACK] LIKE search also failed: {e}")
+        return []
+
+
 async def _embedding_search_optimized(
     session: AsyncSession,
     model: tt.ModelInterface,
     query: str,
 ) -> list[tuple[str, str]]:
-    """Optimized embedding search with retry + in-memory cache for embeddings."""
+    """Vector similarity search; falls back to full-text search on embedding failure."""
 
-    async with profile_operation("embedding_generation") as op:
-        embedding = await _get_embedding_with_retry(model, query)
-        op.finish(embedding_dimensions=len(embedding))
+    # --- Primary: OpenAI vector embeddings ---
+    try:
+        async with profile_operation("embedding_generation") as op:
+            embedding = await _get_embedding_with_retry(model, query)
+            op.finish(embedding_dimensions=len(embedding))
 
-    async with profile_operation("vector_search") as op:
-        # No similarity threshold — return top 10 most relevant chunks by cosine similarity.
-        # Using ORDER BY max_inner_product (ascending = most similar first for normalised vectors).
-        # Off-topic filtering is handled by _classify_intent before this function is called.
-        sql_query = (
-            select(db.DocumentChunk.content, db.SourceDocument.filename)
-            .join(db.SourceDocument)
-            .where(db.SourceDocument.active == True)
-            .order_by(db.DocumentChunk.embedding.max_inner_product(embedding))
-            .limit(10)
-        )
-        result = await session.execute(sql_query)
-        chunks: list[tuple[str, str]] = result.all()
-        op.finish(chunks_found=len(chunks))
+        async with profile_operation("vector_search") as op:
+            sql_query = (
+                select(db.DocumentChunk.content, db.SourceDocument.filename)
+                .join(db.SourceDocument)
+                .where(db.SourceDocument.active == True)
+                .order_by(db.DocumentChunk.embedding.max_inner_product(embedding))
+                .limit(10)
+            )
+            result = await session.execute(sql_query)
+            chunks: list[tuple[str, str]] = result.all()
+            op.finish(chunks_found=len(chunks))
 
-    return chunks
+        if chunks:
+            return chunks
+        # If vector search returns nothing, fall through to full-text
+        tu.logger.warning("[EMBED_SEARCH] Vector search returned 0 chunks; trying FTS fallback")
+
+    except Exception as e:
+        tu.logger.warning(f"[EMBED_SEARCH] Embedding failed ({e}); using FTS fallback")
+
+    # --- Fallback: PostgreSQL full-text search (no API calls needed) ---
+    return await _fulltext_search_fallback(session, query)
 
 
 
