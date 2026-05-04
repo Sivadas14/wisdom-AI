@@ -209,6 +209,57 @@ def get_app() -> FastAPI:
             "version": os.getenv("GIT_SHA", "unknown"),
         }
 
+    @app.get("/api/debug/rag", tags=["debug"])
+    async def debug_rag(session: db.AsyncSession = Depends(db.get_db_session_fa)):
+        """Temporary diagnostic: checks document_chunks count and embedding call."""
+        import traceback
+        from sqlalchemy import func, text as sql_text
+        from src.settings import get_settings as _gs
+
+        result = {}
+
+        # 1. Count source documents
+        try:
+            r = await session.execute(
+                sql_text("SELECT COUNT(*) FROM source_documents WHERE active = true")
+            )
+            result["active_source_docs"] = r.scalar()
+        except Exception as e:
+            result["active_source_docs_error"] = str(e)
+
+        # 2. Count document chunks
+        try:
+            r = await session.execute(
+                sql_text("SELECT COUNT(*) FROM document_chunks")
+            )
+            result["total_chunks"] = r.scalar()
+        except Exception as e:
+            result["total_chunks_error"] = str(e)
+
+        # 3. Check pgvector extension
+        try:
+            r = await session.execute(
+                sql_text("SELECT extname FROM pg_extension WHERE extname = 'vector'")
+            )
+            row = r.fetchone()
+            result["pgvector_installed"] = row is not None
+        except Exception as e:
+            result["pgvector_error"] = str(e)
+
+        # 4. Test embedding call
+        try:
+            from tuneapi import ta
+            settings = _gs()
+            model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
+            emb = await model.embedding_async("Who am I?", model="text-embedding-3-small")
+            result["embedding_ok"] = True
+            result["embedding_dims"] = len(emb.embedding[0]) if emb.embedding else 0
+        except Exception as e:
+            result["embedding_ok"] = False
+            result["embedding_error"] = str(e)
+
+        return result
+
     def custom_openapi():
         if app.openapi_schema:
             return app.openapi_schema
