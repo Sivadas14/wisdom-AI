@@ -246,14 +246,15 @@ def get_app() -> FastAPI:
         except Exception as e:
             result["pgvector_error"] = str(e)
 
-        # 4. Test embedding call
+        # 4. Test embedding call with retry
         try:
             from tuneapi import ta
+            from src.services.chat import _get_embedding_with_retry
             settings = _gs()
             model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
-            emb = await model.embedding_async("Who am I?", model="text-embedding-3-small")
+            emb = await _get_embedding_with_retry(model, "Who am I?")
             result["embedding_ok"] = True
-            result["embedding_dims"] = len(emb.embedding[0]) if emb.embedding else 0
+            result["embedding_dims"] = len(emb)
         except Exception as e:
             result["embedding_ok"] = False
             result["embedding_error"] = str(e)

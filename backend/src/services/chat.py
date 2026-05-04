@@ -3,6 +3,7 @@ from tuneapi import tt, ta, tu
 import uuid
 import time
 import asyncio
+import hashlib
 from asyncio import sleep
 from textwrap import dedent
 from typing import List
@@ -968,35 +969,80 @@ async def _detect_and_suggest_topic(user_message: str) -> None:
         tu.logger.warning(f"[TOPIC_SUGGEST] Background task error (non-fatal): {e}")
 
 
+# ---------------------------------------------------------------------------
+# Embedding cache — avoids re-calling OpenAI for the same text within a
+# process lifetime. Keyed by SHA-256 of the lowercased query. Max 512 entries
+# (LRU eviction via simple ordered dict). Thread-safe enough for asyncio.
+# ---------------------------------------------------------------------------
+_EMBED_CACHE: dict[str, list[float]] = {}
+_EMBED_CACHE_MAX = 512
+
+
+def _embed_cache_key(text: str) -> str:
+    return hashlib.sha256(text.lower().strip().encode()).hexdigest()
+
+
+async def _get_embedding_with_retry(model: tt.ModelInterface, text: str) -> list[float]:
+    """Fetch embedding with in-memory cache + exponential-backoff retry on 429."""
+    key = _embed_cache_key(text)
+    if key in _EMBED_CACHE:
+        tu.logger.info("[EMBED_CACHE] Cache hit")
+        return _EMBED_CACHE[key]
+
+    last_exc: Exception | None = None
+    delays = [1, 3, 7]  # seconds between retries
+    for attempt, delay in enumerate(delays, start=1):
+        try:
+            resp = await model.embedding_async(text, model="text-embedding-3-small")
+            embedding = resp.embedding[0]
+            # Store in cache (evict oldest if full)
+            if len(_EMBED_CACHE) >= _EMBED_CACHE_MAX:
+                oldest_key = next(iter(_EMBED_CACHE))
+                del _EMBED_CACHE[oldest_key]
+            _EMBED_CACHE[key] = embedding
+            return embedding
+        except Exception as e:
+            last_exc = e
+            err_str = str(e)
+            if "429" in err_str or "Too Many Requests" in err_str:
+                tu.logger.warning(
+                    f"[EMBED_RETRY] OpenAI 429 on attempt {attempt}; "
+                    f"retrying in {delay}s…"
+                )
+                await asyncio.sleep(delay)
+            else:
+                # Non-rate-limit error — don't retry
+                raise
+
+    raise last_exc  # type: ignore[misc]
+
+
 async def _embedding_search_optimized(
     session: AsyncSession,
     model: tt.ModelInterface,
     query: str,
 ) -> list[tuple[str, str]]:
-    """Optimized embedding search - PROFILED"""
-    
+    """Optimized embedding search with retry + in-memory cache for embeddings."""
+
     async with profile_operation("embedding_generation") as op:
-        embedding_response = await model.embedding_async(
-            query, model="text-embedding-3-small"
-        )
-        embedding = embedding_response.embedding[0]
+        embedding = await _get_embedding_with_retry(model, query)
         op.finish(embedding_dimensions=len(embedding))
-    
+
     async with profile_operation("vector_search") as op:
         # No similarity threshold — return top 10 most relevant chunks by cosine similarity.
         # Using ORDER BY max_inner_product (ascending = most similar first for normalised vectors).
         # Off-topic filtering is handled by _classify_intent before this function is called.
-        query = (
+        sql_query = (
             select(db.DocumentChunk.content, db.SourceDocument.filename)
             .join(db.SourceDocument)
             .where(db.SourceDocument.active == True)
             .order_by(db.DocumentChunk.embedding.max_inner_product(embedding))
             .limit(10)
         )
-        result = await session.execute(query)
+        result = await session.execute(sql_query)
         chunks: list[tuple[str, str]] = result.all()
         op.finish(chunks_found=len(chunks))
-    
+
     return chunks
 
 
