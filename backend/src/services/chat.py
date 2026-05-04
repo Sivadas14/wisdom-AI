@@ -983,19 +983,13 @@ async def _embedding_search_optimized(
         op.finish(embedding_dimensions=len(embedding))
     
     async with profile_operation("vector_search") as op:
-        # SIMILARITY THRESHOLD: max_inner_product returns negative inner product.
-        # For normalised OpenAI embeddings, cosine similarity = inner product.
-        # Filtering <= -0.35 means only chunks with cosine similarity >= 0.35 pass through.
-        # 0.35 is calibrated for text-embedding-3-small: short queries like "Who am I?"
-        # produce lower scores than long passages even when perfectly relevant, so 0.50
-        # was too aggressive. Off-topic content (sports, food, news) scores < 0.20 and
-        # is still filtered out. Ramana-topic queries consistently score 0.35-0.70.
-        SIMILARITY_THRESHOLD = 0.35
+        # No similarity threshold — return top 10 most relevant chunks by cosine similarity.
+        # Using ORDER BY max_inner_product (ascending = most similar first for normalised vectors).
+        # Off-topic filtering is handled by _classify_intent before this function is called.
         query = (
             select(db.DocumentChunk.content, db.SourceDocument.filename)
             .join(db.SourceDocument)
             .where(db.SourceDocument.active == True)
-            .where(db.DocumentChunk.embedding.max_inner_product(embedding) <= -SIMILARITY_THRESHOLD)
             .order_by(db.DocumentChunk.embedding.max_inner_product(embedding))
             .limit(10)
         )
