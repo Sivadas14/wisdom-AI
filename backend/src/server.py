@@ -268,6 +268,21 @@ def get_app() -> FastAPI:
         except Exception as e:
             result["fts_fallback_error"] = str(e)
 
+        # 6. Test chat_async with minimal thread (same as contemplation)
+        try:
+            from tuneapi import ta, tt
+            settings2 = _gs()
+            model2 = ta.Openai(id="gpt-4o", api_token=settings2.openai_token)
+            from tuneapi import tt as tt2
+            test_thread = tt2.Thread(tt2.system("You are a helpful assistant."))
+            test_thread.append(tt2.Message("Say hello in 3 words.", "user"))
+            resp = await model2.chat_async(test_thread)
+            result["chat_async_ok"] = True
+            result["chat_async_response"] = str(resp.content if hasattr(resp, "content") else resp)[:100]
+        except Exception as e:
+            result["chat_async_ok"] = False
+            result["chat_async_error"] = str(e)
+
         return result
 
     def custom_openapi():
