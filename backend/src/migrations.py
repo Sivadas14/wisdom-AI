@@ -675,6 +675,116 @@ async def _create_suggested_topics_table(session: AsyncSession) -> None:
     _log("suggested_topics table verified/created.")
 
 
+async def _enable_row_level_security(session: AsyncSession) -> None:
+    """Enable Row Level Security on every table in the public schema.
+
+    WHY THIS IS SAFE FOR THE APPLICATION:
+    The backend connects to PostgreSQL as the 'postgres' superuser via
+    ASAM_DB_URL. PostgreSQL superusers and table owners bypass RLS
+    automatically — application queries are completely unaffected.
+
+    WHAT THIS FIXES:
+    The Supabase PostgREST API is accessible at the public Supabase URL
+    using the anon key (which is embedded in frontend JavaScript). Without
+    RLS, anyone can query, modify, or delete all rows in every table via
+    the REST API. Enabling RLS with no permissive policies means the
+    PostgREST API returns empty results / permission denied for all tables.
+
+    POLICIES ADDED:
+    - plans, plan_prices, plan_features: public read-only (pricing page data)
+    - daily_contemplations: public read-only (landing page quote)
+    - All other tables: no public access (deny by default)
+
+    This is idempotent: ALTER TABLE ... ENABLE ROW LEVEL SECURITY and
+    CREATE POLICY IF NOT EXISTS are both safe to run multiple times.
+    """
+    _log("Enabling Row Level Security on all public tables...")
+
+    # Step 1: Enable RLS on every table in the public schema dynamically.
+    # Using a PL/pgSQL block so we don't need to hardcode table names.
+    await session.execute(text("""
+        DO $$
+        DECLARE
+            tbl TEXT;
+        BEGIN
+            FOR tbl IN
+                SELECT tablename
+                FROM pg_tables
+                WHERE schemaname = 'public'
+            LOOP
+                EXECUTE format(
+                    'ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl
+                );
+            END LOOP;
+        END $$;
+    """))
+    await session.commit()
+    _log("RLS enabled on all tables.")
+
+    # Step 2: Add read-only public policies for tables that the landing page
+    # pricing/UI legitimately needs to expose via the Supabase JS client.
+    # These use SELECT only — no INSERT/UPDATE/DELETE allowed for anon.
+    public_read_tables = [
+        "plans",
+        "plan_prices",
+        "plan_features",
+        "plan_features_v1",
+        "features",
+        "daily_contemplations",
+        "notification_bar",
+        "addon_types",
+    ]
+    for tbl in public_read_tables:
+        await session.execute(text(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE schemaname = 'public'
+                      AND tablename = '{tbl}'
+                      AND policyname = 'public_read_{tbl}'
+                ) THEN
+                    EXECUTE format(
+                        'CREATE POLICY public_read_{tbl} ON public.{tbl}
+                         FOR SELECT USING (true)'
+                    );
+                END IF;
+            END $$;
+        """))
+    await session.commit()
+    _log(f"Public read policies set for: {', '.join(public_read_tables)}")
+
+    # Step 3: Authenticated users can read/write their own rows.
+    # Uses auth.uid() which Supabase sets from the JWT token.
+    user_own_tables = [
+        ("user_profiles",        "auth_user_id = auth.uid()"),
+        ("conversations",        "user_id IN (SELECT id FROM user_profiles WHERE auth_user_id = auth.uid())"),
+        ("subscriptions",        "user_id IN (SELECT id FROM user_profiles WHERE auth_user_id = auth.uid())"),
+        ("content_generations",  "user_id IN (SELECT id FROM user_profiles WHERE auth_user_id = auth.uid())"),
+        ("user_addons",          "user_id IN (SELECT id FROM user_profiles WHERE auth_user_id = auth.uid())"),
+    ]
+    for tbl, condition in user_own_tables:
+        await session.execute(text(f"""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_policies
+                    WHERE schemaname = 'public'
+                      AND tablename = '{tbl}'
+                      AND policyname = 'user_own_{tbl}'
+                ) THEN
+                    EXECUTE format(
+                        'CREATE POLICY user_own_{tbl} ON public.{tbl}
+                         FOR ALL USING ({condition})'
+                    );
+                END IF;
+            END $$;
+        """))
+    await session.commit()
+    _log("User-scoped RLS policies set for personal data tables.")
+    _log("Row Level Security migration complete.")
+
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -713,3 +823,9 @@ async def run_migrations(session_factory) -> None:
 
         # ── Feature text updates (runs after limit pass so plan rows exist) ───
         await _safe_migration(session, "_update_plan_feature_texts", _update_plan_feature_texts)
+
+        # ── Security: enable Row Level Security on all public tables ───────────
+        # Blocks the Supabase PostgREST API (anon key) from reading/writing data.
+        # The backend's direct PostgreSQL connection uses the postgres superuser
+        # which bypasses RLS automatically — no application code changes needed.
+        await _safe_migration(session, "_enable_row_level_security", _enable_row_level_security)
