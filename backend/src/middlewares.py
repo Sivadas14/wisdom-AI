@@ -589,7 +589,6 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/v1/topics",         # Public topics list — no auth required
         "/api/translate",         # Public translation gateway (added 2026-05-01)
         "/api/page/",             # Public page-content resolver (added 2026-05-01)
-        "/api/admin/storage-audit",  # Temporary storage audit (remove after use)
     ]
 
     if any(request.url.path.startswith(path) for path in public_paths):

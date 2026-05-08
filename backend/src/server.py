@@ -64,6 +64,7 @@ from src.translation.page_resolver import router as translation_page_router
 from src.services.dashboard import router as dashboard_router
 from src.services.ramana_images import router as ramana_images_router
 from src.migrations import run_migrations
+from src.services.cleanup import run_daily_storage_cleanup_loop
 
 async def _setup_db(app: FastAPI):
     print("[TRACE] _setup_db() start")
@@ -147,6 +148,8 @@ async def lifespan(app: FastAPI):
     # root cause of every silent reversion.
     asyncio.create_task(_startup_tasks(app))
     asyncio.create_task(background_image_pregeneration())
+    # Storage cleanup — runs once at startup (after 60s delay) then every 24h
+    asyncio.create_task(_run_cleanup_loop(app))
     print("[TRACE] lifespan() yielding — server ready (startup runs in background)")
     tu.logger.info("Background startup tasks scheduled. Server accepting requests.")
 
@@ -166,13 +169,35 @@ async def background_image_pregeneration():
     """Pre-generate images in background after server startup"""
     # Wait a bit for server to fully start
     await asyncio.sleep(30)  # Wait 30 seconds after startup
-    
+
     try:
         tu.logger.info("Starting background image pre-generation...")
         await pre_generate_common_images()
     except Exception as e:
         tu.logger.error(f"Background image pre-generation failed: {e}")
         # Don't crash the server if this fails
+
+
+async def _run_cleanup_loop(app: FastAPI):
+    """
+    Wait for the DB session factory to be ready (set by _startup_tasks),
+    then hand off to the daily storage cleanup loop.
+    Polls every 5 s for up to 2 min before giving up.
+    """
+    for _ in range(24):   # 24 × 5s = 2 minutes max wait
+        factory = getattr(app.state, "db_session_factory", None)
+        if factory is not None:
+            break
+        await asyncio.sleep(5)
+    else:
+        tu.logger.warning("[CLEANUP] DB session factory never became available — skipping cleanup loop")
+        return
+
+    tu.logger.info("[CLEANUP] DB ready — starting daily storage cleanup loop")
+    try:
+        await run_daily_storage_cleanup_loop(app.state.db_session_factory)
+    except Exception as e:
+        tu.logger.error(f"[CLEANUP] Cleanup loop exited unexpectedly: {e}")
 
 
 
@@ -208,96 +233,6 @@ def get_app() -> FastAPI:
             "service": "Arunachala Samudra API",
             "version": os.getenv("GIT_SHA", "unknown"),
         }
-
-    @app.get("/api/admin/storage-audit", tags=["admin"])
-    async def storage_audit(session: db.AsyncSession = Depends(db.get_db_session_fa)):
-        """DB + Storage size breakdown for capacity planning. No auth needed (internal use)."""
-        from sqlalchemy import text as sql_text
-        from src.settings import get_supabase_admin_client, get_settings as _gs
-
-        result = {}
-
-        # 1. Top tables by total size (data + indexes)
-        try:
-            r = await session.execute(sql_text("""
-                SELECT
-                    relname AS table_name,
-                    pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size,
-                    pg_total_relation_size(c.oid) AS total_bytes,
-                    pg_size_pretty(pg_relation_size(c.oid)) AS data_size,
-                    pg_size_pretty(pg_indexes_size(c.oid)) AS index_size
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'public' AND c.relkind = 'r'
-                ORDER BY pg_total_relation_size(c.oid) DESC
-                LIMIT 15
-            """))
-            result["top_tables"] = [dict(row._mapping) for row in r.all()]
-        except Exception as e:
-            result["top_tables_error"] = str(e)
-
-        # 2. Total DB size
-        try:
-            r = await session.execute(sql_text("SELECT pg_size_pretty(pg_database_size(current_database())) AS db_size, pg_database_size(current_database()) AS db_bytes"))
-            row = r.fetchone()
-            result["total_db_size"] = row.db_size if row else "unknown"
-            result["total_db_bytes"] = row.db_bytes if row else 0
-        except Exception as e:
-            result["total_db_size_error"] = str(e)
-
-        # 3. Row counts for large tables
-        try:
-            r = await session.execute(sql_text("""
-                SELECT 'guest_sessions' AS tbl, COUNT(*) AS cnt FROM guest_sessions
-                UNION ALL SELECT 'document_chunks', COUNT(*) FROM document_chunks
-                UNION ALL SELECT 'messages', COUNT(*) FROM messages
-                UNION ALL SELECT 'content_generations', COUNT(*) FROM content_generations
-                UNION ALL SELECT 'daily_contemplations', COUNT(*) FROM daily_contemplations
-                UNION ALL SELECT 'conversations', COUNT(*) FROM conversations
-            """))
-            result["row_counts"] = {row.tbl: row.cnt for row in r.all()}
-        except Exception as e:
-            result["row_counts_error"] = str(e)
-
-        # 4. Supabase Storage bucket sizes using service role
-        try:
-            settings_obj = _gs()
-            spb = get_supabase_admin_client(settings_obj)
-            # Query storage.objects for size by prefix
-            r2 = await session.execute(sql_text("""
-                SELECT
-                    SPLIT_PART(name, '/', 1) AS folder,
-                    COUNT(*) AS file_count,
-                    pg_size_pretty(SUM((metadata->>'size')::bigint)) AS total_size,
-                    SUM((metadata->>'size')::bigint) AS total_bytes,
-                    MIN(created_at) AS oldest_file,
-                    MAX(created_at) AS newest_file
-                FROM storage.objects
-                WHERE bucket_id = 'generations'
-                GROUP BY folder
-                ORDER BY total_bytes DESC NULLS LAST
-            """))
-            result["storage_generations"] = [dict(row._mapping) for row in r2.all()]
-        except Exception as e:
-            result["storage_generations_error"] = str(e)
-
-        # 5. All storage buckets summary
-        try:
-            r3 = await session.execute(sql_text("""
-                SELECT
-                    bucket_id,
-                    COUNT(*) AS file_count,
-                    pg_size_pretty(SUM((metadata->>'size')::bigint)) AS total_size,
-                    SUM((metadata->>'size')::bigint) AS total_bytes
-                FROM storage.objects
-                GROUP BY bucket_id
-                ORDER BY total_bytes DESC NULLS LAST
-            """))
-            result["storage_all_buckets"] = [dict(row._mapping) for row in r3.all()]
-        except Exception as e:
-            result["storage_all_buckets_error"] = str(e)
-
-        return result
 
     def custom_openapi():
         if app.openapi_schema:
