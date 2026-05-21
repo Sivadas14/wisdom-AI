@@ -773,16 +773,34 @@ function GuestChatSection() {
   // currently sees on the rest of the page.
   //
   // Polls every 2 s. Idempotent: if currentLang === messagesLang, no-op.
-  // Aborts in-flight retranslations on unmount or rapid re-switches.
+  //
+  // CRITICAL: an `inFlightTarget` guard prevents the polling tick from
+  // aborting its own in-flight retranslation. Without this guard, longer
+  // translations (Indic → English, Indic → Chinese, Indic → Arabic — these
+  // routinely take 3–5 s) get cancelled every 2 s by the next polling tick,
+  // leaving the chat stuck in its previous language. With the guard, a
+  // retranslation aiming at the current target is allowed to finish; we
+  // only abort if the user has switched to a DIFFERENT target.
   useEffect(() => {
     let cancelled = false;
     let activeAbort: AbortController | null = null;
+    let inFlightTarget: string | null = null;  // language we're currently translating TO
 
     const checkAndRetranslate = async () => {
       if (cancelled) return;
       const currentLang = detectLang();
       const messagesLang = getMessagesLang();
       if (currentLang === messagesLang) return;
+
+      // Already retranslating to this exact target — let it finish. Without
+      // this guard the polling tick (every 2 s) aborts in-flight calls that
+      // need 3–5 s (common for Indic↔English / Indic↔Chinese / Indic↔Arabic)
+      // and the chat stays stuck in its old language.
+      if (inFlightTarget === currentLang) return;
+
+      // A different target is in flight (user switched languages mid-call) —
+      // abort the old one, start a new one.
+      if (activeAbort) activeAbort.abort();
 
       const currentMessages = messagesLatestRef.current;
       if (currentMessages.length === 0) {
@@ -791,28 +809,37 @@ function GuestChatSection() {
         return;
       }
 
-      // Cancel any previous in-flight retranslation
-      if (activeAbort) activeAbort.abort();
+      const fromLang = messagesLang;  // capture before await so it's stable
+      inFlightTarget = currentLang;
       activeAbort = new AbortController();
       const sig = activeAbort.signal;
 
-      // Translate all messages in parallel. Each call is independent and
-      // small; with our ~5-message guest-chat cap this is at most 5
-      // concurrent translate requests — well within rate limits.
-      const translated = await Promise.all(
-        currentMessages.map(async (m) => {
-          if (!m.content || !m.content.trim()) return m;
-          const newContent = await translateChatMessage(
-            m.content, messagesLang, currentLang, sig
-          );
-          return { ...m, content: newContent };
-        })
-      );
+      try {
+        // Translate all messages in parallel. Each call is independent and
+        // small; with our ~5-message guest-chat cap this is at most ~10
+        // concurrent translate requests — well within rate limits.
+        const translated = await Promise.all(
+          currentMessages.map(async (m) => {
+            if (!m.content || !m.content.trim()) return m;
+            const newContent = await translateChatMessage(
+              m.content, fromLang, currentLang, sig
+            );
+            return { ...m, content: newContent };
+          })
+        );
 
-      if (cancelled || sig.aborted) return;
-      setMessages(translated);
-      saveMsgs(translated);
-      setMessagesLangStored(currentLang);
+        if (cancelled || sig.aborted) return;
+        // Re-confirm the user is still on this language. If they switched
+        // again mid-call, discard these results — the next polling tick
+        // will pick up the new target.
+        if (detectLang() !== currentLang) return;
+
+        setMessages(translated);
+        saveMsgs(translated);
+        setMessagesLangStored(currentLang);
+      } finally {
+        if (inFlightTarget === currentLang) inFlightTarget = null;
+      }
     };
 
     // Run once on mount in case messages from a previous session need to
