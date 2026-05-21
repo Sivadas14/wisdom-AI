@@ -1,9 +1,13 @@
 name: Daily Health Monitor
 
 on:
-  # Run every day at 8:00 AM IST (02:30 UTC)
+  # Run 4× / day at 6 AM, 12 PM, 6 PM, 11 PM IST.
+  # GitHub Actions cron uses UTC. IST = UTC+5:30.
   schedule:
-    - cron: "30 2 * * *"
+    - cron: "30 0 * * *"   #  6:00 AM IST  (00:30 UTC)
+    - cron: "30 6 * * *"   # 12:00 PM IST  (06:30 UTC)
+    - cron: "30 12 * * *"  #  6:00 PM IST  (12:30 UTC)
+    - cron: "30 17 * * *"  # 11:00 PM IST  (17:30 UTC)
 
   # Also allow manual run from GitHub Actions tab at any time
   workflow_dispatch:
