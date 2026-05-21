@@ -216,6 +216,126 @@ const Chat = () => {
     }
   }, [conversationId]);
 
+  // ── Retranslate chat history on language change ────────────────────────────
+  // The post-login chat lives behind MainLayout, which mounts the GTranslate
+  // floating widget. When the user picks a different language, GTranslate
+  // translates the visible page DOM in-place — but our chat messages live in
+  // React state, so the rendered text gets out of sync after any subsequent
+  // re-render. This effect mirrors the Landing-page guest-chat behaviour:
+  // poll the googtrans cookie every 2 s, and when the current viewing
+  // language differs from the language we last rendered the messages in,
+  // call /api/translate on each message and overwrite state with the result.
+  //
+  // The inFlightTarget guard is critical — without it the polling tick (2 s)
+  // aborts in-flight calls that need 3–5 s for Indic ↔ English / Chinese /
+  // Arabic, leaving the chat stuck in the previous language. With the guard,
+  // a retranslation aimed at the current target is allowed to finish; we
+  // only abort if the user has switched to a DIFFERENT target mid-call.
+  useEffect(() => {
+    let cancelled = false;
+    let activeAbort: AbortController | null = null;
+    let inFlightTarget: string | null = null;
+    // Track what language the rendered messages are currently in. Defaults
+    // to the language the user is viewing the page in at mount time, which
+    // is the best guess for the most common case (user opens /chat in their
+    // preferred locale, server returns messages in that locale). Edge case:
+    // user opens an old conversation that was carried out in a different
+    // language — the messages will be retranslated on the first language
+    // switch via the regular polling logic.
+    const initialDetect = (): string => {
+      const gt = document.cookie.match(/googtrans=\/[^/]+\/([a-zA-Z-]+)/);
+      if (gt && gt[1]) {
+        const code = gt[1].toLowerCase();
+        if (code === "zh-cn") return "zh-CN";
+        if (code === "zh-tw") return "zh-TW";
+        return code;
+      }
+      return "en";
+    };
+    let renderedLang: string = initialDetect();
+
+    const detectLang = initialDetect;
+
+    const translateOne = async (
+      text: string, from: string, to: string, sig: AbortSignal,
+    ): Promise<string> => {
+      if (!text || !text.trim() || from === to) return text;
+      try {
+        const res = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, source_lang: from, target_lang: to }),
+          signal: sig,
+        });
+        if (!res.ok) return text;
+        const data = await res.json();
+        if (data?.success && data?.data?.translated) {
+          return data.data.translated as string;
+        }
+      } catch { /* swallow — fall through to source text */ }
+      return text;
+    };
+
+    const checkAndRetranslate = async () => {
+      if (cancelled) return;
+      const currentLang = detectLang();
+      if (currentLang === renderedLang) return;
+
+      // Already retranslating to this exact target — let it finish (don't
+      // abort our own in-flight call on every 2-s tick).
+      if (inFlightTarget === currentLang) return;
+
+      // Different target in flight (user switched again mid-call) — abort
+      // the old one, start a new one.
+      if (activeAbort) activeAbort.abort();
+
+      const currentMessages = messagesRef.current;
+      if (currentMessages.length === 0) {
+        renderedLang = currentLang;
+        return;
+      }
+
+      const fromLang = renderedLang;  // capture before await
+      inFlightTarget = currentLang;
+      activeAbort = new AbortController();
+      const sig = activeAbort.signal;
+
+      try {
+        const translated = await Promise.all(
+          currentMessages.map(async (m) => {
+            const newContent = await translateOne(
+              m.content || "", fromLang, currentLang, sig,
+            );
+            const newThinking = m.thinking
+              ? await translateOne(m.thinking, fromLang, currentLang, sig)
+              : m.thinking;
+            return { ...m, content: newContent, thinking: newThinking };
+          })
+        );
+
+        if (cancelled || sig.aborted) return;
+        // Re-confirm the user is still on this language — discard stale
+        // results if they switched again mid-call.
+        if (detectLang() !== currentLang) return;
+
+        setMessages(translated);
+        renderedLang = currentLang;
+      } finally {
+        if (inFlightTarget === currentLang) inFlightTarget = null;
+      }
+    };
+
+    checkAndRetranslate();
+    const interval = window.setInterval(checkAndRetranslate, 2000);
+
+    return () => {
+      cancelled = true;
+      if (activeAbort) activeAbort.abort();
+      window.clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Polling hook for all content generations
   useEffect(() => {
     // Collect all pending/processing content IDs from all messages
