@@ -12,6 +12,7 @@ All clients are async (httpx.AsyncClient) and read keys from src.settings.Settin
 """
 from __future__ import annotations
 
+import re
 import httpx
 from tuneapi import tu
 
@@ -29,16 +30,48 @@ _SARVAM_LANG_MAP = {
     "ur": "ur-IN", "en": "en-IN",
 }
 
+# Sarvam Mayura translate endpoint hard limit: ~990 chars per request.
+# We use 900 to leave a safe margin.
+SARVAM_MAX_CHARS = 900
+
 
 def _sarvam_lang(code: str) -> str:
     return _SARVAM_LANG_MAP.get(code, code)
 
 
-async def call_sarvam(text: str, target: str, source: str = "en", timeout: float = 10.0) -> str:
-    """Translate via Sarvam Mayura.
+def _split_text_into_chunks(text: str, max_chars: int) -> list[str]:
+    """Split text at sentence boundaries to stay within max_chars per chunk.
 
-    Raises httpx.HTTPError on network/HTTP failures — caller handles failover.
+    Tries to split at '.', '!', '?' followed by whitespace. If a single
+    sentence exceeds max_chars it is hard-split at the character boundary.
     """
+    # Split on sentence-ending punctuation followed by whitespace
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    chunks: list[str] = []
+    current = ""
+    for sent in sentences:
+        candidate = (current + " " + sent).strip() if current else sent
+        if len(candidate) <= max_chars:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            # Sentence itself longer than limit → hard split
+            if len(sent) > max_chars:
+                for i in range(0, len(sent), max_chars):
+                    chunks.append(sent[i : i + max_chars])
+                current = ""
+            else:
+                current = sent
+    if current:
+        chunks.append(current)
+    return chunks or [text]
+
+
+async def _call_sarvam_single(
+    text: str, target: str, source: str, timeout: float
+) -> str:
+    """Make one Sarvam API call for text that is already within the char limit."""
     settings = get_settings()
     headers = {
         "api-subscription-key": settings.sarvam_api_key,
@@ -62,6 +95,29 @@ async def call_sarvam(text: str, target: str, source: str = "en", timeout: float
         r.raise_for_status()
         data = r.json()
     return data.get("translated_text", "") or ""
+
+
+async def call_sarvam(text: str, target: str, source: str = "en", timeout: float = 10.0) -> str:
+    """Translate via Sarvam Mayura.
+
+    Automatically chunks texts that exceed SARVAM_MAX_CHARS (900) so that
+    long assistant responses (1000+ chars) don't silently fall back to English.
+
+    Raises httpx.HTTPError on network/HTTP failures — caller handles failover.
+    """
+    if len(text) <= SARVAM_MAX_CHARS:
+        return await _call_sarvam_single(text, target, source, timeout)
+
+    # Long text: translate chunk by chunk and rejoin
+    chunks = _split_text_into_chunks(text, SARVAM_MAX_CHARS)
+    tu.logger.info(
+        f"[SARVAM] Long text ({len(text)} chars) split into {len(chunks)} chunks"
+    )
+    translated_parts: list[str] = []
+    for chunk in chunks:
+        part = await _call_sarvam_single(chunk, target, source, timeout)
+        translated_parts.append(part)
+    return " ".join(translated_parts)
 
 
 # ---------------------------------------------------------------------------
