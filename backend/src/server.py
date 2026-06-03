@@ -15,7 +15,7 @@ from tuneapi import tu
 import os
 import asyncio
 from fastapi import FastAPI, Depends
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -367,7 +367,72 @@ def get_app() -> FastAPI:
 
     # Redundant health check removed (consolidated above)
 
-    # Catch-all route for SPA (Single Page Application) - must be last
+    # ── SEO: robots.txt ────────────────────────────────────────────────────────
+    @app.get("/robots.txt", include_in_schema=False)
+    async def robots_txt():
+        """robots.txt — allow all crawlers; point to sitemap."""
+        content = "\n".join([
+            "User-agent: *",
+            "Allow: /",
+            "",
+            "# Disallow internal app routes that should not be indexed",
+            "Disallow: /admin/",
+            "Disallow: /callback",
+            "Disallow: /profile-completion",
+            "Disallow: /reset-password",
+            "Disallow: /api/",
+            "",
+            "Sitemap: https://www.arunachalasamudra.com/sitemap.xml",
+            "Sitemap: https://www.arunachalasamudra.co.in/sitemap.xml",
+        ])
+        return Response(content=content, media_type="text/plain")
+
+    # ── SEO: XML Sitemap ───────────────────────────────────────────────────────
+    @app.get("/sitemap.xml", include_in_schema=False)
+    async def sitemap_xml():
+        """
+        Dynamic XML sitemap served by the backend so Google can discover
+        all public pages regardless of SPA client-side routing.
+
+        Add new public routes here as the platform grows.
+        """
+        from datetime import date
+        today = date.today().isoformat()
+
+        # Static pages with their change frequency and priority
+        static_pages = [
+            ("",               "daily",   "1.0"),   # homepage / AI chat
+            ("privacy",        "yearly",  "0.3"),
+            ("terms",          "yearly",  "0.3"),
+            ("signin",         "monthly", "0.4"),
+            ("register",       "monthly", "0.4"),
+        ]
+
+        urls = []
+        base = "https://www.arunachalasamudra.com"
+        for path, changefreq, priority in static_pages:
+            loc = f"{base}/{path}" if path else base
+            urls.append(
+                f"  <url>\n"
+                f"    <loc>{loc}</loc>\n"
+                f"    <lastmod>{today}</lastmod>\n"
+                f"    <changefreq>{changefreq}</changefreq>\n"
+                f"    <priority>{priority}</priority>\n"
+                f"  </url>"
+            )
+
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+            '        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n'
+            '        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9\n'
+            '        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">\n'
+            + "\n".join(urls) +
+            "\n</urlset>"
+        )
+        return Response(content=xml, media_type="application/xml")
+
+    # ── Catch-all route for SPA (Single Page Application) - must be last ──────
     ui_path = tu.joinp(tu.folder(__file__), "ui")
 
     # ── Permanent 301 redirects for typos / old URLs ────────────────────────

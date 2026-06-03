@@ -20,6 +20,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
 import i18n, { SUPPORTED_LNG_CODES, RTL_LANGS } from "@/i18n";
 import { TEACHINGS } from "@/data/teachings";
@@ -1934,8 +1935,84 @@ export default function Landing() {
     return () => window.clearInterval(id);
   }, []);
 
+  // ── Schema.org JSON-LD structured data ─────────────────────────────────────
+  const schemaOrg = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://www.arunachalasamudra.com/#website",
+        "url": "https://www.arunachalasamudra.com",
+        "name": "Arunachala Samudra",
+        "description": "Explore the authentic teachings of Sri Ramana Maharshi. Ask questions, deepen your practice, and discover the wisdom of self-enquiry and silence.",
+        "publisher": { "@id": "https://www.arunachalasamudra.com/#organization" },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": { "@type": "EntryPoint", "urlTemplate": "https://www.arunachalasamudra.com/search?q={search_term_string}" },
+          "query-input": "required name=search_term_string",
+        },
+        "inLanguage": "en-US",
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://www.arunachalasamudra.com/#organization",
+        "name": "Arunachala Samudra",
+        "url": "https://www.arunachalasamudra.com",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://www.arunachalasamudra.com/images/Favicon/Favicon-Primary.png",
+        },
+        "sameAs": [
+          "https://www.arunachalasamudra.co.in",
+          "https://www.arunachalasamudra.in",
+        ],
+        "description": "A sacred digital platform offering the authentic teachings of Sri Ramana Maharshi through AI-powered wisdom guidance, multilingual support, and contemplative tools.",
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://www.arunachalasamudra.com/#webapp",
+        "name": "Arunachala Samudra — Wisdom of Sri Ramana Maharshi",
+        "url": "https://www.arunachalasamudra.com",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web",
+        "description": "An AI-powered wisdom assistant grounded in the authentic teachings of Sri Ramana Maharshi. Ask questions in 15 languages and receive source-cited answers from Bhagavan's recorded talks and writings.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free access to 20 conversations and 5 contemplation cards. Seeker and Devotee plans available.",
+        },
+      },
+      {
+        "@type": "Person",
+        "@id": "https://www.arunachalasamudra.com/#ramana-maharshi",
+        "name": "Sri Ramana Maharshi",
+        "alternateName": ["Bhagavan Sri Ramana Maharshi", "Ramana Maharshi", "Bhagavan"],
+        "birthDate": "1879-12-30",
+        "deathDate": "1950-04-14",
+        "birthPlace": { "@type": "Place", "name": "Tiruchuzhi, Tamil Nadu, India" },
+        "description": "Sri Ramana Maharshi (1879–1950) was an Indian Hindu sage and jivanmukta. He is widely regarded as one of the outstanding Indian philosophers of the modern era. His primary teaching was the practice of self-enquiry — the direct investigation into one's own nature by asking 'Who Am I?'",
+        "sameAs": [
+          "https://en.wikipedia.org/wiki/Ramana_Maharshi",
+          "https://www.sriramanamaharshi.org",
+        ],
+        "knowsAbout": ["Self-enquiry", "Advaita Vedanta", "Jnana Yoga", "Silence", "Arunachala"],
+      },
+    ],
+  };
+
   return (
     <div style={{ backgroundColor: T.cream, scrollBehavior: "smooth" }} className="min-h-screen overflow-x-hidden">
+      {/* ── Schema.org + per-page meta (react-helmet-async) ────────────────── */}
+      <Helmet>
+        <title>Arunachala Samudra — Wisdom of Sri Ramana Maharshi</title>
+        <meta name="description" content="Explore the authentic teachings of Sri Ramana Maharshi. Ask questions in 15 languages, receive source-cited answers, and deepen your self-enquiry practice." />
+        <link rel="canonical" href="https://www.arunachalasamudra.com" />
+        <meta property="og:url" content="https://www.arunachalasamudra.com" />
+        <meta property="og:image" content="https://www.arunachalasamudra.com/images/og-image.png" />
+        <meta name="twitter:image" content="https://www.arunachalasamudra.com/images/og-image.png" />
+        <script type="application/ld+json">{JSON.stringify(schemaOrg)}</script>
+      </Helmet>
       {showIntro && <IntroScreen onDone={handleIntroDone} />}
       {showOnboarding && <RamanaOnboardingModal onClose={handleOnboardingClose} />}
       <div className="gtranslate_wrapper" />

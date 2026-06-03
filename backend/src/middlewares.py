@@ -589,6 +589,10 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/api/v1/topics",         # Public topics list — no auth required
         "/api/translate",         # Public translation gateway (added 2026-05-01)
         "/api/page/",             # Public page-content resolver (added 2026-05-01)
+        "/sitemap.xml",           # SEO — must be publicly crawlable by Googlebot
+        "/robots.txt",            # SEO — must be publicly crawlable by Googlebot
+        "/api/addon/",            # Public add-on types — no auth required
+        "/api/features/",         # Public features list — no auth required
     ]
 
     if any(request.url.path.startswith(path) for path in public_paths):
