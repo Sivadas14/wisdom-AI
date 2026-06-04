@@ -71,4 +71,50 @@ def json_to_row(j):
 
 
 def load_rows():
-    return [json_to_row(json.load(open(f))) for f in sorted(glob.glob(JSON_DIR + "/*.json"))]
+    return [json_to_row(json.load(open(f, encoding='utf-8'))) for f in sorted(glob.glob(JSON_DIR + "/*.json"))]
+
+
+# ---------------------------------------------------------------------------
+# Shared async seeder — used by startup migration AND the diagnostic endpoint.
+# Commits per row so one bad row never discards the good ones.
+# ---------------------------------------------------------------------------
+_UPSERT_SQL = """
+INSERT INTO pages (slug,title,body,meta_description,og_image,canonical_path,
+                   schema_json,metadata,lang,source_url,published)
+VALUES (:slug,:title,:body,:meta_description,:og_image,:canonical_path,
+        CAST(:schema_json AS jsonb),CAST(:metadata AS jsonb),:lang,:source_url,:published)
+ON CONFLICT (slug) DO UPDATE SET
+    title=EXCLUDED.title, body=EXCLUDED.body,
+    meta_description=EXCLUDED.meta_description, og_image=EXCLUDED.og_image,
+    canonical_path=EXCLUDED.canonical_path, schema_json=EXCLUDED.schema_json,
+    metadata=EXCLUDED.metadata, lang=EXCLUDED.lang,
+    source_url=EXCLUDED.source_url, published=EXCLUDED.published,
+    last_updated=timezone('UTC', now())
+"""
+
+
+async def upsert_pages(session, rows=None):
+    """Upsert page rows; returns (inserted_count, first_error_or_None)."""
+    import json as _json
+    from sqlalchemy import text as _text
+    if rows is None:
+        rows = load_rows()
+    inserted = 0
+    first_error = None
+    for p in rows:
+        try:
+            await session.execute(_text(_UPSERT_SQL), {
+                **p,
+                "schema_json": _json.dumps(p["schema_json"]) if p.get("schema_json") else None,
+                "metadata": _json.dumps(p.get("metadata") or {}),
+            })
+            await session.commit()
+            inserted += 1
+        except Exception as e:
+            try:
+                await session.rollback()
+            except Exception:
+                pass
+            if first_error is None:
+                first_error = f"{p.get('slug')}: {e!r}"
+    return inserted, first_error
