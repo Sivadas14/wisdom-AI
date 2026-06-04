@@ -14,7 +14,7 @@ from tuneapi import tu
 
 import os
 import asyncio
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response, HTMLResponse
 from src.content_pages import get_published_page, render_content_page
 from fastapi.staticfiles import StaticFiles
@@ -370,8 +370,8 @@ def get_app() -> FastAPI:
 
     # ── TEMP diagnostic + reseed (non-/api so it bypasses JWT auth; remove later) ──
     @app.get("/_diag/content", include_in_schema=False)
-    async def _diag_content():
-        import os as _os
+    async def _diag_content(request: Request):
+        import os as _os, traceback as _tb
         from sqlalchemy import text as _t
         out = {}
         rows = []
@@ -385,42 +385,47 @@ def get_app() -> FastAPI:
             )
             rows = _cd.load_rows()
             out["loaded"] = len(rows)
-        except Exception as e:
-            out["load_error"] = repr(e)
-        _sess = db.get_db_session(sync=False)
+        except Exception:
+            out["load_error"] = _tb.format_exc()[-800:]
+        factory = getattr(request.app.state, "db_session_factory", None)
+        out["factory_present"] = factory is not None
+        if factory is None:
+            return out
         try:
-            await _sess.execute(_t("""
-                CREATE TABLE IF NOT EXISTS pages (
-                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                    slug text UNIQUE NOT NULL, title text NOT NULL, body text NOT NULL,
-                    meta_description text, og_image text, canonical_path text,
-                    schema_json jsonb, metadata jsonb DEFAULT '{}'::jsonb,
-                    lang varchar(8) NOT NULL DEFAULT 'en', source_url text,
-                    published boolean NOT NULL DEFAULT false,
-                    last_updated timestamptz DEFAULT timezone('UTC', now()),
-                    created_at timestamptz DEFAULT timezone('UTC', now())
-                )"""))
-            await _sess.execute(_t("CREATE INDEX IF NOT EXISTS idx_pages_slug_published ON pages (slug, published)"))
-            await _sess.commit()
-            out["create_ok"] = True
-        except Exception as e:
-            out["create_error"] = repr(e)
-            try: await _sess.rollback()
-            except Exception: pass
-        if rows:
-            try:
-                from src.content_data import upsert_pages
-                inserted, first_error = await upsert_pages(_sess, rows)
-                out["inserted"] = inserted
-                out["seed_first_error"] = first_error
-            except Exception as e:
-                out["seed_exception"] = repr(e)
-        try:
-            out["total"] = (await _sess.execute(_t("SELECT count(*) FROM pages"))).scalar()
-            out["published"] = (await _sess.execute(_t("SELECT count(*) FROM pages WHERE published = TRUE"))).scalar()
-        except Exception as e:
-            out["count_error"] = repr(e)
-        await _sess.close()
+            async with factory() as _sess:
+                try:
+                    await _sess.execute(_t("""
+                        CREATE TABLE IF NOT EXISTS pages (
+                            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                            slug text UNIQUE NOT NULL, title text NOT NULL, body text NOT NULL,
+                            meta_description text, og_image text, canonical_path text,
+                            schema_json jsonb, metadata jsonb DEFAULT '{}'::jsonb,
+                            lang varchar(8) NOT NULL DEFAULT 'en', source_url text,
+                            published boolean NOT NULL DEFAULT false,
+                            last_updated timestamptz DEFAULT timezone('UTC', now()),
+                            created_at timestamptz DEFAULT timezone('UTC', now())
+                        )"""))
+                    await _sess.execute(_t("CREATE INDEX IF NOT EXISTS idx_pages_slug_published ON pages (slug, published)"))
+                    await _sess.commit()
+                    out["create_ok"] = True
+                except Exception:
+                    out["create_error"] = _tb.format_exc()[-800:]
+                    await _sess.rollback()
+                if rows:
+                    try:
+                        from src.content_data import upsert_pages
+                        inserted, first_error = await upsert_pages(_sess, rows)
+                        out["inserted"] = inserted
+                        out["seed_first_error"] = first_error
+                    except Exception:
+                        out["seed_exception"] = _tb.format_exc()[-800:]
+                try:
+                    out["total"] = (await _sess.execute(_t("SELECT count(*) FROM pages"))).scalar()
+                    out["published"] = (await _sess.execute(_t("SELECT count(*) FROM pages WHERE published = TRUE"))).scalar()
+                except Exception:
+                    out["count_error"] = _tb.format_exc()[-400:]
+        except Exception:
+            out["session_error"] = _tb.format_exc()[-800:]
         return out
 
     # ── SEO: robots.txt ────────────────────────────────────────────────────────
@@ -445,7 +450,7 @@ def get_app() -> FastAPI:
 
     # ── SEO: XML Sitemap ───────────────────────────────────────────────────────
     @app.get("/sitemap.xml", include_in_schema=False)
-    async def sitemap_xml():
+    async def sitemap_xml(request: Request):
         """
         Dynamic XML sitemap served by the backend so Google can discover
         all public pages regardless of SPA client-side routing.
@@ -467,14 +472,15 @@ def get_app() -> FastAPI:
         # Published content pages (migrated .in content)
         try:
             from sqlalchemy import text as _text
-            _sess = db.get_db_session(sync=False)
-            _rows = (await _sess.execute(_text(
-                "SELECT canonical_path, slug FROM pages WHERE published = TRUE"
-            ))).mappings().all()
-            await _sess.close()
-            for _r in _rows:
-                _p = (_r["canonical_path"] or f"/{_r['slug']}").lstrip("/")
-                static_pages.append((_p, "weekly", "0.8"))
+            _factory = getattr(request.app.state, "db_session_factory", None)
+            if _factory is not None:
+                async with _factory() as _sess:
+                    _rows = (await _sess.execute(_text(
+                        "SELECT canonical_path, slug FROM pages WHERE published = TRUE"
+                    ))).mappings().all()
+                for _r in _rows:
+                    _p = (_r["canonical_path"] or f"/{_r['slug']}").lstrip("/")
+                    static_pages.append((_p, "weekly", "0.8"))
         except Exception:
             pass
 
@@ -542,7 +548,7 @@ def get_app() -> FastAPI:
     }
 
     @app.get("/{full_path:path}")
-    async def catch_all(full_path: str):
+    async def catch_all(request: Request, full_path: str):
         """Serve the React app and its assets from the root."""
         # 0. Permanent redirects — typos / old URLs that got indexed or shared
         if full_path in REDIRECTS_301:
@@ -556,12 +562,14 @@ def get_app() -> FastAPI:
         # If a published page exists for this slug, return real SEO HTML so
         # crawlers and AI engines can read it. Everything else is unchanged.
         if full_path and "." not in full_path.split("/")[-1]:
-            try:
-                _sess = db.get_db_session(sync=False)
-                _page = await get_published_page(_sess, full_path)
-                await _sess.close()
-            except Exception:
-                _page = None
+            _page = None
+            _factory = getattr(request.app.state, "db_session_factory", None)
+            if _factory is not None:
+                try:
+                    async with _factory() as _sess:
+                        _page = await get_published_page(_sess, full_path)
+                except Exception:
+                    _page = None
             if _page:
                 return HTMLResponse(
                     render_content_page(_page),
