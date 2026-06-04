@@ -875,34 +875,15 @@ async def _create_pages_table(session: AsyncSession) -> None:
 
 
 async def _seed_pages(session: AsyncSession) -> None:
-    """Upsert migrated content pages from bundled JSON. Idempotent."""
-    import json as _json
+    """Upsert migrated content pages from bundled JSON. Idempotent, per-row safe."""
     try:
-        from src.content_data import load_rows
+        from src.content_data import load_rows, upsert_pages
         rows = load_rows()
     except Exception as e:
-        _log(f"_seed_pages: could not load page data ({e}) — skipping")
+        _log(f"_seed_pages: could not load page data ({e!r}) — skipping")
         return
-    n = 0
-    for p in rows:
-        await session.execute(text("""
-            INSERT INTO pages (slug,title,body,meta_description,og_image,canonical_path,
-                               schema_json,metadata,lang,source_url,published)
-            VALUES (:slug,:title,:body,:meta_description,:og_image,:canonical_path,
-                    CAST(:schema_json AS jsonb),CAST(:metadata AS jsonb),:lang,:source_url,:published)
-            ON CONFLICT (slug) DO UPDATE SET
-                title=EXCLUDED.title, body=EXCLUDED.body,
-                meta_description=EXCLUDED.meta_description, og_image=EXCLUDED.og_image,
-                canonical_path=EXCLUDED.canonical_path, schema_json=EXCLUDED.schema_json,
-                metadata=EXCLUDED.metadata, lang=EXCLUDED.lang,
-                source_url=EXCLUDED.source_url, published=EXCLUDED.published,
-                last_updated=timezone('UTC', now())
-        """), {**p,
-               "schema_json": _json.dumps(p["schema_json"]) if p.get("schema_json") else None,
-               "metadata": _json.dumps(p.get("metadata") or {})})
-        n += 1
-    await session.commit()
-    _log(f"seeded/updated {n} content pages")
+    inserted, first_error = await upsert_pages(session, rows)
+    _log(f"seeded/updated {inserted}/{len(rows)} content pages; first_error={first_error}")
 
 
 async def run_migrations(session_factory) -> None:

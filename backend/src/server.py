@@ -368,6 +368,50 @@ def get_app() -> FastAPI:
 
     # Redundant health check removed (consolidated above)
 
+    # ── TEMP diagnostic + reseed for content pages (remove after verifying) ──
+    @app.get("/api/content-pages/_status", include_in_schema=False)
+    async def _content_pages_status():
+        from sqlalchemy import text as _t
+        out = {}
+        try:
+            from src.content_data import load_rows, upsert_pages
+            rows = load_rows()
+            out["loaded"] = len(rows)
+        except Exception as e:
+            return {"stage": "load", "error": repr(e)}
+        _sess = db.get_db_session(sync=False)
+        try:
+            await _sess.execute(_t("""
+                CREATE TABLE IF NOT EXISTS pages (
+                    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                    slug text UNIQUE NOT NULL, title text NOT NULL, body text NOT NULL,
+                    meta_description text, og_image text, canonical_path text,
+                    schema_json jsonb, metadata jsonb DEFAULT '{}'::jsonb,
+                    lang varchar(8) NOT NULL DEFAULT 'en', source_url text,
+                    published boolean NOT NULL DEFAULT false,
+                    last_updated timestamptz DEFAULT timezone('UTC', now()),
+                    created_at timestamptz DEFAULT timezone('UTC', now())
+                )"""))
+            await _sess.execute(_t("CREATE INDEX IF NOT EXISTS idx_pages_slug_published ON pages (slug, published)"))
+            await _sess.commit()
+        except Exception as e:
+            out["create_error"] = repr(e)
+            try: await _sess.rollback()
+            except Exception: pass
+        try:
+            inserted, first_error = await upsert_pages(_sess, rows)
+            out["inserted"] = inserted
+            out["seed_first_error"] = first_error
+        except Exception as e:
+            out["seed_exception"] = repr(e)
+        try:
+            out["total"] = (await _sess.execute(_t("SELECT count(*) FROM pages"))).scalar()
+            out["published"] = (await _sess.execute(_t("SELECT count(*) FROM pages WHERE published = TRUE"))).scalar()
+        except Exception as e:
+            out["count_error"] = repr(e)
+        await _sess.close()
+        return out
+
     # ── SEO: robots.txt ────────────────────────────────────────────────────────
     @app.get("/robots.txt", include_in_schema=False)
     async def robots_txt():
