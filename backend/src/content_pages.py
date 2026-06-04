@@ -156,7 +156,7 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) 
   <div class="topbar">Now live: Ask Wisdom AI your questions about Bhagavan's teachings →</div>
   <div class="nav">
     <span class="brand">Arunachala Samudra</span>
-    <span class="links"><a href="/arunachala">Arunachala</a><a href="/temple/big-temple">Temple</a><a href="/ramana-maharshi">Ramana Maharshi</a><a href="/saints">Saints</a><a href="/sacred-teachings">Sacred Teachings</a><a href="/resources">Resources</a><a href="/about">About</a><a href="{base_url}/home">Wisdom AI</a></span>
+    <span class="links"><a href="/arunachala">Arunachala</a><a href="/temple/big-temple">Temple</a><a href="/ramana-maharshi">Ramana Maharshi</a><a href="/saints">Saints</a><a href="/sacred-teachings">Sacred Teachings</a><a href="/resources">Resources</a><a href="/about">About</a><a href="/">Wisdom AI</a></span>
   </div>
   {hero_html}
   <main>
@@ -166,7 +166,7 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) 
     <div class="cta">
       <strong>Continue this inquiry with the Wisdom AI</strong>
       <div>Ask anything about Ramana Maharshi's teachings — grounded in the source texts.</div>
-      <a href="{base_url}/home">Open the Wisdom AI →</a>
+      <a href="/">Open the Wisdom AI →</a>
     </div>
   </main>
   <footer>
