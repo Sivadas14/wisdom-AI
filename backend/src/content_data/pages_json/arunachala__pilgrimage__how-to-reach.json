@@ -1,0 +1,15 @@
+{
+  "slug": "arunachala/pilgrimage/how-to-reach",
+  "canonical_path": "/arunachala/pilgrimage/how-to-reach",
+  "title": "How to Reach Tiruvannamalai",
+  "hero_image": "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg",
+  "subtitle": "A guide to help you plan your travel",
+  "meta_description": "Tiruvannamalai does not have its own airport, but it is easily reachable from nearby airports including Chennai, Bangalore, and Pondicherry.",
+  "body_html": "<h4>By Air</h4>\n\n<p>Tiruvannamalai does not have its own airport, but it is easily reachable from nearby airports:</p>\n\n<p><strong>Chennai International Airport (MAA) – approx. 190 km / 4.5 hours by road</strong></p>\n<ul>\n<li>Best option with frequent domestic and international connections.</li>\n<li>Taxis and buses available directly to Tiruvannamalai.</li>\n</ul>\n\n<p><strong>Bangalore International Airport (BLR) – approx. 250 km / 6 hours by road</strong></p>\n<ul>\n<li>Good option if visiting from Karnataka or international routes not covered by Chennai.</li>\n</ul>\n\n<p><strong>Pondicherry Airport (PNY) – approx. 105 km / 2.5 hours by road</strong></p>\n<ul>\n<li>Limited flights but useful for regional connections.</li>\n</ul>\n\n<h4>By Train</h4>\n\n<p>Tiruvannamalai Railway Station (station code: <strong>TNM</strong>) is well connected to various cities in Tamil Nadu and South India.</p>\n<ul>\n<li><strong>Regular trains</strong> from Chennai Egmore, Villupuram, Vellore, Madurai, and Tirupati.</li>\n<li>Overnight trains like the <strong>Tirukkural Express</strong> (via Villupuram) may be convenient.</li>\n<li>The station is just <strong>2&#8211;3 km from the Arunachaleswarar Temple</strong> and Ramana Ashram.</li>\n<li><strong>Auto rickshaws and taxis</strong> are easily available at the station.</li>\n</ul>\n\n<p>Tip: Book tickets early during festival seasons like <strong>Karthigai Deepam</strong> and <strong>Mahashivratri</strong>, as demand is high.</p>\n\n<h4>By Road</h4>\n\n<p>Tiruvannamalai is well-connected by road from Chennai, Bangalore, Vellore, Salem, Pondicherry, and other towns.</p>\n\n<p class=\"attribution\"><em>From Chennai</em></p>\n<p class=\"attribution\"><em>From Bangalore</em></p>\n<p class=\"attribution\"><em>From Pondicherry</em></p>",
+  "images": [
+    "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg"
+  ],
+  "source_urls": ["https://arunachalasamudra.in/how-to-reach-tiruvannamalai"],
+  "status": "ok",
+  "notes": "Hero image and H1 appeared 3x in source; first instance kept. Road sub-sections (From Chennai, From Bangalore, From Pondicherry) had no content beyond the headings in the fetched text—rendered as attribution paragraphs."
+}

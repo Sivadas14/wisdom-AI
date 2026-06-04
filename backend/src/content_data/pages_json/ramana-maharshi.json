@@ -1,0 +1,15 @@
+{
+  "slug": "ramana-maharshi",
+  "canonical_path": "/ramana-maharshi",
+  "title": "Bhagavan Sri Ramana Maharshi: Biography & Legacy",
+  "hero_image": null,
+  "subtitle": null,
+  "meta_description": "Born as Venkataraman Iyer in 1879 in Tiruchuli, Tamil Nadu, Sri Ramana Maharshi experienced a profound spiritual awakening at the age of sixteen.",
+  "body_html": "<h2>Biography of Sri Ramana Maharshi</h2>\n\n<img src=\"https://framerusercontent.com/images/4thVKJDmojpwofa2ZPG5KJ07A.jpg\" alt=\"\">\n\n<p>Born as Venkataraman Iyer in 1879 in Tiruchuli, Tamil Nadu, Sri Ramana Maharshi experienced a profound spiritual awakening at the age of sixteen. Following a sudden, intense fear of death, he intuitively inquired, &#8220;Who dies?&#8221;—an introspection that dissolved his identification with the body and revealed the eternal Self. Soon after, he journeyed to Arunachala, the sacred hill of Shiva, where he remained for the rest of his life. Silent for years and living in deep absorption, his presence attracted seekers from across the world. Without formal initiation or dogma, he guided countless aspirants through the luminous simplicity of Self-enquiry. His life was a living testimony to the stillness of Being—the abiding peace of the Self.</p>",
+  "images": [
+    "https://framerusercontent.com/images/4thVKJDmojpwofa2ZPG5KJ07A.jpg"
+  ],
+  "source_urls": ["https://arunachalasamudra.in/ramana-maharshi-biography"],
+  "status": "ok",
+  "notes": "Page has no hero image preceding the H1; portrait photo appears after the H1. No subtitle present. Content is a single biographical paragraph with portrait image. The page title in source was 'Biography of Sri Ramana Maharshi' rendered as h2."
+}

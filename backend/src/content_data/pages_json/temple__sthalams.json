@@ -1,0 +1,17 @@
+{
+  "slug": "temple/sthalams",
+  "canonical_path": "/temple/sthalams",
+  "title": "The Sthalams of Tiruvannamalai",
+  "hero_image": "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg",
+  "subtitle": null,
+  "meta_description": "Explore the sacred sthalams of Tiruvannamalai, including the Adi Annamalai Temple, Pachaiamman Temple, Parvathamalai, and Rajarajeshwari Temple.",
+  "body_html": "<ul>\n<li><a href=\"https://arunachalasamudra.in/temples-sthalams/adi-annamalai-temple\">Adi Annamalai Temple</a></li>\n<li><a href=\"https://arunachalasamudra.in/temples-sthalams/pachaiamman-temple\">Pachaiamman Temple</a></li>\n<li><a href=\"https://arunachalasamudra.in/temples-sthalams/parvathamalai\">Parvathamalai</a></li>\n<li><a href=\"https://arunachalasamudra.in/temples-sthalams/rajarajeshwari-temple\">Rajarajeshwari Temple</a></li>\n</ul>",
+  "images": [
+    "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg"
+  ],
+  "source_urls": [
+    "https://arunachalasamudra.in/temples-sthalams"
+  ],
+  "status": "ok",
+  "notes": "Index page listing four sthalams. No body text beyond the hero and nav links."
+}

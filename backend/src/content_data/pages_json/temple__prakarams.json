@@ -1,0 +1,17 @@
+{
+  "slug": "temple/prakarams",
+  "canonical_path": "/temple/prakarams",
+  "title": "The Prakarams of Arunachaleswarar Temple",
+  "hero_image": "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg",
+  "subtitle": "The Sacred Corridors of Arunachaleswarar Temple",
+  "meta_description": "The Arunachaleswarar Temple is built with five main prakarams—sacred corridors that guide the devotee inward toward the sanctum, each representing a layer of the human self.",
+  "body_html": "<p>The Arunachaleswarar Temple is built with five main enclosures or <strong>prakarams</strong>—sacred corridors that guide the devotee inward toward the sanctum. Each prakaram represents a layer of the human self, from the physical to the blissful, mirroring the <strong>five kosas</strong>: annamaya, pranamaya, manomaya, vijnanamaya, and anandamaya.</p>\n<p>The <strong>mada veedhis</strong> (the four outer temple streets) form a sixth prakaram, and the <strong>14 km Girivalam path</strong> encircling Arunachala is considered the seventh—extending the temple into the landscape.</p>\n<p>Traditionally, the prakarams are counted from the inner sanctum outward. Over time, the temple's expansions influenced the shape of the town itself, with priests and residents adjusting their homes around the evolving sacred space.</p>\n<ul>\n<li><a href=\"https://arunachalasamudra.in/prakarams/prakaram-1\">First Prakaram</a></li>\n<li><a href=\"https://arunachalasamudra.in/prakarams/prakaram-2\">Second Prakaram</a></li>\n<li><a href=\"https://arunachalasamudra.in/prakarams/prakaram-3\">Third Prakaram</a></li>\n<li><a href=\"https://arunachalasamudra.in/prakarams/prakaram-4\">Fourth Prakaram</a></li>\n<li><a href=\"https://arunachalasamudra.in/prakarams/prakaram-5\">Fifth Prakaram</a></li>\n</ul>",
+  "images": [
+    "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg"
+  ],
+  "source_urls": [
+    "https://arunachalasamudra.in/prakarams"
+  ],
+  "status": "ok",
+  "notes": "Index/overview page. Duplicate hero+H1+subtitle blocks stripped. Sub-prakaram links converted to list."
+}

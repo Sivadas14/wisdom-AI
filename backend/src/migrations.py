@@ -842,6 +842,69 @@ async def _enable_row_level_security(session: AsyncSession) -> None:
     _log("Row Level Security migration complete.")
 
 
+
+
+# ---------------------------------------------------------------------------
+# Public content pages (migrated .in content) — additive, idempotent
+# ---------------------------------------------------------------------------
+async def _create_pages_table(session: AsyncSession) -> None:
+    """Create the public content `pages` table if absent. Additive."""
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS pages (
+            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            slug text UNIQUE NOT NULL,
+            title text NOT NULL,
+            body text NOT NULL,
+            meta_description text,
+            og_image text,
+            canonical_path text,
+            schema_json jsonb,
+            metadata jsonb DEFAULT '{}'::jsonb,
+            lang varchar(8) NOT NULL DEFAULT 'en',
+            source_url text,
+            published boolean NOT NULL DEFAULT false,
+            last_updated timestamptz DEFAULT timezone('UTC', now()),
+            created_at timestamptz DEFAULT timezone('UTC', now())
+        )
+    """))
+    await session.execute(text(
+        "CREATE INDEX IF NOT EXISTS idx_pages_slug_published ON pages (slug, published)"
+    ))
+    await session.commit()
+    _log("pages table ready")
+
+
+async def _seed_pages(session: AsyncSession) -> None:
+    """Upsert migrated content pages from bundled JSON. Idempotent."""
+    import json as _json
+    try:
+        from src.content_data import load_rows
+        rows = load_rows()
+    except Exception as e:
+        _log(f"_seed_pages: could not load page data ({e}) — skipping")
+        return
+    n = 0
+    for p in rows:
+        await session.execute(text("""
+            INSERT INTO pages (slug,title,body,meta_description,og_image,canonical_path,
+                               schema_json,metadata,lang,source_url,published)
+            VALUES (:slug,:title,:body,:meta_description,:og_image,:canonical_path,
+                    CAST(:schema_json AS jsonb),CAST(:metadata AS jsonb),:lang,:source_url,:published)
+            ON CONFLICT (slug) DO UPDATE SET
+                title=EXCLUDED.title, body=EXCLUDED.body,
+                meta_description=EXCLUDED.meta_description, og_image=EXCLUDED.og_image,
+                canonical_path=EXCLUDED.canonical_path, schema_json=EXCLUDED.schema_json,
+                metadata=EXCLUDED.metadata, lang=EXCLUDED.lang,
+                source_url=EXCLUDED.source_url, published=EXCLUDED.published,
+                last_updated=timezone('UTC', now())
+        """), {**p,
+               "schema_json": _json.dumps(p["schema_json"]) if p.get("schema_json") else None,
+               "metadata": _json.dumps(p.get("metadata") or {})})
+        n += 1
+    await session.commit()
+    _log(f"seeded/updated {n} content pages")
+
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -867,6 +930,8 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_add_razorpay_columns", _add_razorpay_columns)
         await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
         await _safe_migration(session, "_create_suggested_topics_table", _create_suggested_topics_table)
+        await _safe_migration(session, "_create_pages_table", _create_pages_table)
+        await _safe_migration(session, "_seed_pages", _seed_pages)
 
         # ── Data migrations (depend on schema being up to date) ─────────────
         await _safe_migration(session, "_set_free_plan_limits", _set_free_plan_limits)

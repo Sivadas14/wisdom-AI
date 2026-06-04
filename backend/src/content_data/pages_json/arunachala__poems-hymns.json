@@ -1,0 +1,15 @@
+{
+  "slug": "arunachala/poems-hymns",
+  "canonical_path": "/arunachala/poems-hymns",
+  "title": "Poems & Hymns to Arunachala",
+  "hero_image": "https://framerusercontent.com/images/Ob1IWdW4X2zTvkp7q010Hvr2LI.png",
+  "subtitle": null,
+  "meta_description": "A collection of sacred poems and hymns dedicated to Arunachala, including works by Ramana Maharshi, Arunagirinathar, and other saints and sages.",
+  "body_html": "<img src='https://framerusercontent.com/images/Ob1IWdW4X2zTvkp7q010Hvr2LI.png' alt=''><h2>Poems &amp; Hymns</h2><p>A treasury of sacred poetry and devotional hymns dedicated to Arunachala, composed by saints, sages, and devotees across the centuries. Each poem is a doorway into the living presence of the Hill.</p><h3>Index of Poems &amp; Hymns</h3><ul><li><a href='https://arunachalasamudra.in/poems/aditya-hridayam'>Aditya Hridayam</a></li><li><a href='https://arunachalasamudra.in/poems/annamalai-venba'>Annamalai Venba</a></li><li><a href='https://arunachalasamudra.in/poems/arunachala-akshara-mana-malai'>Arunachala Akshara Mana Malai</a></li><li><a href='https://arunachalasamudra.in/poems/arunachala-navamanimalai'>Arunachala Navamanimalai</a></li><li><a href='https://arunachalasamudra.in/poems/arunachala-pancharatna'>Arunachala Pancharatna</a></li><li><a href='https://arunachalasamudra.in/poems/arunachala-patikam'>Arunachala Patikam</a></li><li><a href='https://arunachalasamudra.in/poems/arunachala-stuti-sixth-hymn-to-arunachala'>Arunachala Stuti — Sixth Hymn to Arunachala</a></li><li><a href='https://arunachalasamudra.in/poems/arunachala-suprabatham'>Arunachala Suprabatham</a></li><li><a href='https://arunachalasamudra.in/poems/arunagiri-antadi'>Arunagiri Antadi</a></li><li><a href='https://arunachalasamudra.in/poems/arunagiri-malai'>Arunagiri Malai</a></li><li><a href='https://arunachalasamudra.in/poems/hail-to-thee-o-arunachala'>Hail to Thee! O' Arunachala</a></li><li><a href='https://arunachalasamudra.in/poems/hymns-to-arunachala'>Hymns to Arunachala</a></li><li><a href='https://arunachalasamudra.in/poems/shree-shiva-astottara-shatanaamaavali'>Shree Shiva Astottara Shatanaamaavali</a></li><li><a href='https://arunachalasamudra.in/poems/significance-of-arunachala'>Significance of Arunachala</a></li><li><a href='https://arunachalasamudra.in/poems/sri-arunachala-ashtakam'>Sri Arunachala Ashtakam</a></li><li><a href='https://arunachalasamudra.in/poems/thiruvammaanai'>Thiruvammaanai</a></li><li><a href='https://arunachalasamudra.in/poems/thiruvempaavai'>Thiruvempaavai</a></li></ul>",
+  "images": [
+    "https://framerusercontent.com/images/Ob1IWdW4X2zTvkp7q010Hvr2LI.png"
+  ],
+  "source_urls": ["https://arunachalasamudra.in/poems"],
+  "status": "ok",
+  "notes": "The /poems source page is an index/hub with only a hero image and links to 17 individual poem sub-pages. No prose body was present. Body HTML preserves the full link list. Individual poem sub-pages were not in the task scope."
+}

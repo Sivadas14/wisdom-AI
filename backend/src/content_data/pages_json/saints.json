@@ -1,0 +1,16 @@
+{
+  "slug": "saints",
+  "canonical_path": "/saints",
+  "title": "Saints of Tiruvannamalai",
+  "hero_image": "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg",
+  "subtitle": "Be inspired by real journeys of transformation.",
+  "meta_description": "Arunachala Samudra is a sacred space for inner journey, inspired by the saints of Tiruvannamalai and the grace of Arunachala.",
+  "body_html": "<p>Tiruvannamalai has been home to an unbroken lineage of saints — ancient and modern — who were drawn to the sacred hill of Arunachala and realised its grace through their lives. Their stories stand as living testimony to the transformative power of devotion, surrender, and self-inquiry.</p>\n\n<h2>Ancient Saints</h2>\n<ul>\n  <li><a href=\"/saints/arunagirinathar\">Arunagirinathar</a></li>\n  <li><a href=\"/saints/guhai-namashivaya\">Guhai Namashivaya</a></li>\n  <li><a href=\"/saints/guru-namashivaya\">Guru Namashivaya</a></li>\n  <li><a href=\"/saints/isanya-desikar\">Isanya Desikar</a></li>\n  <li><a href=\"/saints/saiva-archaryas\">Saiva Archaryas</a></li>\n</ul>\n\n<h2>Modern Saints</h2>\n<ul>\n  <li><a href=\"/saints/abhishiktananda\">Abhishiktananda</a></li>\n  <li><a href=\"/saints/isakki-swamigal\">Isakki Swamigal</a></li>\n  <li><a href=\"/saints/mookupodi-swamigal\">Mookupodi Swamigal</a></li>\n  <li><a href=\"/saints/nannagaru\">Nannagaru</a></li>\n  <li><a href=\"/saints/papa-ramdas\">Papa Ramdas</a></li>\n  <li><a href=\"/saints/poondi-swami\">Poondi Swami</a></li>\n  <li><a href=\"/saints/sri-ramana-maharshi\">Ramana Maharshi</a></li>\n  <li><a href=\"/saints/seshadri-swamigal\">Seshadri Swamigal</a></li>\n  <li><a href=\"/saints/sri-sadhu-om\">Sri Sadhu Om</a></li>\n  <li><a href=\"/saints/tinnai-swami\">Tinnai Swami</a></li>\n  <li><a href=\"/saints/yogi-ram-suratkumar\">Yogi Ram Suratkumar</a></li>\n</ul>",
+  "images": [
+    "https://framerusercontent.com/images/5jbi0DuOMfdXB7v2RtvGjsM1V0.jpg",
+    "https://framerusercontent.com/images/APR5k71KvcynXW5zegvUw17smc.svg"
+  ],
+  "source_urls": ["https://arunachalasamudra.in/saints"],
+  "status": "ok",
+  "notes": "Hub page. Ancient saints: 5 entries; Modern saints: 11 entries. Total 16 saint pages."
+}

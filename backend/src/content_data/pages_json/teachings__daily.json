@@ -1,0 +1,20 @@
+{
+  "slug": "teachings/daily",
+  "canonical_path": "/teachings/daily",
+  "title": "Daily Sacred Teachings",
+  "hero_image": "https://framerusercontent.com/images/THsRtxlcKKZFrKgdd7muE1wVhQ.png?width=1300&height=976",
+  "subtitle": null,
+  "meta_description": "A curated stream of daily sacred teachings inspired by the saints of Tiruvannamalai and the grace of Arunachala, for seekers on the inner journey.",
+  "body_html": "<h1>Sacred Teachings</h1>\n<img src='https://framerusercontent.com/images/THsRtxlcKKZFrKgdd7muE1wVhQ.png?width=1300&height=976' alt=''>\n<p><strong>May 9, 2026</strong></p>\n<p>The mind is like a river, always flowing outward. True peace is found when the river returns to its source</p>\n<h4>Past Archives</h4>\n<ul>\n  <li>\n    <img src='https://framerusercontent.com/images/lKQz3cx9T5bonWuFmTtcnfnw6k.jpg?width=2592&height=1944' alt=''>\n    <p><strong>Apr 22, 2026</strong></p>\n    <p>In every moment, the opportunity for liberation exists; all that is required is to turn inward</p>\n  </li>\n  <li>\n    <img src='https://framerusercontent.com/images/THsRtxlcKKZFrKgdd7muE1wVhQ.png?width=1300&height=976' alt=''>\n    <p><strong>Apr 12, 2026</strong></p>\n    <p>The mind is like a river, always flowing outward. True peace is found when the river returns to its source</p>\n  </li>\n  <li>\n    <img src='https://framerusercontent.com/images/MuWJ3RiQVYKWXJnTIA9fEPfZ8.jpg?width=2560&height=1704' alt=''>\n    <p><strong>Apr 11, 2026</strong></p>\n    <p>Silence is not the absence of sound, but the presence of truth, which needs no words to be understood</p>\n  </li>\n  <li>\n    <img src='https://framerusercontent.com/images/Spni8h4wcCP7shJe64z14OLXk.jpg?width=2362&height=1572' alt=''>\n    <p><strong>Apr 4, 2026</strong></p>\n    <p>True liberation comes not from escaping the world, but from seeing the world as a reflection of the Self</p>\n  </li>\n</ul>",
+  "images": [
+    "https://framerusercontent.com/images/THsRtxlcKKZFrKgdd7muE1wVhQ.png?width=1300&height=976",
+    "https://framerusercontent.com/images/lKQz3cx9T5bonWuFmTtcnfnw6k.jpg?width=2592&height=1944",
+    "https://framerusercontent.com/images/MuWJ3RiQVYKWXJnTIA9fEPfZ8.jpg?width=2560&height=1704",
+    "https://framerusercontent.com/images/Spni8h4wcCP7shJe64z14OLXk.jpg?width=2362&height=1572"
+  ],
+  "source_urls": [
+    "https://arunachalasamudra.in/sacred-teachings"
+  ],
+  "status": "superseded",
+  "notes": "Superseded by /sacred-teachings."
+}

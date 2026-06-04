@@ -1,0 +1,13 @@
+{
+  "slug": "resources",
+  "canonical_path": "/resources",
+  "title": "Resources",
+  "hero_image": null,
+  "subtitle": "Texts, teachings, and trusted sources for the journey",
+  "meta_description": "All Arunachala Samudra resources in one place: the Ramana library, free ebooks, daily teachings, articles, saint biographies, and trusted external sources on Ramana Maharshi.",
+  "body_html": "<p>Everything on Arunachala Samudra in one place — the source texts, the saints, the daily wisdom, and trusted external resources for deeper study.</p>\n<h2>On this site</h2>\n<ul>\n  <li><a href=\"/library\">The Ramana Library</a> — the source texts behind every teaching</li>\n  <li><a href=\"/library/ebooks\">Free Ebooks</a> — downloadable guides and classic texts</li>\n  <li><a href=\"/sacred-teachings\">Daily Sacred Teachings</a> — a fresh teaching each day</li>\n  <li><a href=\"/articles\">Articles &amp; Reflections</a> — essays on the teachings and the path</li>\n  <li><a href=\"/saints\">Saints of Tiruvannamalai</a> — the lineage of Arunachala</li>\n  <li><a href=\"/arunachala/girivalam\">Girivalam Guide</a> — the practice of circumambulating the hill</li>\n  <li><a href=\"/library/resources\">Curated Links &amp; Further Study</a> — trusted external sources</li>\n</ul>",
+  "images": [],
+  "source_urls": [],
+  "status": "ok",
+  "notes": "New hub page."
+}
