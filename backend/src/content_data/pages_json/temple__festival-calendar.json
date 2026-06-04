@@ -1,0 +1,15 @@
+{
+  "slug": "temple/festival-calendar",
+  "canonical_path": "/temple/festival-calendar",
+  "title": "Temple Festival Calendar",
+  "hero_image": null,
+  "subtitle": null,
+  "meta_description": "The annual festival calendar of Arunachaleswarar Temple, Tiruvannamalai, listing major utsavams across all twelve Tamil months from Chitrai to Panguni.",
+  "body_html": "<h2>Festival Calendar</h2>\n<h3>Chitrai (April-May)</h3>\n<p>Chitirai Vasantha Urchavam (10 days)</p>\n<h3>Vaikasi (May-June)</h3>\n<p>Vaikasi Urchavam (1 day)</p>\n<h3>Ani (June-July)</h3>\n<p>Ani Bramorchavam (10 days)</p>\n<p>Ani Thirumanjanam (Lord Nataraja Urchavam - 1 day)</p>\n<h3>Adi (July-August)</h3>\n<p>Adi Pooram Bramorchavam (10 days)</p>\n<h3>Avani (August-September)</h3>\n<p>Avani Moolam Urchavam (1 day)</p>\n<h3>Puratasi (September-October)</h3>\n<p>Navarathri Urchavam (9 days)</p>\n<h3>Aippasi (October-November)</h3>\n<p>Annabisheka Urchavam (1 day)</p>\n<p>Kanda Sashti Urchavam (6 days)</p>\n<h3>Karthigai (November-December)</h3>\n<p>Karthigai Deepa Bramorchavam (17 days)</p>\n<h3>Margazhi (December-January)</h3>\n<p>Vaikunda Ekadasi Urchavam (1 day)</p>\n<p>Arudra Darisanam (Lord Nataraja Urchavam - 1 day)</p>\n<h3>Thai (January-February)</h3>\n<p>Uthrayana Punyakala Bramorchavam (10 days)</p>\n<p>Thiruvoodal Urchavam (1 day)</p>\n<p>Manalurpettai Theerthavari Urchavam (1 day)</p>\n<p>Kalasapakkam (Rathasapthami) Theerthavari Urchavam (1 day)</p>\n<h3>Masi (February-March)</h3>\n<p>Maha Shivaratri Urchavam</p>\n<p>Masi Makam Pallikondpattu Theerthavari Urchavam</p>\n<h3>Panguni (March-April)</h3>\n<p>Panguni Uthiram Thirukalyana Urchavam (6 days)</p>",
+  "images": [],
+  "source_urls": [
+    "https://arunachalasamudra.in/festival-calendar"
+  ],
+  "status": "ok",
+  "notes": "No hero image on this page. Calendar structured as month headings with festival entries. No inline images."
+}

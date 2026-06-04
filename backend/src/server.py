@@ -15,7 +15,8 @@ from tuneapi import tu
 import os
 import asyncio
 from fastapi import FastAPI, Depends
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response, HTMLResponse
+from src.content_pages import get_published_page, render_content_page
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -408,6 +409,20 @@ def get_app() -> FastAPI:
             ("register",       "monthly", "0.4"),
         ]
 
+        # Published content pages (migrated .in content)
+        try:
+            from sqlalchemy import text as _text
+            _sess = db.get_db_session(sync=False)
+            _rows = (await _sess.execute(_text(
+                "SELECT canonical_path, slug FROM pages WHERE published = TRUE"
+            ))).mappings().all()
+            await _sess.close()
+            for _r in _rows:
+                _p = (_r["canonical_path"] or f"/{_r['slug']}").lstrip("/")
+                static_pages.append((_p, "weekly", "0.8"))
+        except Exception:
+            pass
+
         urls = []
         base = "https://www.arunachalasamudra.com"
         for path, changefreq, priority in static_pages:
@@ -439,9 +454,36 @@ def get_app() -> FastAPI:
     # Key   = the wrong path that was published / indexed by Google
     # Value = the correct canonical path users should land on
     REDIRECTS_301: dict[str, str] = {
-        "raman-maharshi-core-teachings":  "/ramana-maharshi-core-teachings",
-        # Add more typo or legacy URLs here as needed, e.g.:
-        # "ramana-maharshi-teachings":   "/ramana-maharshi-core-teachings",
+        # Legacy Framer .in URLs -> new canonical paths (content migration)
+        "arunachala-history": "/arunachala",
+        "arunachala-myths": "/arunachala/myths",
+        "arunachala-puranam": "/arunachala/puranam",
+        "arunachala-significance": "/arunachala/significance",
+        "best-times-to-visit-tiruvannamalai": "/arunachala/pilgrimage/best-times",
+        "big-temple": "/temple/big-temple",
+        "big-temple-architecture": "/temple/architecture",
+        "blogs": "/articles",
+        "books": "/library/ebooks",
+        "curated-links": "/library/resources",
+        "deepam-festival": "/arunachala/deepam-festival",
+        "festival-calendar": "/temple/festival-calendar",
+        "festivals": "/temple/festivals",
+        "full-moon": "/arunachala/girivalam",
+        "girivalam-importance": "/arunachala/girivalam",
+        "girivalam-path": "/arunachala/girivalam",
+        "girivalam-right-way": "/arunachala/girivalam",
+        "how-to-reach-tiruvannamalai": "/arunachala/pilgrimage/how-to-reach",
+        "lingams": "/arunachala/lingams",
+        "pilgrimage": "/arunachala/pilgrimage",
+        "poems": "/arunachala/poems-hymns",
+        "prakarams": "/temple/prakarams",
+        "raman-maharshi-core-teachings": "/ramana-maharshi/teachings",
+        "ramana-library": "/library",
+        "ramana-maharshi-biography": "/ramana-maharshi",
+        "ramana-maharshi-core-teachings": "/ramana-maharshi/teachings",
+        "ramana-maharshi-direct-disciples": "/ramana-maharshi/disciples",
+        "temples-sthalams": "/temple/sthalams",
+        "wisdom-ai": "/home",
     }
 
     @app.get("/{full_path:path}")
@@ -454,6 +496,22 @@ def get_app() -> FastAPI:
         # 1. Protection for API routes - if it starts with api/ but didn't match a route above, it's a 404
         if full_path.startswith("api/"):
             return JSONResponse(status_code=404, content={"error": "Not found"})
+
+        # ── Server-rendered public content pages (migrated .in content) ──────
+        # If a published page exists for this slug, return real SEO HTML so
+        # crawlers and AI engines can read it. Everything else is unchanged.
+        if full_path and "." not in full_path.split("/")[-1]:
+            try:
+                _sess = db.get_db_session(sync=False)
+                _page = await get_published_page(_sess, full_path)
+                await _sess.close()
+            except Exception:
+                _page = None
+            if _page:
+                return HTMLResponse(
+                    render_content_page(_page),
+                    headers={"Cache-Control": "public, max-age=300"},
+                )
 
         # 2. Try to serve exact file from 'ui' folder (assets, images, etc.)
         # If full_path is empty, target is index.html

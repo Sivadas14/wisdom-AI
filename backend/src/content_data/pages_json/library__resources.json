@@ -1,0 +1,15 @@
+{
+  "slug": "library/resources",
+  "canonical_path": "/library/resources",
+  "title": "Curated Links & Further Study",
+  "hero_image": null,
+  "subtitle": "Trusted sources for deeper study",
+  "meta_description": "Curated, trusted external resources on Sri Ramana Maharshi and Arunachala: Sri Ramanasramam, David Godman, Arunachala Ashrama, and the Paul Brunton Foundation.",
+  "body_html": "<p>Trusted external sources for deeper study of Ramana Maharshi, Arunachala, and the saints of Tiruvannamalai.</p>\n<ul>\n<li><a href=\"https://www.sriramanamaharshi.org\" rel=\"noopener\"><strong>Sri Ramanasramam</strong></a> — The official ashram of Sri Ramana Maharshi at Tiruvannamalai — texts, teachings, and the Mountain Path journal.</li>\n<li><a href=\"https://www.davidgodman.org\" rel=\"noopener\"><strong>David Godman</strong></a> — Extensive articles and books on Ramana Maharshi and his devotees by one of the foremost writers on his life and teaching.</li>\n<li><a href=\"https://www.arunachala.org\" rel=\"noopener\"><strong>Arunachala Ashrama (USA)</strong></a> — North American centre devoted to Ramana Maharshi; hosts archives and the Maharshi newsletter.</li>\n<li><a href=\"https://www.paulbrunton.org\" rel=\"noopener\"><strong>Paul Brunton Philosophic Foundation</strong></a> — The notebooks and legacy of Paul Brunton, who introduced Ramana Maharshi to the West.</li>\n</ul>\n<p><em>This is a starter list. Add your own trusted links here or through the admin panel.</em></p>",
+  "images": [],
+  "source_urls": [
+    "https://arunachalasamudra.in/curated-links"
+  ],
+  "status": "ok",
+  "notes": "The .in page was broken (Framer CMS error); seeded a starter list from the report's authoritative sources."
+}

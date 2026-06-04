@@ -1,0 +1,17 @@
+{
+  "slug": "temple/festivals",
+  "canonical_path": "/temple/festivals",
+  "title": "Festivals of Arunachala",
+  "hero_image": "https://framerusercontent.com/images/GRwFLKlU65ho2yUzgyidwaoAFD8.jpg",
+  "subtitle": "Major festivals celebrated in Tiruvannamalai",
+  "meta_description": "Explore the major festivals celebrated in Tiruvannamalai at the Arunachaleswarar Temple, including Mahakumbhabhishekam, Vasantha Utsavam, Navaratri, Mahashivaratri, and more.",
+  "body_html": "<ul>\n<li><a href=\"https://arunachalasamudra.in/festivals/mahakumbhabhishekam\">Mahakumbhabhishekam</a></li>\n<li><a href=\"https://arunachalasamudra.in/festivals/vasantha-utsavam\">Vasantha Utsavam</a></li>\n<li><a href=\"https://arunachalasamudra.in/festivals/thiruvoodal-festival\">Thiruvoodal Festival</a></li>\n<li><a href=\"https://arunachalasamudra.in/festivals/the-ther-unveiled\">The Ther Unveiled</a></li>\n<li><a href=\"https://arunachalasamudra.in/festivals/navaratri\">Navaratri</a></li>\n<li><a href=\"https://arunachalasamudra.in/festivals/mahashivaratri\">Mahashivaratri</a></li>\n<li><a href=\"https://arunachalasamudra.in/festivals/ganesha-chaturthi\">Ganesha Chaturthi</a></li>\n</ul>",
+  "images": [
+    "https://framerusercontent.com/images/GRwFLKlU65ho2yUzgyidwaoAFD8.jpg"
+  ],
+  "source_urls": [
+    "https://arunachalasamudra.in/festivals"
+  ],
+  "status": "ok",
+  "notes": "Index page listing seven festivals. Duplicate hero+H1+subtitle blocks stripped (appeared 3x). No body text beyond festival links."
+}

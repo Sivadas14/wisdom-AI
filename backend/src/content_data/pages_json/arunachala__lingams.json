@@ -1,0 +1,15 @@
+{
+  "slug": "arunachala/lingams",
+  "canonical_path": "/arunachala/lingams",
+  "title": "The Eight Lingams of Arunachala",
+  "hero_image": "https://framerusercontent.com/images/zw99COjf3LwlTHitNkbSn9iCVE.png",
+  "subtitle": "Arunachala Siva on the Girivalam Path",
+  "meta_description": "Along the 14 km Girivalam path around Arunachala stand the eight directional lingams — Indra, Agni, Yama, Niruthi, Varuna, Vayu, Kubera, and Esanya — each presided over by a cardinal deity.",
+  "body_html": "<img src='https://framerusercontent.com/images/zw99COjf3LwlTHitNkbSn9iCVE.png' alt=''><h2>Lingams — Arunachala Siva on the Girivalam Path</h2><p>Along the sacred Girivalam path around Arunachala, eight directional lingams mark the cardinal and intercardinal directions, each presided over by a Vedic deity. Pilgrims venerate these shrines during circumambulation as representations of Shiva in his cosmic, all-encompassing form.</p><h3>The Eight Directional Lingams</h3><ul><li><a href='https://arunachalasamudra.in/lingams/indra-lingam'>Indra Lingam</a> — East</li><li><a href='https://arunachalasamudra.in/lingams/agni-lingam'>Agni Lingam</a> — South-East</li><li><a href='https://arunachalasamudra.in/lingams/yama-lingam'>Yama Lingam</a> — South</li><li><a href='https://arunachalasamudra.in/lingams/niruthi-lingam'>Niruthi Lingam</a> — South-West</li><li><a href='https://arunachalasamudra.in/lingams/varuna-lingam'>Varuna Lingam</a> — West</li><li><a href='https://arunachalasamudra.in/lingams/vayu-lingam'>Vayu Lingam</a> — North-West</li><li><a href='https://arunachalasamudra.in/lingams/kubera-lingam'>Kubera Lingam</a> — North</li><li><a href='https://arunachalasamudra.in/lingams/esanya-lingam'>Esanya Lingam</a> — North-East</li></ul><h3>Additional Lingams</h3><ul><li><a href='https://arunachalasamudra.in/lingams/surya-lingam'>Surya Lingam</a></li><li><a href='https://arunachalasamudra.in/lingams/chandra-lingam'>Chandra Lingam</a></li></ul>",
+  "images": [
+    "https://framerusercontent.com/images/zw99COjf3LwlTHitNkbSn9iCVE.png"
+  ],
+  "source_urls": ["https://arunachalasamudra.in/lingams"],
+  "status": "ok",
+  "notes": "The /lingams source page is an index/hub page with only a hero image and links to individual lingam sub-pages. No prose body content was present beyond the navigation links. Body HTML includes the link list with directional descriptions added for context. Sub-pages (indra-lingam, agni-lingam, etc.) were not fetched as they were not in the task list."
+}

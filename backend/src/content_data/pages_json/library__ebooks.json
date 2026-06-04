@@ -1,0 +1,15 @@
+{
+  "slug": "library/ebooks",
+  "canonical_path": "/library/ebooks",
+  "title": "Free Ebooks Library",
+  "hero_image": null,
+  "subtitle": "Classic texts, freely shared",
+  "meta_description": "Free ebooks on Arunachala and the teachings of Sri Ramana Maharshi — The Glory of Arunachala, The Essence of the Ribhu Gita, and more, freely downloadable.",
+  "body_html": "<p>Free downloadable ebooks on Arunachala, Ramana Maharshi, and the path of self-enquiry.</p>\n<p><em>Disclaimer: the e-books offered here have been gathered from sources that already make them freely accessible. We neither charge for nor derive revenue from their distribution; full copyright remains with the original authors and publishers. If you hold rights to a work hosted here and would prefer it removed or credited differently, please write to info@arunachalasamudra.in and we will respond promptly.</em></p>\n<h2>Available now</h2>\n<ul>\n<li><a href=\"/static/ebooks/glory-of-arunachala.pdf\"><strong>The Glory of Arunachala</strong></a> — A classic account of the sacred hill, its legends, and its place in the heart of devotees.</li>\n<li><a href=\"/static/ebooks/essence-of-ribhu-gita.pdf\"><strong>The Essence of the Ribhu Gita</strong></a> — Selected verses of the Ribhu Gita — a text Ramana Maharshi held in the highest regard for direct non-dual instruction.</li>\n</ul>\n<p><em>More titles are being added. (Upload each PDF to <code>/static/ebooks/</code> or your storage, then list it here or via the admin panel.)</em></p>",
+  "images": [],
+  "source_urls": [
+    "https://arunachalasamudra.in/books"
+  ],
+  "status": "ok",
+  "notes": "Built from folder PDFs; .in CMS list was empty."
+}

@@ -1,0 +1,15 @@
+{
+  "slug": "sacred-teachings",
+  "canonical_path": "/sacred-teachings",
+  "title": "Daily Sacred Teachings",
+  "hero_image": null,
+  "subtitle": "One line of wisdom, drawn fresh each day",
+  "meta_description": "A daily teaching from Sri Ramana Maharshi and the saints of Arunachala — short, sourced lines of wisdom to turn the mind inward. Free, no account needed.",
+  "body_html": "<p>A new teaching is drawn each day from Bhagavan's words and the wisdom of the saints of Arunachala. Come back any day — no account needed — and let one line turn the mind inward.</p>\n<h2>Recent teachings</h2>\n<div class=\"teaching\"><p class=\"attribution\"><em>May 9, 2026</em></p><blockquote>The mind is like a river, always flowing outward. True peace is found when the river returns to its source.</blockquote></div>\n<div class=\"teaching\"><p class=\"attribution\"><em>April 22, 2026</em></p><blockquote>In every moment, the opportunity for liberation exists; all that is required is to turn inward.</blockquote></div>\n<div class=\"teaching\"><p class=\"attribution\"><em>April 11, 2026</em></p><blockquote>Silence is not the absence of sound, but the presence of truth, which needs no words to be understood.</blockquote></div>\n<div class=\"teaching\"><p class=\"attribution\"><em>April 4, 2026</em></p><blockquote>True liberation comes not from escaping the world, but from seeing the world as a reflection of the Self.</blockquote></div>\n<p><em>The full archive grows daily. Older teachings will appear here as the collection is added.</em></p>",
+  "images": [],
+  "source_urls": [
+    "https://arunachalasamudra.in/sacred-teachings"
+  ],
+  "status": "ok",
+  "notes": "Daily quotes captured via rendered browser; archive to be extended."
+}
