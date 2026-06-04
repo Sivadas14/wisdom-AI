@@ -368,17 +368,25 @@ def get_app() -> FastAPI:
 
     # Redundant health check removed (consolidated above)
 
-    # ── TEMP diagnostic + reseed for content pages (remove after verifying) ──
-    @app.get("/api/content-pages/_status", include_in_schema=False)
-    async def _content_pages_status():
+    # ── TEMP diagnostic + reseed (non-/api so it bypasses JWT auth; remove later) ──
+    @app.get("/_diag/content", include_in_schema=False)
+    async def _diag_content():
+        import os as _os
         from sqlalchemy import text as _t
         out = {}
+        rows = []
         try:
-            from src.content_data import load_rows, upsert_pages
-            rows = load_rows()
+            from src import content_data as _cd
+            out["json_dir"] = _cd.JSON_DIR
+            out["dir_exists"] = _os.path.isdir(_cd.JSON_DIR)
+            out["file_count"] = (
+                len([f for f in _os.listdir(_cd.JSON_DIR) if f.endswith(".json")])
+                if _os.path.isdir(_cd.JSON_DIR) else 0
+            )
+            rows = _cd.load_rows()
             out["loaded"] = len(rows)
         except Exception as e:
-            return {"stage": "load", "error": repr(e)}
+            out["load_error"] = repr(e)
         _sess = db.get_db_session(sync=False)
         try:
             await _sess.execute(_t("""
@@ -394,16 +402,19 @@ def get_app() -> FastAPI:
                 )"""))
             await _sess.execute(_t("CREATE INDEX IF NOT EXISTS idx_pages_slug_published ON pages (slug, published)"))
             await _sess.commit()
+            out["create_ok"] = True
         except Exception as e:
             out["create_error"] = repr(e)
             try: await _sess.rollback()
             except Exception: pass
-        try:
-            inserted, first_error = await upsert_pages(_sess, rows)
-            out["inserted"] = inserted
-            out["seed_first_error"] = first_error
-        except Exception as e:
-            out["seed_exception"] = repr(e)
+        if rows:
+            try:
+                from src.content_data import upsert_pages
+                inserted, first_error = await upsert_pages(_sess, rows)
+                out["inserted"] = inserted
+                out["seed_first_error"] = first_error
+            except Exception as e:
+                out["seed_exception"] = repr(e)
         try:
             out["total"] = (await _sess.execute(_t("SELECT count(*) FROM pages"))).scalar()
             out["published"] = (await _sess.execute(_t("SELECT count(*) FROM pages WHERE published = TRUE"))).scalar()
