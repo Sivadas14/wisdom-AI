@@ -57,6 +57,7 @@ from src.content.parallel_video import pre_generate_common_images
 
 from src.services.user import router as user_profile_router
 from src.routers.mobile_api import router as mobile_api_router
+from src.routers.admin_pages import router as admin_pages_router
 
 # === Translation system routers (added 2026-05-01) ===
 from src.translation.gateway import router as translation_router
@@ -296,6 +297,7 @@ def get_app() -> FastAPI:
     app.include_router(feature_router)
     app.include_router(plan_feature_v1_router)
     app.include_router(mobile_api_router)
+    app.include_router(admin_pages_router)   # /api/admin/pages (admin-gated)
     # === Translation system routers (added 2026-05-01) ===
     app.include_router(translation_router)        # POST /api/translate
     app.include_router(translation_page_router)   # GET  /api/page/{slug}
@@ -367,66 +369,6 @@ def get_app() -> FastAPI:
     # fmt: on
 
     # Redundant health check removed (consolidated above)
-
-    # ── TEMP diagnostic + reseed (non-/api so it bypasses JWT auth; remove later) ──
-    @app.get("/_diag/content", include_in_schema=False)
-    async def _diag_content(request: Request):
-        import os as _os, traceback as _tb
-        from sqlalchemy import text as _t
-        out = {}
-        rows = []
-        try:
-            from src import content_data as _cd
-            out["json_dir"] = _cd.JSON_DIR
-            out["dir_exists"] = _os.path.isdir(_cd.JSON_DIR)
-            out["file_count"] = (
-                len([f for f in _os.listdir(_cd.JSON_DIR) if f.endswith(".json")])
-                if _os.path.isdir(_cd.JSON_DIR) else 0
-            )
-            rows = _cd.load_rows()
-            out["loaded"] = len(rows)
-        except Exception:
-            out["load_error"] = _tb.format_exc()[-800:]
-        factory = getattr(request.app.state, "db_session_factory", None)
-        out["factory_present"] = factory is not None
-        if factory is None:
-            return out
-        try:
-            async with factory() as _sess:
-                try:
-                    await _sess.execute(_t("""
-                        CREATE TABLE IF NOT EXISTS pages (
-                            id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                            slug text UNIQUE NOT NULL, title text NOT NULL, body text NOT NULL,
-                            meta_description text, og_image text, canonical_path text,
-                            schema_json jsonb, metadata jsonb DEFAULT '{}'::jsonb,
-                            lang varchar(8) NOT NULL DEFAULT 'en', source_url text,
-                            published boolean NOT NULL DEFAULT false,
-                            last_updated timestamptz DEFAULT timezone('UTC', now()),
-                            created_at timestamptz DEFAULT timezone('UTC', now())
-                        )"""))
-                    await _sess.execute(_t("CREATE INDEX IF NOT EXISTS idx_pages_slug_published ON pages (slug, published)"))
-                    await _sess.commit()
-                    out["create_ok"] = True
-                except Exception:
-                    out["create_error"] = _tb.format_exc()[-800:]
-                    await _sess.rollback()
-                if rows:
-                    try:
-                        from src.content_data import upsert_pages
-                        inserted, first_error = await upsert_pages(_sess, rows)
-                        out["inserted"] = inserted
-                        out["seed_first_error"] = first_error
-                    except Exception:
-                        out["seed_exception"] = _tb.format_exc()[-800:]
-                try:
-                    out["total"] = (await _sess.execute(_t("SELECT count(*) FROM pages"))).scalar()
-                    out["published"] = (await _sess.execute(_t("SELECT count(*) FROM pages WHERE published = TRUE"))).scalar()
-                except Exception:
-                    out["count_error"] = _tb.format_exc()[-400:]
-        except Exception:
-            out["session_error"] = _tb.format_exc()[-800:]
-        return out
 
     # ── SEO: robots.txt ────────────────────────────────────────────────────────
     @app.get("/robots.txt", include_in_schema=False)

@@ -266,11 +266,12 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
       <div className="hidden md:flex max-w-7xl mx-auto px-6 h-11 items-center justify-between">
         <nav className="flex items-center gap-8">
           {[
-            { label: "Teachings",          href: "#teachings"    },
-            { label: "Daily Contemplation",href: "#contemplation"},
-            { label: "Try Free",           href: "#try"          },
-            { label: "Features",           href: "#features"     },
-            { label: "Pricing",            href: "#pricing"      },
+            { label: "Arunachala",         href: "/arunachala"   },
+            { label: "Ramana Maharshi",    href: "/ramana-maharshi" },
+            { label: "Saints",             href: "/saints"       },
+            { label: "Teachings",          href: "/sacred-teachings" },
+            { label: "Library",            href: "/library"      },
+            { label: "About",              href: "/about"        },
           ].map(({ label, href }) => (
             <a
               key={label} href={href}
@@ -312,10 +313,12 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
         <div style={{ backgroundColor: T.cream, borderTop: `1px solid ${T.border}` }} className="md:hidden px-6 pb-6 pt-4">
           <div className="space-y-1 mb-4">
             {[
-              { label: "Teachings",          href: "#teachings"    },
-              { label: "Daily Contemplation",href: "#contemplation"},
-              { label: "Features",           href: "#features"     },
-              { label: "Pricing",            href: "#pricing"      },
+              { label: "Arunachala",         href: "/arunachala"   },
+              { label: "Ramana Maharshi",    href: "/ramana-maharshi" },
+              { label: "Saints",             href: "/saints"       },
+              { label: "Teachings",          href: "/sacred-teachings" },
+              { label: "Library",            href: "/library"      },
+              { label: "About",              href: "/about"        },
             ].map(({ label, href }) => (
               <a
                 key={label} href={href}
@@ -1718,7 +1721,7 @@ function Footer() {
         <Mandala size={700} opacity={0.045} color="#F5F0EC" />
       </div>
       <div className="max-w-7xl mx-auto relative z-10">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
           {/* Brand + subscribe */}
           <div className="col-span-2">
             <p style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "1.15rem", marginBottom: "0.75rem" }}>Arunachala Samudra</p>
@@ -1768,6 +1771,24 @@ function Footer() {
                 { label: "Terms",     to: "/terms"    },
               ].map(({ label, to }) => (
                 <li key={label}><Link to={to} style={{ fontFamily: T.sans, color: "#8A6D5E", fontSize: "0.85rem" }} className="hover:text-[#C4A892] transition-colors">{label}</Link></li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Explore — content pages (server-rendered) */}
+          <div>
+            <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.72rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1rem" }}>Explore</p>
+            <ul className="space-y-2">
+              {[
+                { label: "Arunachala",       href: "/arunachala"        },
+                { label: "Ramana Maharshi",  href: "/ramana-maharshi"   },
+                { label: "Temple",           href: "/temple/big-temple" },
+                { label: "Saints",           href: "/saints"            },
+                { label: "Sacred Teachings", href: "/sacred-teachings"  },
+                { label: "Library",          href: "/library"           },
+                { label: "About",            href: "/about"             },
+              ].map(({ label, href }) => (
+                <li key={label}><a href={href} style={{ fontFamily: T.sans, color: "#8A6D5E", fontSize: "0.85rem" }} className="hover:text-[#C4A892] transition-colors">{label}</a></li>
               ))}
             </ul>
           </div>
