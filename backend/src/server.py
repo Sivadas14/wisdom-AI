@@ -513,28 +513,13 @@ def get_app() -> FastAPI:
                 except Exception:
                     _page = None
             if _page:
-                # Language: ?lang= wins, else the remembered cookie, else English.
-                _lang = request.query_params.get("lang") or request.cookies.get("site_lang") or "en"
-                if _lang != "en":
-                    try:
-                        from src.content_i18n import translate_content_page
-                        _md = _page.get("metadata") or {}
-                        _sub = _md.get("subtitle") if isinstance(_md, dict) else None
-                        async with _factory() as _s2:
-                            _t, _st, _b, _ = await translate_content_page(
-                                _s2, full_path, _page["title"], _sub, _page["body"], _lang)
-                        _newmd = dict(_md) if isinstance(_md, dict) else {}
-                        _newmd["subtitle"] = _st
-                        _page = {**_page, "title": _t, "body": _b, "metadata": _newmd}
-                    except Exception:
-                        _lang = "en"
-                _resp = HTMLResponse(
-                    render_content_page(_page, lang=_lang),
-                    headers={"Cache-Control": "private, max-age=60", "Vary": "Cookie"},
+                # Auto-translation turned OFF: serve clean English. Approved,
+                # human-reviewed translations will be served here once the admin
+                # translation-review workflow is in place.
+                return HTMLResponse(
+                    render_content_page(_page, lang="en"),
+                    headers={"Cache-Control": "public, max-age=300"},
                 )
-                if request.query_params.get("lang"):
-                    _resp.set_cookie("site_lang", _lang, max_age=31536000, samesite="lax")
-                return _resp
 
         # 2. Try to serve exact file from 'ui' folder (assets, images, etc.)
         # If full_path is empty, target is index.html
