@@ -166,3 +166,43 @@ async def translate_content_page(
         pass
 
     return title_t, subtitle_t, body_t, provider or "sarvam"
+
+
+# ---------------------------------------------------------------------------
+# Approved-translation serving helpers (only human-reviewed translations show)
+# ---------------------------------------------------------------------------
+from sqlalchemy import text as _sql  # noqa: E402
+
+_RT = "contentpage_v2"   # cache namespace for content pages
+
+
+async def get_approved_langs(session, slug: str) -> list[str]:
+    """Languages that have an APPROVED (reviewed) translation for this page."""
+    try:
+        rows = (await session.execute(_sql(
+            "SELECT language_code FROM page_translations "
+            "WHERE domain='coin' AND resource_type=:rt AND resource_id=:s AND reviewed=true"
+        ), {"rt": _RT, "s": slug})).all()
+        return [r[0] for r in rows]
+    except Exception:
+        return []
+
+
+async def get_served_translation(session, slug: str, lang: str):
+    """Return (title, subtitle, body) if an APPROVED translation exists, else None."""
+    try:
+        row = (await session.execute(_sql(
+            "SELECT translated_title, translated_body FROM page_translations "
+            "WHERE domain='coin' AND resource_type=:rt AND resource_id=:s "
+            "AND language_code=:l AND reviewed=true LIMIT 1"
+        ), {"rt": _RT, "s": slug, "l": lang})).first()
+    except Exception:
+        return None
+    if not row:
+        return None
+    ttl, body = (row[0] or ""), (row[1] or "")
+    if "\x1f" in ttl:
+        title, subtitle = ttl.split("\x1f", 1)
+    else:
+        title, subtitle = ttl, None
+    return (title or None), (subtitle or None), body

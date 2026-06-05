@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, CreditCard, History, LogOut, Bell, Images, BookOpen, Tags } from 'lucide-react';
+import { LayoutDashboard, Users, CreditCard, History, LogOut, Bell, Images, BookOpen, Tags, Languages } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 
@@ -21,6 +21,7 @@ const AdminLayout: React.FC = () => {
         { path: '/admin/images', label: 'Image Library', icon: <Images className="w-5 h-5" /> },
         { path: '/admin/knowledge-base', label: 'Knowledge Base', icon: <BookOpen className="w-5 h-5" /> },
         { path: '/admin/topics', label: 'Topic Suggestions', icon: <Tags className="w-5 h-5" /> },
+        { path: '/admin/translations', label: 'Translations', icon: <Languages className="w-5 h-5" /> },
     ];
 
     return (

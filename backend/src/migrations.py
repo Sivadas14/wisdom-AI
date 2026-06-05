@@ -886,6 +886,18 @@ async def _seed_pages(session: AsyncSession) -> None:
     _log(f"seeded/updated {inserted}/{len(rows)} content pages; first_error={first_error}")
 
 
+
+
+async def _add_translation_reviewed_column(session: AsyncSession) -> None:
+    """Add `reviewed` flag to page_translations so only human-approved
+    translations are served on the public site. Additive + idempotent."""
+    await session.execute(text(
+        "ALTER TABLE page_translations ADD COLUMN IF NOT EXISTS "
+        "reviewed boolean NOT NULL DEFAULT false"
+    ))
+    await session.commit()
+    _log("page_translations.reviewed column ready")
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -912,6 +924,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
         await _safe_migration(session, "_create_suggested_topics_table", _create_suggested_topics_table)
         await _safe_migration(session, "_create_pages_table", _create_pages_table)
+        await _safe_migration(session, "_add_translation_reviewed_column", _add_translation_reviewed_column)
         await _safe_migration(session, "_seed_pages", _seed_pages)
 
         # ── Data migrations (depend on schema being up to date) ─────────────

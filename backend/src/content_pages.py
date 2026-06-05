@@ -19,7 +19,7 @@ from typing import Any, Optional
 PRIMARY_BASE_URL = "https://www.arunachalasamudra.com"
 
 
-def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, lang: str = "en") -> str:
+def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, lang: str = "en", available_langs: list | None = None) -> str:
     """Render a `pages` row (dict) into a complete, SEO-ready, design-matched page.
 
     Keys: slug, title, body(HTML), meta_description, og_image, canonical_path,
@@ -37,8 +37,23 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, 
     subtitle = md.get("subtitle")
     e = html_lib.escape
 
-    # Language switcher disabled (auto-translation turned off; admin review workflow pending)
-    _lang_switcher = ""
+    # Language switcher — only shows English + languages with APPROVED translations.
+    _LANG_NAMES = {"en": "English", "hi": "\u0939\u093f\u0928\u094d\u0926\u0940", "ta": "\u0ba4\u0bae\u0bbf\u0bb4\u0bcd",
+                   "te": "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41", "bn": "\u09ac\u09be\u0982\u09b2\u09be", "ml": "\u0d2e\u0d32\u0d2f\u0d3e\u0d33\u0d02",
+                   "es": "Espa\u00f1ol", "fr": "Fran\u00e7ais", "de": "Deutsch", "nl": "Nederlands", "sv": "Svenska",
+                   "da": "Dansk", "no": "Norsk", "fi": "Suomi", "ar": "\u0627\u0644\u0639\u0631\u0628\u064a\u0629", "zh-CN": "\u4e2d\u6587"}
+    _avail = available_langs or ["en"]
+    if len(_avail) > 1:
+        _opts = "".join(
+            f'<option value="{c}"{" selected" if c == lang else ""}>{_LANG_NAMES.get(c, c)}</option>'
+            for c in _avail)
+        _lang_switcher = (
+            '<select aria-label="Language" class="langsel" '
+            "onchange=\"(function(v){var u=new URL(window.location.href);"
+            "if(v){u.searchParams.set('lang',v);}window.location.href=u.toString();})(this.value)\">"
+            + _opts + "</select>")
+    else:
+        _lang_switcher = ""
     _dir = ' dir="rtl"' if lang == "ar" else ""
 
     # ---------- JSON-LD ----------

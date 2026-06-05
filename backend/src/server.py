@@ -58,6 +58,7 @@ from src.content.parallel_video import pre_generate_common_images
 from src.services.user import router as user_profile_router
 from src.routers.mobile_api import router as mobile_api_router
 from src.routers.admin_pages import router as admin_pages_router
+from src.routers.admin_translations import router as admin_translations_router
 
 # === Translation system routers (added 2026-05-01) ===
 from src.translation.gateway import router as translation_router
@@ -298,6 +299,7 @@ def get_app() -> FastAPI:
     app.include_router(plan_feature_v1_router)
     app.include_router(mobile_api_router)
     app.include_router(admin_pages_router)   # /api/admin/pages (admin-gated)
+    app.include_router(admin_translations_router)   # /api/admin/translations (admin-gated)
     # === Translation system routers (added 2026-05-01) ===
     app.include_router(translation_router)        # POST /api/translate
     app.include_router(translation_page_router)   # GET  /api/page/{slug}
@@ -513,13 +515,36 @@ def get_app() -> FastAPI:
                 except Exception:
                     _page = None
             if _page:
-                # Auto-translation turned OFF: serve clean English. Approved,
-                # human-reviewed translations will be served here once the admin
-                # translation-review workflow is in place.
-                return HTMLResponse(
-                    render_content_page(_page, lang="en"),
-                    headers={"Cache-Control": "public, max-age=300"},
+                # Serve ONLY human-approved translations. Unapproved languages
+                # (or English) get clean English. The switcher shows English +
+                # whatever languages have been approved for this page.
+                _lang = request.query_params.get("lang") or request.cookies.get("site_lang") or "en"
+                _approved = []
+                try:
+                    from src.content_i18n import get_approved_langs, get_served_translation
+                    async with _factory() as _s2:
+                        _approved = await get_approved_langs(_s2, full_path)
+                        if _lang != "en" and _lang in _approved:
+                            _tr = await get_served_translation(_s2, full_path, _lang)
+                            if _tr:
+                                _ti, _su, _bo = _tr
+                                _md = dict(_page.get("metadata") or {})
+                                if _su:
+                                    _md["subtitle"] = _su
+                                _page = {**_page, "title": _ti or _page["title"], "body": _bo, "metadata": _md}
+                            else:
+                                _lang = "en"
+                        elif _lang != "en":
+                            _lang = "en"
+                except Exception:
+                    _lang = "en"
+                _resp = HTMLResponse(
+                    render_content_page(_page, lang=_lang, available_langs=["en"] + _approved),
+                    headers={"Cache-Control": "private, max-age=300", "Vary": "Cookie"},
                 )
+                if request.query_params.get("lang"):
+                    _resp.set_cookie("site_lang", _lang, max_age=31536000, samesite="lax")
+                return _resp
 
         # 2. Try to serve exact file from 'ui' folder (assets, images, etc.)
         # If full_path is empty, target is index.html
