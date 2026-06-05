@@ -513,10 +513,24 @@ def get_app() -> FastAPI:
                 except Exception:
                     _page = None
             if _page:
-                return HTMLResponse(
-                    render_content_page(_page),
-                    headers={"Cache-Control": "public, max-age=300"},
+                # Language: ?lang= wins, else the remembered cookie, else English.
+                _lang = request.query_params.get("lang") or request.cookies.get("site_lang") or "en"
+                if _lang != "en":
+                    try:
+                        from src.content_i18n import translate_content_page
+                        async with _factory() as _s2:
+                            _t, _b, _ = await translate_content_page(
+                                _s2, full_path, _page["title"], _page["body"], _lang)
+                        _page = {**_page, "title": _t, "body": _b}
+                    except Exception:
+                        _lang = "en"
+                _resp = HTMLResponse(
+                    render_content_page(_page, lang=_lang),
+                    headers={"Cache-Control": "private, max-age=60", "Vary": "Cookie"},
                 )
+                if request.query_params.get("lang"):
+                    _resp.set_cookie("site_lang", _lang, max_age=31536000, samesite="lax")
+                return _resp
 
         # 2. Try to serve exact file from 'ui' folder (assets, images, etc.)
         # If full_path is empty, target is index.html
