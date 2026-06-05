@@ -119,7 +119,7 @@ async def translate_content_page(
     # 1. cache
     try:
         cached = await cache.lookup_by_resource(
-            session, domain="coin", resource_type="contentpage",
+            session, domain="coin", resource_type="contentpage_v2",
             resource_id=slug, target_lang=lang,
         )
         if cached and cached.translated_body:
@@ -157,7 +157,7 @@ async def translate_content_page(
     # 4. cache (store translated subtitle in metadata for reuse)
     try:
         await cache.upsert(
-            session, domain="coin", resource_type="contentpage", resource_id=slug,
+            session, domain="coin", resource_type="contentpage_v2", resource_id=slug,
             language_code=lang, source_text=body_html, translated_body=body_t,
             translated_title=(title_t + "\x1f" + (subtitle_t or "")),
             provider=provider or "sarvam", quality_score=0.9,
