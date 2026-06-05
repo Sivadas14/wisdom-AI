@@ -518,10 +518,14 @@ def get_app() -> FastAPI:
                 if _lang != "en":
                     try:
                         from src.content_i18n import translate_content_page
+                        _md = _page.get("metadata") or {}
+                        _sub = _md.get("subtitle") if isinstance(_md, dict) else None
                         async with _factory() as _s2:
-                            _t, _b, _ = await translate_content_page(
-                                _s2, full_path, _page["title"], _page["body"], _lang)
-                        _page = {**_page, "title": _t, "body": _b}
+                            _t, _st, _b, _ = await translate_content_page(
+                                _s2, full_path, _page["title"], _sub, _page["body"], _lang)
+                        _newmd = dict(_md) if isinstance(_md, dict) else {}
+                        _newmd["subtitle"] = _st
+                        _page = {**_page, "title": _t, "body": _b, "metadata": _newmd}
                     except Exception:
                         _lang = "en"
                 _resp = HTMLResponse(
