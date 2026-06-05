@@ -19,7 +19,7 @@ from typing import Any, Optional
 PRIMARY_BASE_URL = "https://www.arunachalasamudra.com"
 
 
-def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) -> str:
+def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, lang: str = "en") -> str:
     """Render a `pages` row (dict) into a complete, SEO-ready, design-matched page.
 
     Keys: slug, title, body(HTML), meta_description, og_image, canonical_path,
@@ -36,6 +36,23 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) 
     hero_image = md.get("hero_image")
     subtitle = md.get("subtitle")
     e = html_lib.escape
+
+    # ── Language switcher (matches the site's supported languages) ───────────
+    _LANGS = [("en","English"),("hi","\u0939\u093f\u0928\u094d\u0926\u0940"),("ta","\u0ba4\u0bae\u0bbf\u0bb4\u0bcd"),
+              ("te","\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41"),("bn","\u09ac\u09be\u0982\u09b2\u09be"),("ml","\u0d2e\u0d32\u0d2f\u0d3e\u0d33\u0d02"),
+              ("es","Espa\u00f1ol"),("fr","Fran\u00e7ais"),("de","Deutsch"),("nl","Nederlands"),("sv","Svenska"),
+              ("da","Dansk"),("no","Norsk"),("fi","Suomi"),("ar","\u0627\u0644\u0639\u0631\u0628\u064a\u0629"),("zh-CN","\u4e2d\u6587")]
+    _opts = "".join(
+        f'<option value="{code}"{" selected" if code == lang else ""}>{name}</option>'
+        for code, name in _LANGS
+    )
+    _lang_switcher = (
+        '<select aria-label="Language" class="langsel" '
+        "onchange=\"(function(v){var u=new URL(window.location.href);"
+        "if(v){u.searchParams.set('lang',v);}window.location.href=u.toString();})(this.value)\">"
+        + _opts + "</select>"
+    )
+    _dir = ' dir="rtl"' if lang == "ar" else ""
 
     # ---------- JSON-LD ----------
     ld: list[dict] = []
@@ -92,7 +109,7 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) 
         footer_nav_html = "<div class='fnav'>" + "".join(cols) + "</div>"
 
     return f"""<!doctype html>
-<html lang="{e(page.get('lang','en'))}">
+<html lang="{e(lang)}"{_dir}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -149,6 +166,7 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) 
   .fnav{{max-width:1100px;margin:0 auto;padding:36px 22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:24px}}
   .fcol h4{{color:#f0e2d0;font-size:.9rem;margin:0 0 10px}}
   .fcol a{{display:block;color:#cdbfae;text-decoration:none;font-size:.85rem;padding:3px 0}}
+  .langsel{{margin-left:14px;font-family:system-ui,sans-serif;font-size:.82rem;color:var(--stone);background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 6px}}
   .copyright{{text-align:center;border-top:1px solid rgba(255,255,255,.1);padding:16px;font-size:.8rem;color:#9c8d7c}}
 </style>
 </head>
@@ -156,7 +174,7 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL) 
   <div class="topbar">Now live: Ask Wisdom AI your questions about Bhagavan's teachings →</div>
   <div class="nav">
     <span class="brand">Arunachala Samudra</span>
-    <span class="links"><a href="/arunachala">Arunachala</a><a href="/temple/big-temple">Temple</a><a href="/ramana-maharshi">Ramana Maharshi</a><a href="/saints">Saints</a><a href="/sacred-teachings">Sacred Teachings</a><a href="/resources">Resources</a><a href="/about">About</a><a href="/">Wisdom AI</a></span>
+    <span class="links"><a href="/arunachala">Arunachala</a><a href="/temple/big-temple">Temple</a><a href="/ramana-maharshi">Ramana Maharshi</a><a href="/saints">Saints</a><a href="/sacred-teachings">Sacred Teachings</a><a href="/resources">Resources</a><a href="/about">About</a><a href="/">Wisdom AI</a>{_lang_switcher}</span>
   </div>
   {hero_html}
   <main>

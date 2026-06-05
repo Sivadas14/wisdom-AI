@@ -139,7 +139,7 @@ def _azure_lang(code: str) -> str:
     return _AZURE_LANG_MAP.get(code, code)
 
 
-async def call_azure(text: str, target: str, source: str = "en", timeout: float = 10.0) -> str:
+async def call_azure(text: str, target: str, source: str = "en", timeout: float = 10.0, html: bool = False) -> str:
     """Translate via Microsoft Azure Cognitive Translator (v3 API).
 
     2 million characters per month FREE forever — preferred fallback / international primary.
@@ -151,6 +151,8 @@ async def call_azure(text: str, target: str, source: str = "en", timeout: float 
         "Content-Type":                 "application/json",
     }
     params = {"api-version": "3.0", "from": _azure_lang(source), "to": _azure_lang(target)}
+    if html:
+        params["textType"] = "html"
     async with httpx.AsyncClient(timeout=timeout) as client:
         r = await client.post(
             "https://api.cognitive.microsofttranslator.com/translate",
@@ -170,7 +172,7 @@ async def call_azure(text: str, target: str, source: str = "en", timeout: float 
 # Google Translate (tertiary fallback)
 # ---------------------------------------------------------------------------
 
-async def call_google(text: str, target: str, source: str = "en", timeout: float = 10.0) -> str:
+async def call_google(text: str, target: str, source: str = "en", timeout: float = 10.0, html: bool = False) -> str:
     """Translate via Google Cloud Translation v2.
 
     Only called if both Sarvam and Azure fail. 500K chars/month free.
@@ -183,7 +185,7 @@ async def call_google(text: str, target: str, source: str = "en", timeout: float
         r = await client.post(
             "https://translation.googleapis.com/language/translate/v2",
             params={"key": settings.google_translate_key},
-            json={"q": text, "source": source, "target": target, "format": "text"},
+            json={"q": text, "source": source, "target": target, "format": "html" if html else "text"},
         )
         r.raise_for_status()
         data = r.json()
