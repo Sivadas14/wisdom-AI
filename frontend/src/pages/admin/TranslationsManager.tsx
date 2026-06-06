@@ -19,31 +19,31 @@ export default function TranslationsManager() {
     const [busy, setBusy] = useState<string>("");
 
     useEffect(() => {
-        apiClient.get("/api/admin/pages").then(r => setPages(r.data || [])).catch(() => {});
+        apiClient.get("/admin/pages").then(r => setPages(r.data || [])).catch(() => {});
     }, []);
 
     const loadPage = async (s: string) => {
         setSlug(s); setLang(""); setSource(null); setLangs([]);
         if (!s) return;
-        const r = await apiClient.get(`/api/admin/translations?slug=${encodeURIComponent(s)}`);
+        const r = await apiClient.get(`/admin/translations?slug=${encodeURIComponent(s)}`);
         setSource(r.data.source); setLangs(r.data.languages || []);
     };
 
     const loadLang = async (l: string) => {
         setLang(l);
-        const r = await apiClient.get(`/api/admin/translations/one?slug=${encodeURIComponent(slug)}&lang=${l}`);
+        const r = await apiClient.get(`/admin/translations/one?slug=${encodeURIComponent(slug)}&lang=${l}`);
         setDraft({ title: r.data.title || "", subtitle: r.data.subtitle || "", body: r.data.body || "", status: r.data.status });
     };
 
     const refreshStatus = async () => {
-        const r = await apiClient.get(`/api/admin/translations?slug=${encodeURIComponent(slug)}`);
+        const r = await apiClient.get(`/admin/translations?slug=${encodeURIComponent(slug)}`);
         setLangs(r.data.languages || []);
     };
 
     const autoTranslate = async () => {
         setBusy("Translating… (this can take a few seconds)");
         try {
-            const r = await apiClient.post("/api/admin/translations/draft", { slug, lang });
+            const r = await apiClient.post("/admin/translations/draft", { slug, lang });
             setDraft({ title: r.data.title || "", subtitle: r.data.subtitle || "", body: r.data.body || "", status: "draft" });
             await refreshStatus();
         } finally { setBusy(""); }
@@ -51,20 +51,20 @@ export default function TranslationsManager() {
     const save = async () => {
         setBusy("Saving…");
         try {
-            await apiClient.put("/api/admin/translations", { slug, lang, title: draft.title, subtitle: draft.subtitle, body: draft.body });
+            await apiClient.put("/admin/translations", { slug, lang, title: draft.title, subtitle: draft.subtitle, body: draft.body });
             setDraft(d => ({ ...d, status: "draft" })); await refreshStatus();
         } finally { setBusy(""); }
     };
     const approve = async () => {
         setBusy("Approving…");
         try {
-            await apiClient.put("/api/admin/translations", { slug, lang, title: draft.title, subtitle: draft.subtitle, body: draft.body });
-            await apiClient.post("/api/admin/translations/approve", { slug, lang });
+            await apiClient.put("/admin/translations", { slug, lang, title: draft.title, subtitle: draft.subtitle, body: draft.body });
+            await apiClient.post("/admin/translations/approve", { slug, lang });
             setDraft(d => ({ ...d, status: "approved" })); await refreshStatus();
             alert("Approved — now live on the site for this language.");
         } finally { setBusy(""); }
     };
-    const unapprove = async () => { await apiClient.post("/api/admin/translations/unapprove", { slug, lang }); setDraft(d => ({ ...d, status: "draft" })); await refreshStatus(); };
+    const unapprove = async () => { await apiClient.post("/admin/translations/unapprove", { slug, lang }); setDraft(d => ({ ...d, status: "draft" })); await refreshStatus(); };
 
     const badge = (st: string) => st === "approved" ? "✅" : st === "draft" ? "✎ draft" : "—";
 
