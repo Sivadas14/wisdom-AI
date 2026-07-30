@@ -11,12 +11,13 @@ import time
 from src.settings import get_settings
 from src.wire import SuccessResponse, Error
 from src.db import (
-    UserProfile, 
-    UserRole, 
-    Conversation, 
-    Subscription, 
-    SubscriptionStatus, 
+    UserProfile,
+    UserRole,
+    Conversation,
+    Subscription,
+    SubscriptionStatus,
     Plan,
+    PlanType,
     ContentGeneration,
     ContentType,
     UserAddon,
@@ -79,12 +80,17 @@ async def chat_limit_middleware(request: Request, call_next):
             )
         
         tu.logger.info(f"[CHAT_LIMIT] Checking limits for user_id={user.id}, plan_type={user.plan_type}")
-        
+
+        # PRO plan → unlimited; bypass all subscription/count checks
+        if user.plan_type == PlanType.PRO:
+            tu.logger.info(f"[CHAT_LIMIT] PRO plan_type — unlimited access, skipping limit check")
+            return await call_next(request)
+
         session = None
         try:
             # Get database session
             session = request.app.state.db_session_factory()
-            
+
             # Get user's active subscription and plan
             query = (
                 select(Subscription, Plan)
@@ -816,11 +822,16 @@ async def conversation_limit_middleware(request: Request, call_next):
             )
         
         tu.logger.info(f"[CONVERSATION] Checking limits for user_id={user.id}")
-        
+
+        # PRO plan → unlimited; bypass all subscription/count checks
+        if user.plan_type == PlanType.PRO:
+            tu.logger.info(f"[CONVERSATION] PRO plan_type — unlimited access, skipping limit check")
+            return await call_next(request)
+
         session = None
         try:
             session = request.app.state.db_session_factory()
-            
+
             query = (
                 select(Subscription, Plan)
                 .join(Plan, Subscription.plan_id == Plan.id)
