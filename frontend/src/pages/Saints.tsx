@@ -1,15 +1,14 @@
 /**
- * Saints.tsx — Public page listing saints associated with Arunachala / Ramana lineage.
- * Accessible at /saints (public, no auth required).
+ * Saints.tsx — Public page replicating arunachalasamudra.co.in/saints
+ * Lists all saints of Tiruvannamalai. Accessible at /saints, no auth required.
  */
 
 import { Link } from "react-router-dom";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 // ─── Design tokens (matching Landing.tsx) ─────────────────────────────────────
 const T = {
   cream:    "#F5F0EC",
-  creamMid: "#EDE5DC",
   umber:    "#2E1208",
   brown:    "#472B20",
   muted:    "#8A6D5E",
@@ -23,175 +22,117 @@ const T = {
 
 interface Saint {
   name: string;
-  dates?: string;
-  description: string;
-  witnessesLink?: string;   // anchor on landing page
-  externalLink?: string;
-  externalLabel?: string;
+  slug?: string;          // sub-page slug within /saints/
+  witnessesAnchor?: true; // special case: links to /#witnesses on landing
 }
 
 const ANCIENT_SAINTS: Saint[] = [
-  {
-    name: "Adi Shankaracharya",
-    dates: "c. 788–820 CE",
-    description:
-      "The master consolidator of Advaita Vedanta. His commentaries on the Upanishads, Bhagavad Gita and Brahma Sutras remain the foundation of non-dual understanding in India.",
-  },
-  {
-    name: "Ashtavakra",
-    dates: "Vedic era",
-    description:
-      "Sage whose dialogue with King Janaka — the Ashtavakra Gita — is one of the most direct statements of the non-dual understanding ever recorded. Ramana Maharshi often quoted it.",
-  },
-  {
-    name: "Ribhu",
-    dates: "Vedic era",
-    description:
-      "Disciple of Brahma and teacher of Nidagha. The Ribhu Gita, extracted from the Shiva Rahasya Purana, was Ramana Maharshi's favourite text and is recited daily at Sri Ramanasramam.",
-  },
+  { name: "Arunagirinathar",    slug: "arunagirinathar" },
+  { name: "Guhai Namashivaya",  slug: "guhai-namashivaya" },
+  { name: "Guru Namashivaya",   slug: "guru-namashivaya" },
+  { name: "Isanya Desikar",     slug: "isanya-desikar" },
+  { name: "Saiva Archaryas",    slug: "saiva-archaryas" },
 ];
 
 const MODERN_SAINTS: Saint[] = [
-  {
-    name: "Sri Ramana Maharshi",
-    dates: "1879–1950",
-    description:
-      "The Sage of Arunachala. At sixteen he underwent a spontaneous death-experience that resolved into the permanent recognition of the Self. He lived at the foot of Arunachala Hill for the remainder of his life, teaching mainly through silence and the practice of Self-enquiry (\"Who am I?\").",
-    externalLink: "https://www.sriramanamaharshi.org",
-    externalLabel: "Sri Ramanasramam",
-  },
-  {
-    name: "Paul Brunton",
-    dates: "1898–1981",
-    description:
-      "British philosopher and author who first brought Ramana Maharshi to the West through his 1934 book A Search in Secret India. Ramana said of him: \"Paul Brunton is one of my 'eyes.' My shakti is working through him. Follow him closely.\" His later work — sixteen volumes of The Notebooks of Paul Brunton — explores what he called The Short Path: the direct, immediate recognition of the Overself that is already present.",
-    witnessesLink: "/#witnesses",
-    externalLink: "https://www.paulbrunton.org",
-    externalLabel: "paulbrunton.org — his books & archive",
-  },
-  {
-    name: "Nisargadatta Maharaj",
-    dates: "1897–1981",
-    description:
-      "Mumbai-based teacher of Advaita Vedanta whose dialogues were compiled in I Am That (1973). Like Ramana, he pointed directly to the sense 'I am' as the doorway to the Absolute.",
-  },
-  {
-    name: "Swami Vivekananda",
-    dates: "1863–1902",
-    description:
-      "Principal disciple of Sri Ramakrishna who introduced Vedanta and Yoga to the Western world at the Parliament of the World's Religions, Chicago, 1893.",
-  },
+  { name: "Abhishiktananda",     slug: "abhishiktananda" },
+  { name: "Isakki Swamigal",    slug: "isakki-swamigal" },
+  { name: "Mookupodi Swamigal", slug: "mookupodi-swamigal" },
+  { name: "Nannagaru",          slug: "nannagaru" },
+  { name: "Papa Ramdas",        slug: "papa-ramdas" },
+  { name: "Paul Brunton",       witnessesAnchor: true },
+  { name: "Poondi Swami",       slug: "poondi-swami" },
+  { name: "Ramana Maharshi",    slug: "sri-ramana-maharshi" },
+  { name: "Seshadri Swamigal",  slug: "seshadri-swamigal" },
+  { name: "Sri Sadhu Om",       slug: "sri-sadhu-om" },
+  { name: "Tinnai Swami",       slug: "tinnai-swami" },
+  { name: "Yogi Ram Suratkumar", slug: "yogi-ram-suratkumar" },
 ];
 
-// ─── Card component ───────────────────────────────────────────────────────────
+// ─── Saint row ────────────────────────────────────────────────────────────────
 
-function SaintCard({ saint }: { saint: Saint }) {
-  return (
+function SaintRow({ saint }: { saint: Saint }) {
+  const inner = (
     <div
       style={{
-        backgroundColor: "rgba(255,252,249,0.04)",
-        border: "1px solid rgba(240,216,200,0.15)",
-        borderRadius: "8px",
-        padding: "1.5rem 1.75rem",
-        transition: "border-color 0.2s",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "1rem 1.25rem",
+        borderRadius: "6px",
+        border: "1px solid rgba(224,213,204,0.18)",
+        transition: "background 0.15s, border-color 0.15s",
+        cursor: saint.slug || saint.witnessesAnchor ? "pointer" : "default",
       }}
-      onMouseEnter={e =>
-        ((e.currentTarget as HTMLElement).style.borderColor = "rgba(184,90,45,0.4)")
-      }
-      onMouseLeave={e =>
-        ((e.currentTarget as HTMLElement).style.borderColor = "rgba(240,216,200,0.15)")
-      }
+      onMouseEnter={e => {
+        if (!saint.slug && !saint.witnessesAnchor) return;
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = "rgba(184,90,45,0.07)";
+        el.style.borderColor = "rgba(184,90,45,0.35)";
+      }}
+      onMouseLeave={e => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.background = "transparent";
+        el.style.borderColor = "rgba(224,213,204,0.18)";
+      }}
     >
-      {/* Name + dates */}
-      <div style={{ marginBottom: "0.75rem" }}>
-        <h3
-          style={{
-            fontFamily: T.serif,
-            fontSize: "clamp(1.1rem, 2.5vw, 1.3rem)",
-            color: "rgba(245,230,210,0.92)",
-            margin: 0,
-            fontWeight: 400,
-            letterSpacing: "0.01em",
-          }}
-        >
-          {saint.name}
-        </h3>
-        {saint.dates && (
-          <p
-            style={{
-              fontFamily: T.sans,
-              fontSize: "0.72rem",
-              color: "rgba(196,168,146,0.55)",
-              marginTop: "0.2rem",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            {saint.dates}
-          </p>
-        )}
-      </div>
-
-      {/* Description */}
-      <p
+      <span
         style={{
-          fontFamily: T.sans,
-          fontSize: "0.9rem",
-          color: "rgba(220,200,182,0.78)",
-          lineHeight: 1.75,
-          margin: 0,
-          marginBottom: saint.witnessesLink || saint.externalLink ? "1.1rem" : 0,
+          fontFamily: T.serif,
+          fontSize: "clamp(1rem, 2.5vw, 1.15rem)",
+          color: saint.slug || saint.witnessesAnchor
+            ? "rgba(245,230,210,0.9)"
+            : "rgba(245,230,210,0.55)",
+          fontWeight: 400,
+          letterSpacing: "0.01em",
         }}
       >
-        {saint.description}
-      </p>
-
-      {/* Links */}
-      {(saint.witnessesLink || saint.externalLink) && (
-        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-          {saint.witnessesLink && (
-            <Link
-              to={saint.witnessesLink}
-              style={{
-                fontFamily: T.sans,
-                fontSize: "0.82rem",
-                color: "rgba(184,90,45,0.85)",
-                textDecoration: "underline",
-                textDecorationColor: "rgba(184,90,45,0.35)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.3rem",
-              }}
-            >
-              View his profile on this site
-              <ArrowLeft
-                style={{ transform: "rotate(180deg)", width: "13px", height: "13px" }}
-              />
-            </Link>
-          )}
-          {saint.externalLink && (
-            <a
-              href={saint.externalLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontFamily: T.sans,
-                fontSize: "0.82rem",
-                color: "rgba(196,168,146,0.65)",
-                textDecoration: "underline",
-                textDecorationColor: "rgba(196,168,146,0.3)",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.3rem",
-              }}
-            >
-              {saint.externalLabel ?? saint.externalLink}
-              <ExternalLink style={{ width: "11px", height: "11px" }} />
-            </a>
-          )}
-        </div>
+        {saint.name}
+      </span>
+      {(saint.slug || saint.witnessesAnchor) && (
+        <ArrowRight
+          style={{
+            width: "15px",
+            height: "15px",
+            color: "rgba(184,90,45,0.55)",
+            flexShrink: 0,
+          }}
+        />
       )}
     </div>
+  );
+
+  if (saint.witnessesAnchor) {
+    return <Link to="/#witnesses" style={{ textDecoration: "none", display: "block" }}>{inner}</Link>;
+  }
+  if (saint.slug) {
+    return <Link to={`/saints/${saint.slug}`} style={{ textDecoration: "none", display: "block" }}>{inner}</Link>;
+  }
+  return <div>{inner}</div>;
+}
+
+// ─── Section ──────────────────────────────────────────────────────────────────
+
+function SaintSection({ title, saints }: { title: string; saints: Saint[] }) {
+  return (
+    <section style={{ marginBottom: "2.5rem" }}>
+      <h2
+        style={{
+          fontFamily: T.sans,
+          fontSize: "0.7rem",
+          color: "rgba(196,168,146,0.5)",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          fontWeight: 600,
+          marginBottom: "1rem",
+        }}
+      >
+        {title}
+      </h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        {saints.map(s => <SaintRow key={s.name} saint={s} />)}
+      </div>
+    </section>
   );
 }
 
@@ -210,7 +151,7 @@ const Saints = () => {
       {/* ── Header ── */}
       <header
         style={{
-          maxWidth: "860px",
+          maxWidth: "720px",
           margin: "0 auto",
           padding: "2rem 1.5rem 0",
           display: "flex",
@@ -223,178 +164,141 @@ const Saints = () => {
           style={{
             fontFamily: T.serif,
             fontSize: "1rem",
-            color: "rgba(245,230,210,0.7)",
+            color: "rgba(245,230,210,0.65)",
             textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.4rem",
             letterSpacing: "0.01em",
           }}
         >
-          <ArrowLeft style={{ width: "15px", height: "15px" }} />
           Arunachala Samudra
         </Link>
-
         <Link
           to="/register"
           style={{
             fontFamily: T.sans,
             fontSize: "0.8rem",
-            color: "rgba(184,90,45,0.8)",
+            color: "rgba(184,90,45,0.75)",
             textDecoration: "underline",
             textDecorationColor: "rgba(184,90,45,0.3)",
           }}
         >
-          Enter the Portal →
+          Wisdom AI →
         </Link>
       </header>
 
       {/* ── Hero ── */}
       <div
         style={{
-          maxWidth: "860px",
+          maxWidth: "720px",
           margin: "0 auto",
-          padding: "3.5rem 1.5rem 2.5rem",
+          padding: "3rem 1.5rem 2.5rem",
           borderBottom: "1px solid rgba(240,216,200,0.1)",
         }}
       >
+        {/* Breadcrumb */}
         <p
           style={{
             fontFamily: T.sans,
-            fontSize: "0.72rem",
-            color: "rgba(196,168,146,0.5)",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            marginBottom: "0.75rem",
+            fontSize: "0.75rem",
+            color: "rgba(196,168,146,0.45)",
+            marginBottom: "1.25rem",
           }}
         >
-          Arunachala Samudra
+          <Link to="/" style={{ color: "inherit", textDecoration: "none" }}>Home</Link>
+          {" › "}Saints
         </p>
+
         <h1
           style={{
             fontFamily: T.serif,
-            fontSize: "clamp(2rem, 6vw, 3.25rem)",
+            fontSize: "clamp(2rem, 6vw, 3rem)",
             color: "rgba(245,230,210,0.95)",
-            margin: "0 0 1rem",
+            margin: "0 0 0.75rem",
             fontWeight: 400,
             lineHeight: 1.15,
             letterSpacing: "-0.01em",
           }}
         >
-          Saints & Sages
+          Saints of Tiruvannamalai
         </h1>
         <p
           style={{
             fontFamily: T.sans,
-            fontSize: "clamp(0.92rem, 2vw, 1.05rem)",
-            color: "rgba(220,200,182,0.7)",
-            maxWidth: "560px",
-            lineHeight: 1.75,
+            fontSize: "0.88rem",
+            color: "rgba(196,168,146,0.55)",
+            marginBottom: "0.4rem",
+            fontStyle: "italic",
           }}
         >
-          The teachers and witnesses who have walked the path of Arunachala — from
-          ancient seers to modern sages who carried the flame of Self-enquiry into the
-          contemporary world.
+          Be inspired by real journeys of transformation.
+        </p>
+        <p
+          style={{
+            fontFamily: T.sans,
+            fontSize: "clamp(0.88rem, 2vw, 0.98rem)",
+            color: "rgba(220,200,182,0.68)",
+            maxWidth: "560px",
+            lineHeight: 1.8,
+            marginTop: "1.25rem",
+          }}
+        >
+          Tiruvannamalai has been home to an unbroken lineage of saints — ancient and
+          modern — who were drawn to the sacred hill of Arunachala and realised its grace
+          through their lives. Their stories stand as living testimony to the
+          transformative power of devotion, surrender, and self-inquiry.
         </p>
       </div>
 
-      {/* ── Content ── */}
-      <main style={{ maxWidth: "860px", margin: "0 auto", padding: "0 1.5rem 5rem" }}>
+      {/* ── Saint lists ── */}
+      <main style={{ maxWidth: "720px", margin: "0 auto", padding: "3rem 1.5rem 5rem" }}>
+        <SaintSection title="Ancient Saints" saints={ANCIENT_SAINTS} />
+        <SaintSection title="Modern Saints"  saints={MODERN_SAINTS} />
 
-        {/* Ancient sages */}
-        <section style={{ paddingTop: "3rem" }}>
-          <h2
-            style={{
-              fontFamily: T.sans,
-              fontSize: "0.72rem",
-              color: "rgba(196,168,146,0.5)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              marginBottom: "1.5rem",
-              fontWeight: 600,
-            }}
-          >
-            Ancient Sages
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {ANCIENT_SAINTS.map(s => (
-              <SaintCard key={s.name} saint={s} />
-            ))}
-          </div>
-        </section>
-
-        {/* Divider */}
+        {/* CTA */}
         <div
           style={{
-            borderTop: "1px solid rgba(240,216,200,0.08)",
-            margin: "3rem 0",
-          }}
-        />
-
-        {/* Modern saints */}
-        <section>
-          <h2
-            style={{
-              fontFamily: T.sans,
-              fontSize: "0.72rem",
-              color: "rgba(196,168,146,0.5)",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              marginBottom: "1.5rem",
-              fontWeight: 600,
-            }}
-          >
-            Modern Saints
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {MODERN_SAINTS.map(s => (
-              <SaintCard key={s.name} saint={s} />
-            ))}
-          </div>
-        </section>
-
-        {/* Footer note */}
-        <div
-          style={{
-            marginTop: "4rem",
-            paddingTop: "2rem",
-            borderTop: "1px solid rgba(240,216,200,0.08)",
-            textAlign: "center",
+            marginTop: "3rem",
+            padding: "1.75rem 2rem",
+            background: "rgba(46,18,8,0.5)",
+            border: "1px solid rgba(240,216,200,0.1)",
+            borderRadius: "8px",
           }}
         >
           <p
             style={{
-              fontFamily: T.sans,
-              fontSize: "0.82rem",
-              color: "rgba(196,168,146,0.45)",
-              lineHeight: 1.75,
+              fontFamily: T.serif,
+              fontSize: "1.1rem",
+              color: "rgba(245,230,210,0.88)",
+              marginBottom: "0.4rem",
+              fontWeight: 400,
             }}
           >
-            This list grows as the lineage is explored. If you feel a saint belongs
-            here, write to us at{" "}
-            <a
-              href="mailto:info@arunachalasamudra.in"
-              style={{ color: "rgba(184,90,45,0.6)", textDecoration: "underline" }}
-            >
-              info@arunachalasamudra.in
-            </a>
-            .
+            Continue this inquiry with the Wisdom AI
+          </p>
+          <p
+            style={{
+              fontFamily: T.sans,
+              fontSize: "0.85rem",
+              color: "rgba(196,168,146,0.6)",
+              marginBottom: "1.1rem",
+              lineHeight: 1.6,
+            }}
+          >
+            Ask anything about Ramana Maharshi's teachings — grounded in the source texts.
           </p>
           <Link
-            to="/"
+            to="/register"
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: "0.35rem",
-              marginTop: "1.5rem",
               fontFamily: T.sans,
-              fontSize: "0.84rem",
-              color: "rgba(245,230,210,0.55)",
-              textDecoration: "none",
+              fontSize: "0.85rem",
+              color: T.accent,
+              textDecoration: "underline",
+              textDecorationColor: "rgba(184,90,45,0.35)",
             }}
           >
-            <ArrowLeft style={{ width: "13px", height: "13px" }} />
-            Return to Arunachala Samudra
+            Open the Wisdom AI <ArrowRight style={{ width: "13px", height: "13px" }} />
           </Link>
         </div>
       </main>
