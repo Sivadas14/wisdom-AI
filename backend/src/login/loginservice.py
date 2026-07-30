@@ -117,6 +117,9 @@ class Authorization:
     
     async def check_email_exists(self, request: EmailRequest):
         try:
+            # Query user_profiles table directly — avoids the pagination bug in
+            # list_users() which only returns the first page (~50 users) and
+            # misses accounts that were created later.
             result = (
                 self.supabase_admin
                 .table("user_profiles")

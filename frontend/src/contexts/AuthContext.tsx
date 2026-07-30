@@ -588,9 +588,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔵 [AuthContext] Sending OTP to:', cleanEmail);
 
       // shouldCreateUser: false — OTP can only sign in existing, verified accounts.
-      // Supabase rejects the request if the email isn't registered, so no
-      // separate pre-check is needed (the old list_users() check only returned
-      // the first page of users and incorrectly blocked valid accounts).
+      // Supabase itself rejects the request if the email isn't registered, so no
+      // separate pre-check is needed (the old list_users() check only returned the
+      // first page of users and incorrectly blocked valid accounts).
       const { data, error } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
         options: {

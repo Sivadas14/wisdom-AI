@@ -1019,6 +1019,19 @@ const Chat = () => {
     navigate("/chat");
   };
 
+  // ── PB elaboration — asks for Paul Brunton's Short Path perspective ──────────
+  // Constructs a contextual prompt from the last user question so the follow-up
+  // feels natural rather than generic. Falls back to a standalone prompt when
+  // there are no user messages yet.
+  const handlePBElaboration = () => {
+    const lastUserMsg = [...messages].reverse().find(m => m.isUser);
+    const topic = lastUserMsg?.content?.trim();
+    const prompt = topic
+      ? `What does Paul Brunton say about "${topic}" in The Notebooks of Paul Brunton? How does his teaching on The Short Path — the direct, immediate recognition of what is already present — illuminate what Ramana Maharshi has shared on this topic?`
+      : `What is Paul Brunton's teaching on The Short Path in The Notebooks of Paul Brunton, and how does it connect to Ramana Maharshi's practice of self-inquiry?`;
+    handleSendMessage(prompt);
+  };
+
   const renderGeneratedContentThumbnail = (contents: Message['generatedContents'], messageId: string) => {
     if (!contents || contents.length === 0) return null;
 
@@ -1638,6 +1651,17 @@ const Chat = () => {
                   className="rounded-full h-8 md:h-9 whitespace-nowrap px-3 text-xs md:text-sm"
                 >
                   Explore More
+                </Button>
+                <Button
+                  onClick={handlePBElaboration}
+                  disabled={isBusy}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full h-8 md:h-9 whitespace-nowrap px-3 text-xs md:text-sm"
+                  title="Ask Paul Brunton's perspective from The Notebooks"
+                >
+                  <BookOpen className="w-3 md:w-3.5 h-3 md:h-3.5 mr-1 md:mr-1.5" />
+                  PB's View
                 </Button>
                 <Button
                   onClick={() => {
