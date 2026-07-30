@@ -17,6 +17,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AdminRoute from "@/components/AdminRoute";
 import PublicRoute from "@/components/PublicRoute";
 import Landing from "./pages/Landing";
+import Saints from "./pages/Saints";
 
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -92,6 +93,9 @@ const App = () => {
 
                                     {/* ── Landing page: index = renders ONLY for exactly "/" ── */}
                                     <Route index element={<Landing />} />
+
+                                    {/* ── Public content pages (no auth required) ── */}
+                                    <Route path="saints" element={<Saints />} />
 
                                     {/* ── All other routes: wrapped in AppShell ── */}
                                     <Route element={<AppShell />}>

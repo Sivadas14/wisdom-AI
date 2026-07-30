@@ -1420,23 +1420,28 @@ function TeachersWitnessesSection({ isAuthenticated }: { isAuthenticated: boolea
               }}
               className="lg:w-64 lg:border-b-0 lg:border-r"
             >
-              {/* Portrait placeholder */}
+              {/* Portrait */}
               <div
                 style={{
-                  width: "96px",
-                  height: "96px",
-                  borderRadius: "50%",
-                  background: "radial-gradient(circle at 40% 35%, #7a3318, #2e1208)",
+                  width: "120px",
+                  height: "160px",
+                  borderRadius: "6px",
+                  overflow: "hidden",
                   border: "2px solid rgba(245,200,160,0.2)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
                   flexShrink: 0,
                   marginBottom: "0.5rem",
+                  position: "relative",
                 }}
               >
-                <span style={{ fontFamily: T.serif, color: "rgba(245,200,160,0.65)", fontSize: "1.9rem", letterSpacing: "0.02em" }}>PB</span>
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/4/49/Paul_Bruton.jpg"
+                  alt="Paul Brunton"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center", display: "block" }}
+                />
               </div>
+              <p style={{ fontFamily: T.sans, color: "rgba(154,128,112,0.5)", fontSize: "0.62rem", textAlign: "center", marginBottom: "0.25rem" }}>
+                © CC BY-SA 4.0
+              </p>
 
               <div style={{ textAlign: "center" }}>
                 <h3 style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "1.25rem", marginBottom: "0.2rem" }}>Paul Brunton</h3>
@@ -1506,17 +1511,44 @@ function TeachersWitnessesSection({ isAuthenticated }: { isAuthenticated: boolea
                 </p>
               ))}
 
+              {/* Ramana's endorsement of PB */}
+              <div
+                style={{
+                  borderLeft: `3px solid rgba(245,200,160,0.35)`,
+                  paddingLeft: "1.25rem",
+                  marginTop: "1.5rem",
+                  marginBottom: "1.75rem",
+                }}
+              >
+                <p style={{ fontFamily: T.serif, color: "rgba(245,230,210,0.9)", fontSize: "clamp(0.92rem, 1.8vw, 1.05rem)", lineHeight: 1.65, fontStyle: "italic", marginBottom: "0.6rem" }}>
+                  "Paul Brunton is one of my 'eyes.' My shakti is working through him. Follow him closely."
+                </p>
+                <p style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.55)", fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500 }}>
+                  Sri Ramana Maharshi · when asked about Brunton's books by a visitor
+                </p>
+              </div>
+
               {/* CTAs */}
-              <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
                 <a
                   href="#teachings"
                   style={{ ...btn, display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.85rem" }}
                 >
                   Explore his Notebooks <ArrowRight className="w-4 h-4" />
                 </a>
+                <a
+                  href="https://www.paulbrunton.org"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.7)", fontSize: "0.83rem", textDecoration: "underline", textDecorationColor: "rgba(196,168,146,0.3)" }}
+                >
+                  paulbrunton.org — his books &amp; archive →
+                </a>
+              </div>
+              <div style={{ marginTop: "0.85rem" }}>
                 <Link
                   to={isAuthenticated ? "/home" : "/register"}
-                  style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.7)", fontSize: "0.83rem", textDecoration: "underline", textDecorationColor: "rgba(196,168,146,0.3)" }}
+                  style={{ fontFamily: T.sans, color: "rgba(184,90,45,0.75)", fontSize: "0.8rem", textDecoration: "underline", textDecorationColor: "rgba(184,90,45,0.3)" }}
                 >
                   Ask Wisdom AI about The Short Path →
                 </Link>
