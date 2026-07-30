@@ -115,10 +115,9 @@ const SignIn: React.FC = () => {
         setSuccess("Sign in successful! Redirecting...");
         const location = window.history.state?.usr;
         const fromState = location as { from?: { pathname: string; search: string } } | undefined;
-        let targetPath = fromState?.from?.pathname
+        const targetPath = fromState?.from?.pathname
           ? `${fromState.from.pathname}${fromState.from.search || ''}`
           : '/home';
-        if (response.userProfile?.role === 'ADMIN') targetPath = '/admin';
         setTimeout(() => navigate(targetPath, { replace: true }), 500);
       } else {
         const code = (response as any).code || '';
@@ -189,10 +188,9 @@ const SignIn: React.FC = () => {
         setSuccess("Verified! Redirecting...");
         const location = window.history.state?.usr;
         const fromState = location as { from?: { pathname: string; search: string } } | undefined;
-        let targetPath = fromState?.from?.pathname
+        const targetPath = fromState?.from?.pathname
           ? `${fromState.from.pathname}${fromState.from.search || ''}`
           : '/home';
-        if (response.userProfile?.role === 'ADMIN') targetPath = '/admin';
         setTimeout(() => navigate(targetPath, { replace: true }), 1000);
       } else {
         setError(response.message);
