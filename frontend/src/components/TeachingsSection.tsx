@@ -26,7 +26,7 @@ export default function TeachingsSection({ onExplore }: TeachingsSectionProps) {
               Guided Introduction to the Teachings
             </h2>
             <p className="text-xs font-body mt-0.5" style={{ color: "#9b6a4a" }}>
-              Five sacred texts · tap to read &amp; listen
+              Six sacred texts · tap to read &amp; listen
             </p>
           </div>
         </div>

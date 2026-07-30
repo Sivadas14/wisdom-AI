@@ -101,6 +101,29 @@ Ramana kept returning to it. Perhaps you will too.`,
       "I've just read about 'Devikalottara', the ancient scripture on supreme wisdom that Ramana Maharshi translated and revered. Can you share some of its core teachings on the nature of awareness and how to abide in the Self?",
   },
   {
+  {
+    id: "pb-notebooks",
+    title: "The Notebooks of Paul Brunton",
+    sanskrit: "The Short Path",
+    author: "Paul Brunton",
+    era: "1934\u20131981",
+    teaser:
+      "In 1931, a British journalist arrived in South India searching for miracles \u2014 and left transformed by a silence that answered every question without a single word. What Paul Brunton found in that moment, and spent fifty years decoding, is here.",
+    introduction: `In 1931, a young British journalist arrived in South India on a search that had taken him across Egypt, across mystical fraternities, across every tradition he could find. He had come to a small mountain town called Tiruvannamalai because he had heard rumours of a sage who had not spoken in years \u2014 a sage who, it was whispered, could give you with a look what decades of practice could not.
+
+What happened when Paul Brunton sat before Ramana Maharshi on that first evening changed his life permanently. He did not see a miracle. He felt a silence so complete, so alive, that his mind \u2014 the restless, sceptical journalist's mind \u2014 stopped. In that stillness, something recognized itself. He wrote: "A peace that passed understanding flooded my mind."
+
+Brunton went back to the West and wrote A Search in Secret India \u2014 the book that introduced Ramana Maharshi to the world. But his own journey had only just begun. For the next fifty years, from ashrams in India to a rented room in a Swiss village, he sat with his notebooks and worked, with extraordinary precision, to map the territory that Ramana had opened in him.
+
+The Notebooks of Paul Brunton \u2014 published in sixteen volumes after his death \u2014 is one of the most complete contemplative works of the twentieth century. It covers the nature of the ego, the practice of deep meditation, the discovery of the Void as a living reality, and the final recognition he called The Alone: that behind all appearances, all thoughts, and all selves, there is a single, undivided, luminous awareness \u2014 and that you are it.
+
+Brunton called the most direct route to this recognition The Short Path. Not the gradual path of years of practice, but the sudden, immediate turning of attention to what is already here. It is the same recognition that Ramana pointed to \u2014 but described by a Western mind, in language that cuts through the distance that Eastern forms can sometimes create.
+
+This is not mysticism translated for curious tourists. It is the unfiltered record of a Western man who went all the way in \u2014 and came back with a map.`,
+    chatPrompt:
+      "I've just read about The Notebooks of Paul Brunton and his journey from meeting Ramana Maharshi to a lifetime of contemplative inquiry. Can you share what Paul Brunton taught about 'The Short Path' \u2014 the direct recognition of the Self \u2014 and how it connects to what Ramana Maharshi taught about self-inquiry?",
+  },
+  {
     id: "ashtavakra-gita",
     title: "The Song of the Self",
     sanskrit: "Ashtavakra Gita",
