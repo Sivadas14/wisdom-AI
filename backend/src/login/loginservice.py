@@ -117,11 +117,15 @@ class Authorization:
     
     async def check_email_exists(self, request: EmailRequest):
         try:
-            result = self.supabase_admin.auth.admin.list_users()
-            users = result.users if hasattr(result, "users") else []
-
-            email_exists = any(user.email == request.email for user in users)
-            return {"exists": email_exists}
+            result = (
+                self.supabase_admin
+                .table("user_profiles")
+                .select("email_id")
+                .eq("email_id", request.email.strip().lower())
+                .limit(1)
+                .execute()
+            )
+            return {"exists": len(result.data) > 0}
 
         except Exception as e:
             raise HTTPException(

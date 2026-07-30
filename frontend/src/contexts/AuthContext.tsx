@@ -587,29 +587,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const cleanEmail = email.trim().toLowerCase();
       console.log('🔵 [AuthContext] Sending OTP to:', cleanEmail);
 
-      // ── Guard: email must be registered before we send an OTP ──
-      // We check against the backend (which queries Supabase admin API) so that
-      // OTP sign-in cannot be used as a backdoor to create unverified accounts.
-      try {
-        const checkRes = await fetch(`${API_BASE_URL}/auth/check-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail }),
-        });
-        const checkData = await checkRes.json();
-        if (!checkData?.exists) {
-          return {
-            success: false,
-            code: 'NOT_REGISTERED',
-            message: 'No account found with this email. Please register first before signing in with OTP.',
-          };
-        }
-      } catch (checkErr: any) {
-        console.warn('⚠️ [AuthContext] Email existence check failed, proceeding cautiously:', checkErr);
-        // Don't block if the check itself fails — Supabase will still refuse shouldCreateUser:false
-      }
-
       // shouldCreateUser: false — OTP can only sign in existing, verified accounts.
+      // Supabase rejects the request if the email isn't registered, so no
+      // separate pre-check is needed (the old list_users() check only returned
+      // the first page of users and incorrectly blocked valid accounts).
       const { data, error } = await supabase.auth.signInWithOtp({
         email: cleanEmail,
         options: {
