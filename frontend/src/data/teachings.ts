@@ -101,7 +101,6 @@ Ramana kept returning to it. Perhaps you will too.`,
       "I've just read about 'Devikalottara', the ancient scripture on supreme wisdom that Ramana Maharshi translated and revered. Can you share some of its core teachings on the nature of awareness and how to abide in the Self?",
   },
   {
-  {
     id: "pb-notebooks",
     title: "The Notebooks of Paul Brunton",
     sanskrit: "The Short Path",
