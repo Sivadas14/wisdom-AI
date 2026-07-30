@@ -271,6 +271,7 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
             { label: "Saints",             href: "/saints"       },
             { label: "Teachings",          href: "/sacred-teachings" },
             { label: "Library",            href: "/library"      },
+            { label: "Witnesses",          href: "#witnesses"    },
             { label: "About",              href: "/about"        },
           ].map(({ label, href }) => (
             <a
@@ -318,6 +319,7 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
               { label: "Saints",             href: "/saints"       },
               { label: "Teachings",          href: "/sacred-teachings" },
               { label: "Library",            href: "/library"      },
+              { label: "Witnesses",          href: "#witnesses"    },
               { label: "About",              href: "/about"        },
             ].map(({ label, href }) => (
               <a
@@ -597,7 +599,7 @@ function SacredLibrarySection() {
         <div className="mb-14">
           <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>The Sacred Library</p>
           <h2 style={{ fontFamily: T.serif, color: T.brown, fontSize: "clamp(2rem, 4vw, 3rem)", lineHeight: 1.2, marginBottom: "1rem", maxWidth: "560px" }}>
-            Five texts.<br />A lifetime of depth.
+            Six texts.<br />A lifetime of depth.
           </h2>
           <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.95rem", lineHeight: 1.7, maxWidth: "520px" }}>
             The Wisdom Portal draws exclusively from these authenticated works — every answer is grounded in Bhagavan's own words.
@@ -1373,6 +1375,172 @@ function GuestChatSection() {
   );
 }
 
+// ─── 6b. Teachers & Witnesses ────────────────────────────────────────────────
+function TeachersWitnessesSection({ isAuthenticated }: { isAuthenticated: boolean }) {
+  return (
+    <section id="witnesses" style={{ backgroundColor: T.cream, position: "relative", overflow: "hidden" }} className="py-20 px-6">
+      <div style={{ position: "absolute", left: "-120px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+        <Mandala size={540} opacity={0.055} color={T.brown} />
+      </div>
+
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* Section header */}
+        <div className="mb-14">
+          <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>
+            Teachers &amp; Witnesses
+          </p>
+          <h2 style={{ fontFamily: T.serif, color: T.brown, fontSize: "clamp(2rem, 4vw, 3rem)", lineHeight: 1.2, marginBottom: "1rem", maxWidth: "560px" }}>
+            Those who came to Arunachala<br />and carried the light back.
+          </h2>
+          <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.95rem", lineHeight: 1.7, maxWidth: "540px" }}>
+            Ramana Maharshi never left the hill. But many came — scholars, journalists, artists, mystics — and left transformed. Their accounts are themselves teachings, and the library here is built on what they faithfully recorded.
+          </p>
+        </div>
+
+        {/* Paul Brunton profile card */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #1a0a04 0%, #3d1a0a 30%, #6b3a22 60%, #3d1a0a 80%, #1a0a04 100%)",
+            borderRadius: "6px",
+            overflow: "hidden",
+            boxShadow: "0 25px 70px rgba(0,0,0,0.18)",
+          }}
+        >
+          <div className="flex flex-col lg:flex-row">
+            {/* Left: Portrait + metadata */}
+            <div
+              style={{
+                padding: "2.5rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                gap: "1rem",
+                borderBottom: "1px solid rgba(245,200,160,0.1)",
+              }}
+              className="lg:w-64 lg:border-b-0 lg:border-r"
+            >
+              {/* Portrait placeholder */}
+              <div
+                style={{
+                  width: "96px",
+                  height: "96px",
+                  borderRadius: "50%",
+                  background: "radial-gradient(circle at 40% 35%, #7a3318, #2e1208)",
+                  border: "2px solid rgba(245,200,160,0.2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  marginBottom: "0.5rem",
+                }}
+              >
+                <span style={{ fontFamily: T.serif, color: "rgba(245,200,160,0.65)", fontSize: "1.9rem", letterSpacing: "0.02em" }}>PB</span>
+              </div>
+
+              <div style={{ textAlign: "center" }}>
+                <h3 style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "1.25rem", marginBottom: "0.2rem" }}>Paul Brunton</h3>
+                <p style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.65)", fontSize: "0.78rem", marginBottom: "0.75rem" }}>1898 – 1981</p>
+                <p style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.85)", fontSize: "0.83rem", lineHeight: 1.6, marginBottom: "1rem", maxWidth: "180px" }}>
+                  British philosopher, mystic, and the writer who introduced Ramana Maharshi to the Western world.
+                </p>
+              </div>
+
+              {/* Tags */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", alignItems: "center" }}>
+                {["The Short Path", "A Search in Secret India", "The Notebooks (16 vols)"].map(tag => (
+                  <span
+                    key={tag}
+                    style={{
+                      fontFamily: T.sans,
+                      fontSize: "0.7rem",
+                      color: "rgba(184,90,45,0.9)",
+                      backgroundColor: "rgba(184,90,45,0.1)",
+                      border: "1px solid rgba(184,90,45,0.25)",
+                      borderRadius: "3px",
+                      padding: "0.2rem 0.65rem",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Story */}
+            <div style={{ padding: "2.5rem", flex: 1 }}>
+              {/* Pull quote */}
+              <div
+                style={{
+                  borderLeft: `3px solid ${T.accent}`,
+                  paddingLeft: "1.25rem",
+                  marginBottom: "2rem",
+                }}
+              >
+                <p style={{ fontFamily: T.serif, color: "#F5F0EC", fontSize: "clamp(1rem, 2vw, 1.2rem)", lineHeight: 1.65, fontStyle: "italic" }}>
+                  "A peace that passed understanding flooded my mind."
+                </p>
+                <p style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.55)", fontSize: "0.73rem", marginTop: "0.6rem", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 500 }}>
+                  Paul Brunton · on his first sitting with Ramana Maharshi, 1931
+                </p>
+              </div>
+
+              {/* Story paragraphs */}
+              {[
+                `In 1930, a young British journalist arrived in South India on an assignment that would end his journalism career. He had spent years tracking esoteric fraternities, occultists, and yogis across Egypt and Europe — finding, for the most part, charlatans. He came to Tiruvannamalai because someone had mentioned a silent sage who lived on a hill and seemed to do nothing at all.`,
+                `What happened on his first evening in the hall changed his life. He sat with Ramana Maharshi for perhaps an hour. Nothing dramatic occurred. The sage barely moved. And yet something in Paul Brunton's restless, sceptical mind came to a complete stop. A silence entered that was not empty — it was alive, saturated, answering something he could not have named before that moment.`,
+                `The book he wrote — A Search in Secret India (1934) — introduced Ramana Maharshi to the English-speaking world. Thousands made the pilgrimage to Arunachala because of it. But Brunton's own journey had only begun. For the next fifty years, from ashrams in India to a rented room in Vevey, Switzerland, he filled hundreds of notebooks with the most careful and precise mapping of the contemplative interior that any Western mind has produced. His central contribution: The Short Path — the direct, immediate turning of attention to what is already here, without waiting for years of preparation. The same recognition Ramana pointed to, in language the Western mind could receive without translation.`,
+              ].map((para, i) => (
+                <p
+                  key={i}
+                  style={{
+                    fontFamily: T.sans,
+                    color: "#C4A892",
+                    fontSize: "0.92rem",
+                    lineHeight: 1.75,
+                    marginBottom: "1rem",
+                  }}
+                >
+                  {para}
+                </p>
+              ))}
+
+              {/* CTAs */}
+              <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+                <a
+                  href="#teachings"
+                  style={{ ...btn, display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.85rem" }}
+                >
+                  Explore his Notebooks <ArrowRight className="w-4 h-4" />
+                </a>
+                <Link
+                  to={isAuthenticated ? "/home" : "/register"}
+                  style={{ fontFamily: T.sans, color: "rgba(196,168,146,0.7)", fontSize: "0.83rem", textDecoration: "underline", textDecorationColor: "rgba(196,168,146,0.3)" }}
+                >
+                  Ask Wisdom AI about The Short Path →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer bar */}
+          <div
+            style={{
+              borderTop: "1px solid rgba(245,200,160,0.08)",
+              padding: "0.9rem 2.5rem",
+            }}
+          >
+            <p style={{ fontFamily: T.sans, color: "rgba(154,128,112,0.6)", fontSize: "0.78rem" }}>
+              ✦&nbsp; More witnesses will be added — Maurice Frydman, Arthur Osborne, Annamalai Swami, and others who sat with Bhagavan and left faithful records.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Features ─────────────────────────────────────────────────────────────────
 const FEATURES = [
   {
@@ -2044,6 +2212,7 @@ export default function Landing() {
         <DailyContemplationSection />
         <GuestChatSection />
         <SacredLibrarySection />
+        <TeachersWitnessesSection isAuthenticated={isAuthenticated} />
         <FeaturesSection />
         <TestimonialsSection />
         <PricingSection />
