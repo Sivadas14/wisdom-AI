@@ -2008,9 +2008,7 @@ function Footer() {
             <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.72rem", letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginBottom: "1rem" }}>Resources</p>
             <ul className="space-y-2">
               {[
-                { label: "Arunachala Samudra .in",   href: "https://www.arunachalasamudra.in"                          },
-                { label: "Digital Experience Centre", href: "https://www.arunachalasamudra.in/digital-experience-centre" },
-                { label: "Sacred Teachings",          href: "https://www.arunachalasamudra.in/sacred-teachings"         },
+                { label: "Sacred Teachings",          href: "https://www.arunachalasamudra.co.in/sacred-teachings"     },
                 { label: "Ramanasramam",              href: "https://www.gururamana.org"                                        },
                 { label: "Mountain Path Journal",     href: "https://www.gururamana.org/Resources/mountain-path"            },
                 { label: "David Godman",              href: "https://www.davidgodman.org"                                    },

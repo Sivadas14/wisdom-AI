@@ -898,6 +898,16 @@ async def _add_translation_reviewed_column(session: AsyncSession) -> None:
     await session.commit()
     _log("page_translations.reviewed column ready")
 
+async def _set_owner_pro_plan(session: AsyncSession) -> None:
+    """Set rsivadas@gmail.com to PRO plan (unlimited chats) for owner testing.
+    Idempotent — safe to run on every deploy."""
+    result = await session.execute(
+        text("UPDATE user_profiles SET plan_type = 'PRO' WHERE email_id = 'rsivadas@gmail.com'")
+    )
+    await session.commit()
+    _log(f"_set_owner_pro_plan: updated {result.rowcount} row(s) for rsivadas@gmail.com → PRO")
+
+
 async def run_migrations(session_factory) -> None:
     """
     Entry point called from server lifespan.
@@ -951,3 +961,6 @@ async def run_migrations(session_factory) -> None:
         # requires explicit GRANT on each table in addition to RLS policies.
         # Idempotent — GRANT is a no-op when the privilege already exists.
         await _safe_migration(session, "_add_explicit_postgrest_grants", _add_explicit_postgrest_grants)
+
+        # ── Admin / owner account: unlimited PRO plan for rsivadas@gmail.com ───
+        await _safe_migration(session, "_set_owner_pro_plan", _set_owner_pro_plan)

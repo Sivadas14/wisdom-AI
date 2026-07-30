@@ -119,7 +119,7 @@ const Sidebar = () => {
     return (
         <div className="flex bg-[#F5F0EC] flex-col h-full w-[260px] border-r border-[#ECE5DF]">
             <div className="px-4 pt-2 pb-2">
-                <a href="http://www.arunachalasamudra.in" target="_blank" rel="noopener noreferrer" className="cursor-pointer">
+                <a href="https://www.arunachalasamudra.co.in" className="cursor-pointer">
                     {/* <img
                         src="/images/LogoPrimary/Logo-Primary.svg"
                         alt="ArunachalaSamudra"
@@ -204,12 +204,10 @@ const Sidebar = () => {
                         </Button>
 
                         <a
-                            href="https://www.arunachalasamudra.in"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="/sacred-teachings"
                             className="flex items-center gap-2 h-9 px-2 w-full rounded-md text-[#472B20] hover:bg-[#ECE5DF] transition-colors text-sm font-normal"
                         >
-                            <ExternalLink className="h-4 w-4 shrink-0" />
+                            <BookOpen className="h-4 w-4 shrink-0" />
                             Sacred Teachings
                         </a>
                     </div>
