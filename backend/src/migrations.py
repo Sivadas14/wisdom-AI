@@ -920,6 +920,8 @@ async def _set_owner_pro_plan(session: AsyncSession) -> None:
         #    ensure they are ACTIVE — /subscriptions/me returns the most
         #    recent subscription regardless of status, so we must also set
         #    status=ACTIVE to avoid the cancelled FREE sub showing in the UI.
+        # Use raw int ID to avoid any SQLAlchemy enum-cast issues.
+        pro_plan_id = int(pro_plan.id)
         r2 = await session.execute(
             text("""
                 UPDATE subscriptions
@@ -930,10 +932,10 @@ async def _set_owner_pro_plan(session: AsyncSession) -> None:
                     WHERE email_id = 'rsivadas@gmail.com'
                 )
             """),
-            {"plan_id": str(pro_plan.id)}
+            {"plan_id": pro_plan_id}
         )
         await session.commit()
-        _log(f"_set_owner_pro_plan: pointed {r2.rowcount} subscription(s) → PRO plan '{pro_plan.name}' (id={pro_plan.id})")
+        _log(f"_set_owner_pro_plan: pointed {r2.rowcount} subscription(s) → PRO plan '{pro_plan.name}' (id={pro_plan_id})")
     else:
         await session.commit()
         _log("_set_owner_pro_plan: WARNING — no PRO plan found in plans table; only plan_type updated")
