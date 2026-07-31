@@ -900,8 +900,8 @@ async def _add_translation_reviewed_column(session: AsyncSession) -> None:
 
 async def _set_owner_pro_plan(session: AsyncSession) -> None:
     """Set rsivadas@gmail.com to PRO plan (unlimited chats) for owner testing.
-    Also cancels any active FREE subscriptions so the PRO plan_type takes
-    effect everywhere — including the sidebar display.
+    Updates user_profiles.plan_type AND points all subscriptions at the PRO
+    plan so the sidebar display, middleware, and billing page all agree.
     Idempotent — safe to run on every deploy."""
     # 1. Set plan_type = PRO on all user_profiles rows for this email
     r1 = await session.execute(
@@ -909,23 +909,34 @@ async def _set_owner_pro_plan(session: AsyncSession) -> None:
     )
     _log(f"_set_owner_pro_plan: updated {r1.rowcount} user_profile row(s) → PRO")
 
-    # 2. Cancel any active subscriptions linked to a FREE plan so the PRO
-    #    plan_type is the authoritative source (no active subscription overrides it)
-    r2 = await session.execute(
-        text("""
-            UPDATE subscriptions
-            SET status = 'CANCELLED'
-            WHERE user_id IN (
-                SELECT id FROM user_profiles WHERE email_id = 'rsivadas@gmail.com'
-            )
-            AND status = 'ACTIVE'
-            AND plan_id IN (
-                SELECT id FROM plans WHERE plan_type = 'FREE'
-            )
-        """)
+    # 2. Find the PRO monthly plan ID
+    pro_plan_result = await session.execute(
+        select(Plan).where(Plan.plan_type == PlanType.PRO).limit(1)
     )
-    await session.commit()
-    _log(f"_set_owner_pro_plan: cancelled {r2.rowcount} FREE subscription(s) for rsivadas@gmail.com")
+    pro_plan = pro_plan_result.scalar_one_or_none()
+
+    if pro_plan:
+        # 3. Repoint ALL subscriptions for this user to the PRO plan and
+        #    ensure they are ACTIVE — /subscriptions/me returns the most
+        #    recent subscription regardless of status, so we must also set
+        #    status=ACTIVE to avoid the cancelled FREE sub showing in the UI.
+        r2 = await session.execute(
+            text("""
+                UPDATE subscriptions
+                SET plan_id  = :plan_id,
+                    status   = 'ACTIVE'
+                WHERE user_id IN (
+                    SELECT id FROM user_profiles
+                    WHERE email_id = 'rsivadas@gmail.com'
+                )
+            """),
+            {"plan_id": str(pro_plan.id)}
+        )
+        await session.commit()
+        _log(f"_set_owner_pro_plan: pointed {r2.rowcount} subscription(s) → PRO plan '{pro_plan.name}' (id={pro_plan.id})")
+    else:
+        await session.commit()
+        _log("_set_owner_pro_plan: WARNING — no PRO plan found in plans table; only plan_type updated")
 
 
 async def run_migrations(session_factory) -> None:
