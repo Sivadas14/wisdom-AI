@@ -900,12 +900,32 @@ async def _add_translation_reviewed_column(session: AsyncSession) -> None:
 
 async def _set_owner_pro_plan(session: AsyncSession) -> None:
     """Set rsivadas@gmail.com to PRO plan (unlimited chats) for owner testing.
+    Also cancels any active FREE subscriptions so the PRO plan_type takes
+    effect everywhere — including the sidebar display.
     Idempotent — safe to run on every deploy."""
-    result = await session.execute(
+    # 1. Set plan_type = PRO on all user_profiles rows for this email
+    r1 = await session.execute(
         text("UPDATE user_profiles SET plan_type = 'PRO' WHERE email_id = 'rsivadas@gmail.com'")
     )
+    _log(f"_set_owner_pro_plan: updated {r1.rowcount} user_profile row(s) → PRO")
+
+    # 2. Cancel any active subscriptions linked to a FREE plan so the PRO
+    #    plan_type is the authoritative source (no active subscription overrides it)
+    r2 = await session.execute(
+        text("""
+            UPDATE subscriptions
+            SET status = 'CANCELLED'
+            WHERE user_id IN (
+                SELECT id FROM user_profiles WHERE email_id = 'rsivadas@gmail.com'
+            )
+            AND status = 'ACTIVE'
+            AND plan_id IN (
+                SELECT id FROM plans WHERE plan_type = 'FREE'
+            )
+        """)
+    )
     await session.commit()
-    _log(f"_set_owner_pro_plan: updated {result.rowcount} row(s) for rsivadas@gmail.com → PRO")
+    _log(f"_set_owner_pro_plan: cancelled {r2.rowcount} FREE subscription(s) for rsivadas@gmail.com")
 
 
 async def run_migrations(session_factory) -> None:
