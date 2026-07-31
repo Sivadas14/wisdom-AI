@@ -87,8 +87,11 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, 
 
     hero_html = ""
     if hero_image:
+        hero_position = md.get("hero_position") or "center"
+        hero_size = md.get("hero_size") or "cover"
+        hero_repeat = md.get("hero_repeat") or "no-repeat"
         hero_html = f"""
-    <header class="hero" style="background-image:linear-gradient(rgba(26,20,16,.28),rgba(26,20,16,.55)),url('{e(hero_image)}')">
+    <header class="hero" style="background-image:linear-gradient(rgba(26,20,16,.28),rgba(26,20,16,.55)),url('{e(hero_image)}');background-position:{hero_position};background-size:{hero_size};background-repeat:{hero_repeat}">
       <div class="hero-inner">
         <h1>{e(title)}</h1>
         {f'<p class="hero-sub">{e(subtitle)}</p>' if subtitle else ''}

@@ -50,6 +50,9 @@ def json_to_row(j):
     canonical = j.get("canonical_path") or "/" + j["slug"]
     metadata = {
         "hero_image": j.get("hero_image"),
+        "hero_position": j.get("hero_position"),
+        "hero_size": j.get("hero_size"),
+        "hero_repeat": j.get("hero_repeat"),
         "subtitle": j.get("subtitle"),
         "breadcrumb": breadcrumb_for(canonical),
         "footer_nav": FOOTER_NAV,
