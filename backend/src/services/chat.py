@@ -1376,6 +1376,7 @@ async def _guest_chat_stream(
     user_message: str,
     history: List[GuestChatMessage],
     user_lang: str = "en",
+    charge_quota=None,
 ):
     """Stateless RAG streaming chat for unauthenticated visitors.
 
@@ -1525,13 +1526,25 @@ async def _guest_chat_stream(
                 )
             # === END PHASE 1B ===
 
+        # A real answer was produced — only NOW is it fair to charge the seeker.
+        if charge_quota is not None:
+            try:
+                await charge_quota()
+            except Exception as ce:
+                # Never fail a good answer because metering failed.
+                tu.logger.error(f"[GUEST_CHAT] Failed to record quota usage: {ce}")
+
         # Stream as individual words for smooth frontend display
         words = response_content.split()
         for i, word in enumerate(words):
             yield ta.to_openai_chunk(tt.assistant(word if i == 0 else " " + word))
             await asyncio.sleep(0.025)
     except Exception as e:
-        tu.logger.error(f"Guest chat LLM error: {e}")
+        # NOTE: quota is deliberately NOT charged here. If our AI fails, the
+        # seeker keeps their free question.
+        tu.logger.error(
+            f"Guest chat LLM error [{type(e).__name__}]: {e}", exc_info=True
+        )
         # Distinguish between quota/rate-limit errors and other errors
         err_str = str(e)
         if "429" in err_str or "Too Many Requests" in err_str:
@@ -1619,31 +1632,10 @@ async def guest_chat_completion(
             tu.logger.info(f"[GUEST_CHAT] Session limit reached: sid={sid[:16]}… count={sid_row.message_count}")
             raise HTTPException(status_code=429, detail=_LIMIT_429)
 
-        # ── Both checks passed — increment counters (pessimistic) ──────────
-        if ip_row:
-            ip_row.message_count += 1
-            ip_row.updated_at = _dt.datetime.utcnow()
-            session.add(ip_row)
-        else:
-            session.add(db.GuestSession(
-                ip_hash=ip_hash, session_id=sid,
-                session_date=today_str, message_count=1,
-            ))
-
-        if sid_row:
-            sid_row.message_count += 1
-            sid_row.updated_at = _dt.datetime.utcnow()
-            session.add(sid_row)
-        else:
-            # Only create a new session row if we didn't already create one above
-            # (ip_row is None means we added a new row with ip_hash; sid_row is None separately)
-            if ip_row is not None or sid != ip_hash:
-                session.add(db.GuestSession(
-                    ip_hash=ip_hash, session_id=sid,
-                    session_date=today_str, message_count=1,
-                ))
-
-        await session.commit()
+        # ── Both checks passed. Do NOT increment yet. ──────────────────────
+        # The counter is only incremented once the AI has actually produced an
+        # answer (see charge_quota below). Charging up-front meant that when our
+        # LLM failed, the seeker silently lost a free question for our bug.
 
     except HTTPException:
         raise
@@ -1653,6 +1645,49 @@ async def guest_chat_completion(
         tu.logger.error(f"[GUEST_CHAT] DB rate-limit check failed: {db_err}")
         await session.rollback()
 
+    async def charge_quota():
+        """Record one used question. Called ONLY after a successful answer."""
+        # Re-read inside the callback: the pre-check rows were loaded before the
+        # LLM call and may be stale by the time the answer completes.
+        ip_r = (await session.execute(
+            select(db.GuestSession).where(
+                db.GuestSession.ip_hash == ip_hash,
+                db.GuestSession.session_date == today_str,
+            ).limit(1)
+        )).scalar_one_or_none()
+
+        sid_r = (await session.execute(
+            select(db.GuestSession).where(
+                db.GuestSession.session_id == sid,
+                db.GuestSession.session_date == today_str,
+            ).limit(1)
+        )).scalar_one_or_none()
+
+        if ip_r:
+            ip_r.message_count += 1
+            ip_r.updated_at = _dt.datetime.utcnow()
+            session.add(ip_r)
+        else:
+            session.add(db.GuestSession(
+                ip_hash=ip_hash, session_id=sid,
+                session_date=today_str, message_count=1,
+            ))
+
+        # Only add a separate session row if it is genuinely a different record
+        # than the IP row we just handled.
+        if sid_r:
+            if ip_r is None or sid_r.id != ip_r.id:
+                sid_r.message_count += 1
+                sid_r.updated_at = _dt.datetime.utcnow()
+                session.add(sid_r)
+        elif ip_r is not None and ip_r.session_id != sid:
+            session.add(db.GuestSession(
+                ip_hash=ip_hash, session_id=sid,
+                session_date=today_str, message_count=1,
+            ))
+
+        await session.commit()
+
     model = ta.Openai(id="gpt-4o", api_token=settings.openai_token)
 
     # PHASE 1B (guest): pass user_lang from request so the streaming generator
@@ -1660,7 +1695,10 @@ async def guest_chat_completion(
     user_lang = (request.lang or "en").strip().lower()
 
     return StreamingResponse(
-        _guest_chat_stream(session, model, request.message, request.history, user_lang=user_lang),
+        _guest_chat_stream(
+            session, model, request.message, request.history,
+            user_lang=user_lang, charge_quota=charge_quota,
+        ),
         media_type="text/plain",
     )
 

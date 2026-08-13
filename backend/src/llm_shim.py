@@ -221,6 +221,16 @@ class LLMResponse:
         self.content = content
 
 
+class EmbeddingResponse:
+    """Returned by AnthropicModel.embedding_async() — mirrors the TuneAPI shape.
+
+    Callers do `resp.embedding[0]` to get the vector, so `embedding` is a
+    list-of-vectors even for a single input.
+    """
+    def __init__(self, embedding: List[List[float]]):
+        self.embedding = embedding
+
+
 def _to_openai_chunk(msg: Union[Message, dict, str]) -> str:
     """Format a message as an OpenAI-compatible SSE data: line."""
     if isinstance(msg, Message):
@@ -269,8 +279,22 @@ class AnthropicModel(ModelInterface):
         api_token: Optional[str] = None,
         **_kwargs,          # absorb unused params (base_url, extra_headers, …)
     ):
+        import os
+
         self.model_id = _OPENAI_TO_ANTHROPIC.get(id, id)   # remap if needed
-        self._client  = anthropic.AsyncAnthropic(api_key=api_token or "")
+
+        # The chat key must be an Anthropic key. ASAM_OPENAI_TOKEN is the
+        # historical name (it fed the TuneAPI proxy) and now holds sk-ant-…,
+        # but allow an explicit ASAM_ANTHROPIC_TOKEN to take precedence.
+        chat_key = os.getenv("ASAM_ANTHROPIC_TOKEN", "") or (api_token or "")
+        self._client = anthropic.AsyncAnthropic(api_key=chat_key)
+
+        # Embeddings need a genuine OpenAI key — kept separate on purpose.
+        self._embedding_token = os.getenv("ASAM_EMBEDDING_TOKEN", "")
+        if not self._embedding_token and (api_token or "").startswith("sk-") \
+                and not (api_token or "").startswith("sk-ant-"):
+            # The configured token is actually an OpenAI key — reuse it.
+            self._embedding_token = api_token
 
     async def chat_async(
         self,
@@ -288,7 +312,48 @@ class AnthropicModel(ModelInterface):
             kwargs["system"] = system_prompt
 
         response = await self._client.messages.create(**kwargs)
-        return LLMResponse(content=response.content[0].text)
+
+        # Anthropic returns a list of content blocks; concatenate every text
+        # block rather than assuming block 0 exists and is text. A response
+        # with no text block would otherwise raise IndexError and surface to
+        # the seeker as "Something unexpected interrupted the response".
+        parts = [
+            b.text for b in (response.content or [])
+            if getattr(b, "type", None) == "text" and getattr(b, "text", None)
+        ]
+        return LLMResponse(content="".join(parts))
+
+    async def embedding_async(
+        self,
+        text: Union[str, List[str]],
+        model: str = "text-embedding-3-small",
+        **_kwargs,
+    ) -> EmbeddingResponse:
+        """
+        Embeddings for vector search.  Anthropic does not serve an embeddings
+        API, and the stored pgvector column was built with OpenAI's
+        text-embedding-3-small, so we must call OpenAI directly to stay in the
+        same vector space.
+
+        Requires a real OpenAI key in ASAM_EMBEDDING_TOKEN (or an
+        ASAM_OPENAI_TOKEN that is actually an OpenAI key).  If none is
+        configured we raise, and the caller falls back to full-text search.
+        """
+        import os
+
+        key = self._embedding_token or os.getenv("ASAM_EMBEDDING_TOKEN", "")
+        if not key or not key.startswith("sk-") or key.startswith("sk-ant-"):
+            raise RuntimeError(
+                "No OpenAI embedding key configured (ASAM_EMBEDDING_TOKEN). "
+                "Vector search unavailable; falling back to full-text search."
+            )
+
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=key)
+        inputs = [text] if isinstance(text, str) else list(text)
+        resp = await client.embeddings.create(model=model, input=inputs)
+        return EmbeddingResponse(embedding=[d.embedding for d in resp.data])
 
 
 class _TA:

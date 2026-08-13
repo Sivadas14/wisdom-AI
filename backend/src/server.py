@@ -237,6 +237,66 @@ def get_app() -> FastAPI:
             "version": os.getenv("GIT_SHA", "unknown"),
         }
 
+    @app.get("/api/health/llm", tags=["health"])
+    async def llm_health_check():
+        """Diagnostic: make a minimal Anthropic call and report the real error.
+
+        The chat path swallows LLM exceptions to keep the UX calm, which makes
+        production failures invisible. This endpoint surfaces the actual error
+        class and message. The API key is never returned — only a short
+        fingerprint so we can tell WHICH kind of key is configured.
+        """
+        from src.settings import get_settings as _gs
+        from src.llm_shim import tt as _tt, ta as _ta
+
+        s = _gs()
+        raw = (s.openai_token or "")
+        fingerprint = {
+            "present": bool(raw) and raw != "dummy_token",
+            "length": len(raw),
+            "prefix": raw[:7] if raw else "",
+            "looks_like_anthropic": raw.startswith("sk-ant-"),
+            "looks_like_openai": raw.startswith("sk-") and not raw.startswith("sk-ant-"),
+        }
+
+        try:
+            m = _ta.Anthropic(api_token=raw)
+            thread = _tt.Thread(_tt.human("Reply with the single word: ok"))
+            resp = await m.chat_async(thread, max_tokens=16)
+            content = resp.content if hasattr(resp, "content") else str(resp)
+            return {
+                "llm": "ok",
+                "model": m.model_id,
+                "reply": content[:100],
+                "key": fingerprint,
+            }
+        except Exception as e:
+            return {
+                "llm": "error",
+                "error_type": type(e).__name__,
+                "error": str(e)[:600],
+                "key": fingerprint,
+            }
+
+    @app.get("/api/health/embedding", tags=["health"])
+    async def embedding_health_check():
+        """Diagnostic: verify the embedding backend used for vector search."""
+        from src.settings import get_settings as _gs
+        from src.llm_shim import ta as _ta
+
+        s = _gs()
+        try:
+            m = _ta.Anthropic(api_token=s.openai_token)
+            emb = await m.embedding_async("test", model="text-embedding-3-small")
+            vec = emb.embedding[0]
+            return {"embedding": "ok", "dimensions": len(vec)}
+        except Exception as e:
+            return {
+                "embedding": "error",
+                "error_type": type(e).__name__,
+                "error": str(e)[:600],
+            }
+
     def custom_openapi():
         if app.openapi_schema:
             return app.openapi_schema
