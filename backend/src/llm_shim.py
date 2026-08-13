@@ -170,11 +170,35 @@ class ModelInterface:
         raise NotImplementedError
 
 
+def _compat_field(*args, **kwargs):
+    """
+    Compatibility wrapper for the old TuneAPI Field calling convention.
+
+    TuneAPI called Field as:
+      tt.F("description")               → required field
+      tt.F("description", default)      → field with default
+
+    Pydantic v2 Field() only accepts the default as the first positional arg.
+    This shim detects the old signature (first arg is a str that looks like a
+    description) and rewrites it to the correct pydantic v2 form.
+    """
+    if args and isinstance(args[0], str) and "description" not in kwargs:
+        description = args[0]
+        if len(args) > 1:
+            # tt.F("description", default_value)
+            return Field(args[1], description=description, **kwargs)
+        else:
+            # tt.F("description") — required field, no default
+            return Field(description=description, **kwargs)
+    # Normal pydantic v2 usage: Field(default, ...)
+    return Field(*args, **kwargs)
+
+
 class _TT:
     # Pydantic re-exports (wire.py uses tt.BM and tt.F)
     BM    = BaseModel
-    F     = staticmethod(Field)
-    Field = staticmethod(Field)
+    F     = staticmethod(_compat_field)
+    Field = staticmethod(_compat_field)
 
     # Message types
     Message       = Message
