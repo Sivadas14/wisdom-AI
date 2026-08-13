@@ -390,7 +390,7 @@ def get_app() -> FastAPI:
             page = await client.models.list(limit=50)
             return {
                 "configured_model": os.getenv(
-                    "ASAM_ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"
+                    "ASAM_ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"
                 ),
                 "available": [m.id for m in page.data],
             }

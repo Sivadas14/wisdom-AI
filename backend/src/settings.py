@@ -113,17 +113,20 @@ def get_settings() -> Settings:
 
 # ---------- LLM Helper ----------
 
-def get_llm(model_name: str = "claude-3-5-haiku-20241022"):
-    """Create a TuneAPI model instance backed by Anthropic Claude.
+def get_llm(model_name: str | None = None):
+    """Create an Anthropic-backed model instance.
 
-    The ASAM_OPENAI_TOKEN env var holds the Anthropic API key (sk-ant-...).
-    We route through ta.Anthropic so the key is used correctly.
+    The Anthropic key comes from ASAM_ANTHROPIC_TOKEN (preferred); the shim
+    falls back to the legacy ASAM_OPENAI_TOKEN. The model ID is NOT hardcoded
+    here — not every account has access to every model, and a stale ID fails
+    with a 404 that the chat path swallows into a generic error. Override with
+    ASAM_ANTHROPIC_MODEL.
     """
     settings_instance = get_settings()
-    return ta.Anthropic(
-        id="claude-3-5-haiku-20241022",
-        api_token=settings_instance.openai_token,
-    )
+    kwargs = {"api_token": settings_instance.openai_token}
+    if model_name:
+        kwargs["id"] = model_name
+    return ta.Anthropic(**kwargs)
 
 
 

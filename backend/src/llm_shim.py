@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 # otherwise swallow into a generic "something went wrong" for the seeker.
 import os as _os
 
-_DEFAULT_MODEL = _os.getenv("ASAM_ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
+_DEFAULT_MODEL = _os.getenv("ASAM_ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
