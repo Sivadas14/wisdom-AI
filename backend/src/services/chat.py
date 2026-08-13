@@ -1,5 +1,6 @@
 from src.llm_shim import tt, ta, tu
 
+import os
 import uuid
 import time
 import asyncio
@@ -1101,23 +1102,48 @@ async def _embedding_search_optimized(
             op.finish(embedding_dimensions=len(embedding))
 
         async with profile_operation("vector_search") as op:
+            # Select the cosine distance alongside the content so we can reject
+            # weak matches. Without this the query ALWAYS returns its top 10
+            # rows no matter how unrelated they are, which invites the model to
+            # answer confidently from irrelevant passages.
+            distance = db.DocumentChunk.embedding.cosine_distance(embedding)
             sql_query = (
-                select(db.DocumentChunk.content, db.SourceDocument.filename)
+                select(
+                    db.DocumentChunk.content,
+                    db.SourceDocument.filename,
+                    distance.label("distance"),
+                )
                 .join(db.SourceDocument)
                 .where(db.SourceDocument.active == True)
-                .order_by(db.DocumentChunk.embedding.max_inner_product(embedding))
-                .limit(10)
+                .order_by(distance)
+                .limit(RAG_MAX_CHUNKS)
             )
             result = await session.execute(sql_query)
-            chunks: list[tuple[str, str]] = result.all()
+            scored = result.all()
+
+            # Keep only passages that clear the relevance bar. If none do, we
+            # return nothing and the caller issues an honest refusal rather
+            # than dressing up an unrelated passage as Bhagavan's teaching.
+            chunks: list[tuple[str, str]] = [
+                (c, f) for (c, f, d) in scored if d is not None and d <= RAG_MAX_DISTANCE
+            ]
+
+            if scored and not chunks:
+                best = min(d for (_, _, d) in scored if d is not None)
+                tu.logger.info(
+                    f"[RAG_GUARDRAIL] All {len(scored)} passages below relevance "
+                    f"threshold (best distance {best:.3f} > {RAG_MAX_DISTANCE}); "
+                    f"refusing rather than answering from weak matches."
+                )
             op.finish(chunks_found=len(chunks))
 
-        if chunks:
-            RETRIEVAL_STATE["mode"] = "vector"
-            RETRIEVAL_STATE["last_error"] = None
-            return chunks
-        # If vector search returns nothing, fall through to full-text
-        tu.logger.warning("[EMBED_SEARCH] Vector search returned 0 chunks; trying FTS fallback")
+        # Vector search is authoritative when it works. Return its verdict even
+        # when that verdict is "nothing relevant" — falling through to keyword
+        # search here would resurrect exactly the weak matches the relevance
+        # threshold just rejected. FTS is a fallback for embedding OUTAGES only.
+        RETRIEVAL_STATE["mode"] = "vector"
+        RETRIEVAL_STATE["last_error"] = None
+        return chunks
 
     except Exception as e:
         # Retrieval quality is materially worse without vectors, so this is
@@ -1363,7 +1389,7 @@ async def chat_completions(
 import hashlib
 import datetime as _dt
 
-GUEST_MESSAGE_LIMIT = 5  # Per IP per day AND per session per day
+GUEST_MESSAGE_LIMIT = 3  # Per IP per day AND per session per day
 
 # Emitted at the START of any guest reply that must NOT consume a free question
 # (our AI errored, no passages found, or an off-topic refusal that cost no LLM
@@ -1375,6 +1401,15 @@ NO_CHARGE_MARKER = "<no_charge/>"
 # Live retrieval health, reported by /health so a silent drop from vector
 # search to full-text search is always visible rather than merely suspected.
 RETRIEVAL_STATE: dict = {"mode": "unknown", "last_error": None}
+
+# ── RAG retrieval guardrails ─────────────────────────────────────────────────
+# Cosine distance above which a passage is considered irrelevant. OpenAI
+# embeddings are unit-normalised, so distance = 1 - cosine similarity; 0.65
+# keeps passages of roughly 0.35 similarity or better. Without a bar the query
+# always returns its top N rows however unrelated, and the model then answers
+# confidently from them. Tune with ASAM_RAG_MAX_DISTANCE.
+RAG_MAX_DISTANCE = float(os.getenv("ASAM_RAG_MAX_DISTANCE", "0.65"))
+RAG_MAX_CHUNKS = int(os.getenv("ASAM_RAG_MAX_CHUNKS", "10"))
 
 
 class GuestChatMessage(BaseModel):

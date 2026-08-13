@@ -622,7 +622,7 @@ const GUEST_MSG_COUNT_KEY    = "as_guest_count";
 const GUEST_MESSAGES_KEY     = "as_guest_msgs";
 const GUEST_MESSAGES_LANG_KEY = "as_guest_msgs_lang";  // tracks the language the stored messages are currently in
 const GUEST_CONTENT_COUNT_KEY = "as_guest_content_count";
-const GUEST_LIMIT            = 5;
+const GUEST_LIMIT            = 3;
 const GUEST_CONTENT_LIMIT    = 3;
 // One-time repair key. Builds before this date charged a free question even
 // when our AI failed, so seekers were locked out by our own outage. On first
@@ -1878,7 +1878,7 @@ function PricingSection() {
         </div>
 
         <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.78rem", marginTop: "1.5rem" }}>
-          Try 5 free questions — no account needed · Cancel anytime · Indian pricing in ₹ · International pricing in $
+          Try {GUEST_LIMIT} free questions — no account needed · Cancel anytime · Indian pricing in ₹ · International pricing in $
         </p>
       </div>
     </section>

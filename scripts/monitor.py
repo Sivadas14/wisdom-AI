@@ -296,7 +296,8 @@ try:
         check(
             "Guest chat — LLM QUOTA EXHAUSTED",
             False,
-            "TuneAPI/OpenAI credits depleted — top up at studio.tune.app or update OPENAI_TOKEN in App Runner",
+            "LLM credits depleted or key invalid — check /health/llm, then update "
+            "ASAM_ANTHROPIC_TOKEN (chat) or ASAM_OPENAI_TOKEN (embeddings) in App Runner",
         )
     else:
         check(
