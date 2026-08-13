@@ -136,9 +136,38 @@ def _strip_em_dashes(text: str) -> str:
 
     Kept out of quotations by the masking layer, so Bhagavan's recorded
     punctuation survives intact.
+
+    A comma is the usual replacement, but a *single* dash in a clause that
+    already carries commas produces a splice ("without the ego, in sleep, the
+    ego does not exist"). In that case a full stop reads better, so the
+    sentence is split and the next word capitalised.
     """
-    # Parenthetical or appositive use: " — " / "—" between words.
-    text = re.sub(r"\s*[—―]\s*", ", ", text)
+    def _fix_sentence(sentence: str) -> str:
+        dashes = len(re.findall(r"[—―]", sentence))
+        if dashes == 0:
+            return sentence
+        # Paired dashes are parenthetical: commas keep the aside intact.
+        if dashes % 2 == 0:
+            return re.sub(r"\s*[—―]\s*", ", ", sentence)
+        # Single dash. If what FOLLOWS already carries commas, another comma
+        # produces a splice, so prefer a full stop — but only when the tail can
+        # stand as its own sentence. A tail opening with a participle ("turning
+        # inward, silently") is a phrase, not a clause, and splitting it would
+        # leave a fragment.
+        head, _, tail = sentence.partition(re.search(r"[—―]", sentence).group(0))
+        tail = tail.lstrip()
+        first = re.match(r"[A-Za-z']+", tail)
+        starts_with_participle = bool(first) and first.group(0).lower().endswith("ing")
+
+        if "," in tail and tail and not starts_with_participle and head.strip():
+            tail = tail[:1].upper() + tail[1:]
+            return head.rstrip().rstrip(",") + ". " + tail
+        return re.sub(r"\s*[—―]\s*", ", ", sentence)
+
+    # Process sentence by sentence so the comma count is judged locally.
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    text = " ".join(_fix_sentence(p) for p in parts)
+
     # En dash used as an em dash (spaced). Numeric ranges (5–10) stay.
     text = re.sub(r"(?<=[A-Za-z,])\s+[–]\s+(?=[A-Za-z])", ", ", text)
     return text

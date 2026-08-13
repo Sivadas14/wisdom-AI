@@ -62,6 +62,26 @@ def test_em_dash_removed_outside_quotes():
     assert "—" not in out
 
 
+def test_single_dash_before_comma_clause_becomes_full_stop():
+    out = H("We can exist happily without the ego — in sleep, the ego does not exist, and there is no pain.")
+    assert "ego. In sleep" in out, out
+
+
+def test_paired_dashes_become_commas_not_fragments():
+    out = H("The Self, ever-present — the one reality — is here and now for you.")
+    assert out.count(".") == 1, f"sentence was fragmented: {out}"
+
+
+def test_participle_tail_not_split_into_fragment():
+    out = H("This is the practice — turning inward, silently, as he taught.")
+    assert out.count(".") == 1, f"created a fragment: {out}"
+
+
+def test_short_head_not_split_into_fragment():
+    out = H("The Self, ever-present — is here.")
+    assert out.count(".") == 1, f"created a fragment: {out}"
+
+
 def test_question_praise_removed():
     out = H("What a beautiful question. The Self is your own being, always present here.")
     assert "beautiful question" not in out.lower()
