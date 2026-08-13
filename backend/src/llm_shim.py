@@ -82,6 +82,12 @@ class _TU:
         return os.path.dirname(os.path.abspath(path))
 
     @staticmethod
+    def joinp(*parts) -> str:
+        """tu.joinp replacement — os.path.join."""
+        import os
+        return os.path.join(*parts)
+
+    @staticmethod
     def get_snowflake() -> str:
         """tu.get_snowflake replacement — a unique hex ID."""
         return uuid.uuid4().hex
