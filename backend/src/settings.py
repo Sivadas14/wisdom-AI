@@ -113,11 +113,17 @@ def get_settings() -> Settings:
 
 # ---------- LLM Helper ----------
 
-def get_llm(model_name: str = "gpt-4o"):
-    """Create a TuneAPI model instance with the configured OpenAI token."""
-   
+def get_llm(model_name: str = "claude-3-5-haiku-20241022"):
+    """Create a TuneAPI model instance backed by Anthropic Claude.
+
+    The ASAM_OPENAI_TOKEN env var holds the Anthropic API key (sk-ant-...).
+    We route through ta.Anthropic so the key is used correctly.
+    """
     settings_instance = get_settings()
-    return  ta.Openai(id="gpt-4o", api_token=settings_instance.openai_token)
+    return ta.Anthropic(
+        id="claude-3-5-haiku-20241022",
+        api_token=settings_instance.openai_token,
+    )
 
 
 
