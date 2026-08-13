@@ -283,16 +283,27 @@ try:
     visible = _re.sub(r"<(message_id|citations|questions|title)[^>]*>.*?</\1>", "", text, flags=_re.DOTALL)
     visible_clean = _re.sub(r"<[^>]+>", "", visible).strip()
 
+    # Detect the specific LLM-quota fallback message so the alert is actionable
+    LLM_QUOTA_MSG = "momentarily resting"
+    llm_quota_exhausted = LLM_QUOTA_MSG in visible_clean
+
     check(
         "Guest chat returns 200",
         r.status_code == 200,
         f"HTTP {r.status_code}  elapsed={elapsed:.1f}s",
     )
-    check(
-        "Guest chat answer is non-trivial",
-        len(visible_clean) >= 80,
-        f"answer_chars={len(visible_clean)}  elapsed={elapsed:.1f}s",
-    )
+    if llm_quota_exhausted:
+        check(
+            "Guest chat — LLM QUOTA EXHAUSTED",
+            False,
+            "TuneAPI/OpenAI credits depleted — top up at studio.tune.app or update OPENAI_TOKEN in App Runner",
+        )
+    else:
+        check(
+            "Guest chat answer is non-trivial",
+            len(visible_clean) >= 80,
+            f"answer_chars={len(visible_clean)}  elapsed={elapsed:.1f}s",
+        )
     # Heuristic: a real Ramana answer should mention Ramana, self-inquiry,
     # or related core terms. Catches blank / refusal / hallucinated answers.
     keywords = ("Ramana", "self", "inquiry", "Self", "I am")
