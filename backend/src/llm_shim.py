@@ -11,6 +11,7 @@ can now do `from src.llm_shim import tt, ta, tu` with zero other changes.
 """
 from __future__ import annotations
 
+import datetime
 import json
 import logging
 import time
@@ -46,8 +47,28 @@ def _to_json(obj: Any, tight: bool = False) -> str:
     return json.dumps(obj, separators=sep, ensure_ascii=False)
 
 
+class _SimplerTimes:
+    """Drop-in for tu.SimplerTimes — datetime utilities used throughout chat.py."""
+
+    @staticmethod
+    def get_now_human() -> str:
+        """Human-readable current datetime, e.g. 'Thursday, 13 August 2026, 10:30 AM'."""
+        return datetime.datetime.now().strftime("%A, %d %B %Y, %I:%M %p")
+
+    @staticmethod
+    def get_now_fp64() -> float:
+        """Current time as a float (seconds since epoch) — used for timing."""
+        return time.time()
+
+    @staticmethod
+    def get_now_datetime() -> datetime.datetime:
+        """Current UTC datetime — used for DB timestamp columns."""
+        return datetime.datetime.utcnow()
+
+
 class _TU:
     logger = _Logger()
+    SimplerTimes = _SimplerTimes
 
     @staticmethod
     def to_json(obj: Any, tight: bool = False) -> str:
@@ -192,9 +213,23 @@ def _to_openai_chunk(msg: Union[Message, dict, str]) -> str:
     return f"data: {json.dumps(chunk)}\n\n"
 
 
+# chat.py calls ta.Openai(id="gpt-4o") because the old TuneAPI silently routed
+# OpenAI model IDs to Anthropic.  Map them here so nothing breaks.
+_OPENAI_TO_ANTHROPIC: dict[str, str] = {
+    "gpt-4o":            _DEFAULT_MODEL,
+    "gpt-4o-mini":       _DEFAULT_MODEL,
+    "gpt-4":             _DEFAULT_MODEL,
+    "gpt-4-turbo":       _DEFAULT_MODEL,
+    "gpt-3.5-turbo":     _DEFAULT_MODEL,
+    "gpt-4.1":           _DEFAULT_MODEL,
+    "gpt-5.1-chat-latest": _DEFAULT_MODEL,
+}
+
+
 class AnthropicModel(ModelInterface):
     """
     Direct Anthropic SDK wrapper.  Replaces ta.Anthropic and ta.Openai.
+    OpenAI model IDs (gpt-4o etc.) are silently remapped to the Anthropic default.
     """
 
     def __init__(
@@ -203,7 +238,7 @@ class AnthropicModel(ModelInterface):
         api_token: Optional[str] = None,
         **_kwargs,          # absorb unused params (base_url, extra_headers, …)
     ):
-        self.model_id = id
+        self.model_id = _OPENAI_TO_ANTHROPIC.get(id, id)   # remap if needed
         self._client  = anthropic.AsyncAnthropic(api_key=api_token or "")
 
     async def chat_async(
