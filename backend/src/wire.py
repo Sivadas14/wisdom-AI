@@ -1,7 +1,7 @@
 # Authentication Interfaces
 
 import datetime
-from tuneapi import tt
+from src.llm_shim import tt
 from enum import Enum
 from typing import Optional
 

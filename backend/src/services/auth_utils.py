@@ -1,7 +1,7 @@
 import jwt
 from jwt import PyJWKClient
 from typing import Optional, Any
-from tuneapi import tu
+from src.llm_shim import tu
 from src.settings import get_settings
 
 class SupabaseJWKS:

@@ -1,7 +1,7 @@
 
 import time
 from fastapi import Request
-from tuneapi import tu
+from src.llm_shim import tu
 
 async def request_timing_middleware(request: Request, call_next):
     """

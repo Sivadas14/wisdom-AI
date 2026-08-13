@@ -1,7 +1,6 @@
 import sys
-from tuneapi import tu
-
-sys.path.append(tu.folder(tu.folder(__file__)))
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 import os
 import aiofiles

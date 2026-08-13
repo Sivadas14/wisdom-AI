@@ -8,7 +8,7 @@ import json
 import asyncio
 from textwrap import dedent
 import tiktoken
-from tuneapi import tt, tu
+from src.llm_shim import tt, tu
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func

@@ -1,4 +1,4 @@
-from tuneapi import tu
+from src.llm_shim import tu
 
 from fastapi import Depends, Query, HTTPException, UploadFile, BackgroundTasks
 from uuid import UUID

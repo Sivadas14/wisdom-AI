@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from tuneapi import tu, tt
+from src.llm_shim import tu, tt
 
 from src.db import DailyContemplation, get_db_session
 from src.settings import get_llm

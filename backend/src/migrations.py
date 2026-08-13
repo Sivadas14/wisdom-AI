@@ -6,7 +6,7 @@ Add new migrations as new async functions and call them from run_migrations().
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from tuneapi import tu
+from src.llm_shim import tu
 
 from src.db import Plan, PlanType, BillingCycle
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 import httpx
-from tuneapi import tu
+from src.llm_shim import tu
 
 from src.settings import get_settings
 

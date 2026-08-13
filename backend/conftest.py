@@ -1,34 +1,12 @@
-"""Top-level conftest — stubs tuneapi and other internal deps so the new
-src/translation modules can be imported without hitting the real DB or APIs.
+"""Top-level conftest — stubs heavy internal deps so translation modules can be
+imported in tests without hitting the real DB or APIs.
+
+tuneapi has been removed: the project now uses src.llm_shim directly.
 """
 import sys, types
 from pathlib import Path
 from pydantic import BaseModel
 
-# Stub tuneapi
-tu_mod = types.ModuleType("tuneapi")
-tt_mod = types.ModuleType("tuneapi.tt")
-ta_mod = types.ModuleType("tuneapi.ta")
-tu_inner = types.ModuleType("tuneapi.tu")
-class _Logger:
-    def info(self, *a, **kw): pass
-    def warning(self, *a, **kw): pass
-    def error(self, *a, **kw): pass
-    def debug(self, *a, **kw): pass
-tu_inner.logger = _Logger()
-class _SimplerTimes:
-    @staticmethod
-    def get_now_human(): return "now"
-tu_inner.SimplerTimes = _SimplerTimes
-class _BM(BaseModel): pass
-tt_mod.BM = _BM
-def _F(*a, **kw):
-    if a: return a[-1] if len(a) > 1 else None
-    return kw.get("default")
-tt_mod.F = _F
-ta_mod.to_openai_chunk = lambda x: x
-tu_mod.tt = tt_mod; tu_mod.ta = ta_mod; tu_mod.tu = tu_inner
-sys.modules.update({"tuneapi": tu_mod, "tuneapi.tt": tt_mod, "tuneapi.ta": ta_mod, "tuneapi.tu": tu_inner})
 sys.modules["polar_sdk"] = types.ModuleType("polar_sdk")
 sys.modules["polar_sdk"].Polar = object
 

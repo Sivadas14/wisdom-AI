@@ -1,7 +1,7 @@
 import jwt
 import time
 from collections import defaultdict, deque
-from tuneapi import tu
+from src.llm_shim import tu
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

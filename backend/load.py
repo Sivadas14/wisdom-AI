@@ -1,8 +1,8 @@
 from time import sleep
 import subprocess
-from tuneapi import tu
+import uuid
 
-fp = f"./{tu.get_snowflake()}.txt"
+fp = f"./{uuid.uuid4().hex}.txt"
 
 
 def main():

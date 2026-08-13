@@ -18,7 +18,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from tuneapi import tu
+from src.llm_shim import tu
 
 from src.settings import Settings, get_settings
 from src.translation.models import TranslationUsageDaily

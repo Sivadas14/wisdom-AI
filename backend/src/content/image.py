@@ -16,8 +16,6 @@ import logging
 from pydantic import ValidationError
 from openai import OpenAI
 
-# Import tuneapi components correctly for version 8.0.18
-import tuneapi
 
 from src.db import (
     ContentGeneration,

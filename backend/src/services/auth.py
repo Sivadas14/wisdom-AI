@@ -1,5 +1,4 @@
-from tuneapi import tu
-
+from src.llm_shim import tu
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -8,7 +7,6 @@ import datetime
 from uuid import uuid4
 from src.settings import Settings, get_settings
 from src.dependencies import get_current_user
-from tuneapi import tu
 
 # from src.wire import (
 #     LoginRequest,

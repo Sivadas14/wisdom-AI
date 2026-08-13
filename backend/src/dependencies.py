@@ -1,4 +1,4 @@
-from tuneapi import tu
+from src.llm_shim import tu
 import subprocess
 from fastapi import Request, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

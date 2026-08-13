@@ -7,7 +7,7 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from supabase import Client
-from tuneapi import tu
+from src.llm_shim import tu
 
 from src.db import (
     ContentGeneration,

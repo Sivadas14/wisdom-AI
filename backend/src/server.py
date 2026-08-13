@@ -10,7 +10,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("server")
 
-from tuneapi import tu
+from src.llm_shim import tu
 
 import os
 import asyncio

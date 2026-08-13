@@ -3,7 +3,7 @@ from supabase import create_client, Client
 from fastapi import Depends, Query, HTTPException
 print("[TRACE] settings.py import start")
 from typing import Optional
-from tuneapi import tt, ta, tu
+from src.llm_shim import tt, ta, tu
 from polar_sdk import Polar
 
 

@@ -285,7 +285,7 @@ async def _generate_guest_meditation_transcript(question: str, answer: str, leng
     This is the USP of the service: fully personalised content.
     """
     from textwrap import dedent
-    from tuneapi import tt
+    from src.llm_shim import tt
     from src.settings import get_llm
 
     try:

@@ -3,7 +3,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from tuneapi import tu
+from src.llm_shim import tu
 
 @dataclass
 class OperationProfile:

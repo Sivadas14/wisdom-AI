@@ -1,4 +1,4 @@
-from tuneapi import tt, ta, tu
+from src.llm_shim import tt, ta, tu
 
 import uuid
 import time

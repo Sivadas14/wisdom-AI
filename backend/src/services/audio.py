@@ -1,4 +1,4 @@
-from tuneapi import tu
+from src.llm_shim import tu
 
 from fastapi import File, UploadFile, Response, HTTPException,Depends
 from fastapi import APIRouter

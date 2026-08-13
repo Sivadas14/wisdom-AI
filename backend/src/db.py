@@ -1,5 +1,5 @@
 from typing import AsyncGenerator, Annotated, ClassVar, Any, Optional, List
-from tuneapi import tu, tt
+from src.llm_shim import tu, tt
 
 import datetime
 from uuid import uuid4

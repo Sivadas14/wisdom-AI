@@ -7,7 +7,7 @@ just kept showing a spinner. Now every background task explicitly writes
 'complete' or 'failed' to the row so the frontend can render the correct state.
 """
 
-from tuneapi import tu
+from src.llm_shim import tu
 from sqlalchemy import select
 
 from src.db import ContentGeneration, get_background_session
