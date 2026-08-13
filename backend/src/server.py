@@ -132,7 +132,61 @@ async def _startup_tasks(app: FastAPI):
             print(f"[TRACE] WARNING: Migrations failed (non-fatal): {e}")
             tu.logger.error(f"Migration error (non-fatal): {e}")
 
+    # ── One-time guest quota refund ─────────────────────────────────────────
+    # Builds before this fix charged a guest a free question even when our AI
+    # failed. Those counts are not the seekers' fault, so we clear them once.
+    if getattr(app.state, "db_session_factory", None) is not None:
+        try:
+            await _refund_outage_guest_quota(app.state.db_session_factory)
+        except Exception as e:
+            tu.logger.error(f"Guest quota refund failed (non-fatal): {e}")
+
     print("[TRACE] _startup_tasks() done")
+
+
+# Sentinel written into guest_sessions so the refund runs exactly once across
+# every App Runner instance and restart.
+_QUOTA_REFUND_SENTINEL = "__quota_refund_v1__"
+
+
+async def _refund_outage_guest_quota(session_factory):
+    """Zero out guest message counts wrongly charged during the AI outage.
+
+    Idempotent: a sentinel row is inserted in the same transaction, so if it
+    already exists the refund is skipped. Safe to run on every instance.
+    """
+    from sqlalchemy import select, update
+    from src import db as _db
+
+    async with session_factory() as s:
+        existing = (await s.execute(
+            select(_db.GuestSession).where(
+                _db.GuestSession.ip_hash == _QUOTA_REFUND_SENTINEL
+            ).limit(1)
+        )).scalar_one_or_none()
+
+        if existing is not None:
+            return  # Already refunded on a previous boot.
+
+        result = await s.execute(
+            update(_db.GuestSession)
+            .where(_db.GuestSession.ip_hash != _QUOTA_REFUND_SENTINEL)
+            .where(_db.GuestSession.message_count > 0)
+            .values(message_count=0)
+        )
+
+        s.add(_db.GuestSession(
+            ip_hash=_QUOTA_REFUND_SENTINEL,
+            session_id=_QUOTA_REFUND_SENTINEL,
+            session_date="1970-01-01",
+            message_count=0,
+        ))
+        await s.commit()
+
+        tu.logger.info(
+            f"[QUOTA_REFUND] Cleared guest counts charged during the AI outage "
+            f"({result.rowcount} rows refunded)."
+        )
 
 
 @asynccontextmanager

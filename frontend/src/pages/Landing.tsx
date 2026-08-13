@@ -624,6 +624,10 @@ const GUEST_MESSAGES_LANG_KEY = "as_guest_msgs_lang";  // tracks the language th
 const GUEST_CONTENT_COUNT_KEY = "as_guest_content_count";
 const GUEST_LIMIT            = 5;
 const GUEST_CONTENT_LIMIT    = 3;
+// One-time repair key. Builds before this date charged a free question even
+// when our AI failed, so seekers were locked out by our own outage. On first
+// load after the fix we refund their counter exactly once.
+const GUEST_QUOTA_REPAIR_KEY = "as_guest_quota_repair_v1";
 const API_BASE               = (import.meta.env.VITE_API_BASE_URL as string || "/api").replace(/\/$/, "");
 
 type GMsg = { role: "user" | "assistant"; content: string };
@@ -709,7 +713,16 @@ function GuestChatSection() {
   const [input, setInput]   = useState("");
   const [loading, setLoading] = useState(false);
   const [count, setCount]   = useState<number>(() => {
-    try { return parseInt(localStorage.getItem(GUEST_MSG_COUNT_KEY) || "0", 10); }
+    try {
+      // One-time refund for seekers whose free questions were consumed by our
+      // own AI outage. Runs once per browser, then never again.
+      if (!localStorage.getItem(GUEST_QUOTA_REPAIR_KEY)) {
+        localStorage.setItem(GUEST_QUOTA_REPAIR_KEY, "done");
+        localStorage.setItem(GUEST_MSG_COUNT_KEY, "0");
+        return 0;
+      }
+      return parseInt(localStorage.getItem(GUEST_MSG_COUNT_KEY) || "0", 10);
+    }
     catch { return 0; }
   });
   const [showModal, setShowModal] = useState(false);
@@ -867,10 +880,12 @@ function GuestChatSection() {
     if (!q || loading) return;
     if (count >= GUEST_LIMIT) { setShowModal(true); return; }
 
-    const sid       = getGuestSessionId();
-    const newCount  = count + 1;
-    setCount(newCount);
-    try { localStorage.setItem(GUEST_MSG_COUNT_KEY, String(newCount)); } catch {}
+    const sid = getGuestSessionId();
+    // NOTE: the free-question counter is deliberately NOT incremented here.
+    // It is only incremented once the AI has actually returned a real answer
+    // (see below). Charging up-front meant a failed or errored response still
+    // cost the seeker a free question — we never penalise a user for our bug.
+    const newCount = count + 1;
 
     const userMsg: GMsg = { role: "user", content: q };
     const prev = [...messages, userMsg];
@@ -907,6 +922,9 @@ function GuestChatSection() {
       const decoder = new TextDecoder();
       let partial   = "";
       let aiText    = "";
+      // Set when the backend explicitly flags this reply as non-billable
+      // (our error, no passages, or a no-cost off-topic refusal).
+      let noCharge  = false;
 
       outer: while (true) {
         const { done, value } = await reader.read();
@@ -924,6 +942,12 @@ function GuestChatSection() {
               const cd = JSON.parse(jstr);
               content = cd.choices?.[0]?.delta?.content || "";
             }
+            // Backend flag: this reply must not consume a free question.
+            if (content && content.includes("<no_charge/>")) {
+              noCharge = true;
+              content = content.replace(/<no_charge\/>/g, "");
+              if (!content.trim()) continue;
+            }
             // Skip backend metadata tags
             if (content && /<(message_id|citations|questions|title)[^>]*>/.test(content)) continue;
             if (content) {
@@ -938,12 +962,20 @@ function GuestChatSection() {
         }
       }
 
-      // If the backend returned a "no passages found" message, it wasn't a real
-      // answer — roll back the count so the user doesn't lose a free message.
-      const NO_PASSAGE_MARKER = "The passages available do not yet cover";
-      if (aiText.startsWith(NO_PASSAGE_MARKER)) {
-        setCount(count);  // revert to pre-send value
-        try { localStorage.setItem(GUEST_MSG_COUNT_KEY, String(count)); } catch {}
+      // Charge a free question ONLY for a genuine answer. Anything the backend
+      // flagged as non-billable, or an empty response, is our failure and must
+      // not cost the seeker anything. Legacy English string checks are kept as
+      // a belt-and-braces fallback for older backend builds.
+      const isRealAnswer =
+        !noCharge &&
+        aiText.trim().length > 0 &&
+        !aiText.startsWith("The passages available do not yet cover") &&
+        !aiText.startsWith("The wisdom service is momentarily resting") &&
+        !aiText.startsWith("Something unexpected interrupted the response");
+
+      if (isRealAnswer) {
+        setCount(newCount);
+        try { localStorage.setItem(GUEST_MSG_COUNT_KEY, String(newCount)); } catch {}
       }
 
       const finalMsgs: GMsg[] = [...prev, { role: "assistant", content: aiText || "…" }];
@@ -952,7 +984,7 @@ function GuestChatSection() {
       // Mark the language these messages are now in (used by the retranslation
       // effect below to know what to translate FROM if the user switches).
       setMessagesLangStored(lang);
-      if (newCount >= GUEST_LIMIT && !aiText.startsWith(NO_PASSAGE_MARKER)) {
+      if (isRealAnswer && newCount >= GUEST_LIMIT) {
         setTimeout(() => setShowModal(true), 1800);
       }
     } catch {

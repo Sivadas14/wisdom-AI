@@ -1354,6 +1354,13 @@ import datetime as _dt
 
 GUEST_MESSAGE_LIMIT = 5  # Per IP per day AND per session per day
 
+# Emitted at the START of any guest reply that must NOT consume a free question
+# (our AI errored, no passages found, or an off-topic refusal that cost no LLM
+# call). The frontend strips this tag and skips its local counter increment.
+# A structural marker is used rather than string-matching the message text so
+# it keeps working for every translated language.
+NO_CHARGE_MARKER = "<no_charge/>"
+
 
 class GuestChatMessage(BaseModel):
     role: str   # "user" or "assistant"
@@ -1443,6 +1450,8 @@ async def _guest_chat_stream(
             except Exception as e:
                 tu.logger.warning(f"[GUEST_CHAT_LANG] Off-topic refusal translation failed: {e}")
         # === END ===
+        # Off-topic refusals cost us no LLM call — never charge the seeker.
+        yield ta.to_openai_chunk(tt.assistant(NO_CHARGE_MARKER))
         yield ta.to_openai_chunk(tt.assistant(refusal))
         yield "[DONE]\n\n"
         return
@@ -1467,6 +1476,9 @@ async def _guest_chat_stream(
             except Exception as e:
                 tu.logger.warning(f"[GUEST_CHAT_LANG] No-chunks refusal translation failed: {e}")
         # === END ===
+        # We failed to find passages — that is our shortcoming, not the
+        # seeker's. Never charge for it.
+        yield ta.to_openai_chunk(tt.assistant(NO_CHARGE_MARKER))
         yield ta.to_openai_chunk(tt.assistant(no_chunks))
         yield "[DONE]\n\n"
         return
@@ -1564,6 +1576,8 @@ async def _guest_chat_stream(
                 err_msg = await translate_assistant_response(session, err_msg, user_lang)
             except Exception:
                 pass
+        # Our AI failed. The seeker keeps their free question.
+        yield ta.to_openai_chunk(tt.assistant(NO_CHARGE_MARKER))
         yield ta.to_openai_chunk(tt.assistant(err_msg))
 
     yield "[DONE]\n\n"
