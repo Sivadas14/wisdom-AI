@@ -374,6 +374,29 @@ def get_app() -> FastAPI:
                 "key": fingerprint,
             }
 
+    @app.get("/health/models", tags=["health"])
+    async def models_health_check():
+        """Diagnostic: list the models this Anthropic account can actually use.
+
+        A model ID the account lacks access to fails with a 404 that looks
+        identical to a code bug from the outside, so list the real options.
+        """
+        import anthropic as _an
+        from src.settings import get_settings as _gs
+
+        key = os.getenv("ASAM_ANTHROPIC_TOKEN", "") or (_gs().openai_token or "")
+        try:
+            client = _an.AsyncAnthropic(api_key=key)
+            page = await client.models.list(limit=50)
+            return {
+                "configured_model": os.getenv(
+                    "ASAM_ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"
+                ),
+                "available": [m.id for m in page.data],
+            }
+        except Exception as e:
+            return {"error_type": type(e).__name__, "error": str(e)[:600]}
+
     @app.get("/health/embedding", tags=["health"])
     async def embedding_health_check():
         """Diagnostic: verify the embedding backend used for vector search."""

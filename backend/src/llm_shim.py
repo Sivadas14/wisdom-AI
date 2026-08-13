@@ -23,7 +23,12 @@ import anthropic
 from pydantic import BaseModel, Field
 
 # ── Model to use ──────────────────────────────────────────────────────────────
-_DEFAULT_MODEL = "claude-3-5-haiku-20241022"
+# Overridable without a redeploy: not every Anthropic account has access to
+# every model, and a wrong ID fails with a 404 that the chat path would
+# otherwise swallow into a generic "something went wrong" for the seeker.
+import os as _os
+
+_DEFAULT_MODEL = _os.getenv("ASAM_ANTHROPIC_MODEL", "claude-3-5-haiku-20241022")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
