@@ -110,6 +110,30 @@ async def _startup_tasks(app: FastAPI):
     """
     print("[TRACE] _startup_tasks() begin")
 
+    # ── Credential sanity check ─────────────────────────────────────────────
+    # The chat path calls Anthropic directly. If the configured key is not an
+    # Anthropic key, every answer will fail with 401 and the seeker only sees
+    # a soft error, so say so loudly at boot.
+    try:
+        from src.settings import get_settings as _gs
+        _chat_key = os.getenv("ASAM_ANTHROPIC_TOKEN", "") or (_gs().openai_token or "")
+        if not _chat_key or _chat_key == "dummy_token":
+            tu.logger.error(
+                "[CONFIG] No LLM key configured. Set ASAM_ANTHROPIC_TOKEN — "
+                "chat will fail until this is set."
+            )
+        elif not _chat_key.startswith("sk-ant-"):
+            tu.logger.error(
+                "[CONFIG] Configured chat key does not look like an Anthropic "
+                f"key (prefix {_chat_key[:7]!r}). Anthropic will reject it with "
+                "401 and every answer will fail. Set ASAM_ANTHROPIC_TOKEN to an "
+                "sk-ant-… key."
+            )
+        else:
+            tu.logger.info("[CONFIG] Anthropic chat key present.")
+    except Exception as e:
+        tu.logger.warning(f"[CONFIG] Key sanity check skipped: {e}")
+
     # ── Database setup ──────────────────────────────────────────────────────
     try:
         await _setup_db(app)
@@ -284,11 +308,16 @@ def get_app() -> FastAPI:
     async def health_check():
         """Unified health check endpoint for App Runner, Render, and LBs"""
         logger.info("[TRACE] Health check endpoint hit")
+        from src.services.chat import RETRIEVAL_STATE
         return {
             "status": "healthy",
             "timestamp": tu.SimplerTimes.get_now_datetime().isoformat(),
             "service": "Arunachala Samudra API",
             "version": os.getenv("GIT_SHA", "unknown"),
+            # Retrieval can silently degrade from vector search to full-text
+            # search when embeddings are unavailable. Report it explicitly.
+            "retrieval": RETRIEVAL_STATE.get("mode", "unknown"),
+            "retrieval_error": RETRIEVAL_STATE.get("last_error"),
         }
 
     @app.get("/health/llm", tags=["health"])

@@ -1113,12 +1113,23 @@ async def _embedding_search_optimized(
             op.finish(chunks_found=len(chunks))
 
         if chunks:
+            RETRIEVAL_STATE["mode"] = "vector"
+            RETRIEVAL_STATE["last_error"] = None
             return chunks
         # If vector search returns nothing, fall through to full-text
         tu.logger.warning("[EMBED_SEARCH] Vector search returned 0 chunks; trying FTS fallback")
 
     except Exception as e:
-        tu.logger.warning(f"[EMBED_SEARCH] Embedding failed ({e}); using FTS fallback")
+        # Retrieval quality is materially worse without vectors, so this is
+        # logged as an error (not a debug aside) and recorded so /health can
+        # report the degradation instead of it passing unnoticed.
+        RETRIEVAL_STATE["mode"] = "fulltext_fallback"
+        RETRIEVAL_STATE["last_error"] = f"{type(e).__name__}: {e}"[:300]
+        tu.logger.error(
+            "[EMBED_SEARCH] DEGRADED: vector search unavailable, answers are "
+            f"falling back to full-text search with reduced quality. Cause: "
+            f"[{type(e).__name__}] {e}"
+        )
 
     # --- Fallback: PostgreSQL full-text search (no API calls needed) ---
     return await _fulltext_search_fallback(session, query)
@@ -1360,6 +1371,10 @@ GUEST_MESSAGE_LIMIT = 5  # Per IP per day AND per session per day
 # A structural marker is used rather than string-matching the message text so
 # it keeps working for every translated language.
 NO_CHARGE_MARKER = "<no_charge/>"
+
+# Live retrieval health, reported by /health so a silent drop from vector
+# search to full-text search is always visible rather than merely suspected.
+RETRIEVAL_STATE: dict = {"mode": "unknown", "last_error": None}
 
 
 class GuestChatMessage(BaseModel):
