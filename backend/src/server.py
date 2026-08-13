@@ -333,13 +333,26 @@ def get_app() -> FastAPI:
         from src.llm_shim import tt as _tt, ta as _ta
 
         s = _gs()
-        raw = (s.openai_token or "")
+
+        def _fp(v: str) -> dict:
+            v = v or ""
+            return {
+                "set": bool(v) and v != "dummy_token",
+                "length": len(v),
+                "prefix": v[:7] if v else "",
+                "is_anthropic_shaped": v.startswith("sk-ant-"),
+            }
+
+        # Report EVERY candidate variable separately, and say which one the
+        # client actually used, so "not set" is never confused with "wrong".
+        anthropic_var = os.getenv("ASAM_ANTHROPIC_TOKEN", "")
+        openai_var = s.openai_token or ""
+        raw = anthropic_var or openai_var
+
         fingerprint = {
-            "present": bool(raw) and raw != "dummy_token",
-            "length": len(raw),
-            "prefix": raw[:7] if raw else "",
-            "looks_like_anthropic": raw.startswith("sk-ant-"),
-            "looks_like_openai": raw.startswith("sk-") and not raw.startswith("sk-ant-"),
+            "ASAM_ANTHROPIC_TOKEN": _fp(anthropic_var),
+            "ASAM_OPENAI_TOKEN": _fp(openai_var),
+            "using": "ASAM_ANTHROPIC_TOKEN" if anthropic_var else "ASAM_OPENAI_TOKEN (fallback)",
         }
 
         try:
