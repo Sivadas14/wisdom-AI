@@ -1,4 +1,5 @@
 from src.llm_shim import tt, ta, tu
+from src.humanize import humanize_response
 
 import os
 import uuid
@@ -272,7 +273,7 @@ async def _llm_chat(
     
     async with profile_operation("llm_response") as op:
         response = await model.chat_async(master_thread)
-        response_content = response.content if hasattr(response, 'content') else str(response)
+        response_content = humanize_response(response.content if hasattr(response, 'content') else str(response))
         op.finish(response_length=len(response_content))
     
     # Yield the response content
@@ -407,7 +408,7 @@ async def _llm_chat_optimized(
     # NOW call LLM with chunks in context
     async with profile_operation("llm_response") as op:
         response = await model.chat_async(master_thread)
-        response_content = response.content if hasattr(response, 'content') else str(response)
+        response_content = humanize_response(response.content if hasattr(response, 'content') else str(response))
         op.finish(response_length=len(response_content))
     
     # Yield the response content
@@ -612,10 +613,10 @@ async def _llm_chat_streaming_optimized(
                         response_content += content
                 else:
                     response = await model.chat_async(master_thread)
-                    response_content = response.content if hasattr(response, 'content') else str(response)
+                    response_content = humanize_response(response.content if hasattr(response, 'content') else str(response))
             except Exception as e:
                 response = await model.chat_async(master_thread)
-                response_content = response.content if hasattr(response, 'content') else str(response)
+                response_content = humanize_response(response.content if hasattr(response, 'content') else str(response))
 
             # Translate the full English response into user's language
             try:
@@ -651,7 +652,7 @@ async def _llm_chat_streaming_optimized(
                 else:
                     # Method 2: Use the regular chat method and simulate streaming
                     response = await model.chat_async(master_thread)
-                    response_content = response.content if hasattr(response, 'content') else str(response)
+                    response_content = humanize_response(response.content if hasattr(response, 'content') else str(response))
 
                     # Stream the response word by word
                     words = response_content.split()
@@ -665,7 +666,7 @@ async def _llm_chat_streaming_optimized(
             except Exception as e:
                 # Fallback: Get full response and stream it
                 response = await model.chat_async(master_thread)
-                response_content = response.content if hasattr(response, 'content') else str(response)
+                response_content = humanize_response(response.content if hasattr(response, 'content') else str(response))
 
                 # Stream word by word
                 words = response_content.split()
@@ -1320,6 +1321,20 @@ async def chat_completions(
                         8. NEVER refer the seeker to Ramanasramam.org, any external website, or any
                            outside resource. ONLY invite them to continue this conversation or explore
                            the Arunachala Samudra digital library.
+
+                        HOW TO WRITE — write like a person, not like a chatbot:
+                        9. Never open by praising the question ("What a beautiful question").
+                           Never say "I hope this helps" or "Let me know if". Begin with the answer.
+                        10. Use no em dashes. Use commas, full stops or parentheses instead.
+                        11. Use no emojis, no bold decoration, no bulleted lists of bolded headers.
+                        12. Say "is" and "has". Avoid "serves as", "stands as", "plays a vital role".
+                        13. Avoid "delve", "testament", "tapestry", "underscores", "it is important
+                            to note that", and similar padding. Cut straight to the substance.
+                        14. Do not force ideas into groups of three, and do not end with an uplifting
+                            summary that adds nothing.
+                        15. Vary sentence length. Short sentences are good. Plain words are good.
+                        16. When you quote Bhagavan or a text, quote it EXACTLY. Never smooth,
+                            modernise or paraphrase inside quotation marks.
                         """
                     ).strip()
                 ),
@@ -1479,6 +1494,20 @@ async def _guest_chat_stream(
         7. NEVER refer the seeker to Ramanasramam.org, any external website, or any outside
            resource. ONLY invite them to continue this conversation or explore the
            Arunachala Samudra digital library.
+
+        HOW TO WRITE — write like a person, not like a chatbot:
+        8. Never open by praising the question ("What a beautiful question").
+           Never say "I hope this helps" or "Let me know if". Begin with the answer.
+        9. Use no em dashes. Use commas, full stops or parentheses instead.
+        10. Use no emojis, no bold decoration, no bulleted lists of bolded headers.
+        11. Say "is" and "has". Avoid "serves as", "stands as", "plays a vital role".
+        12. Avoid "delve", "testament", "tapestry", "underscores", "it is important
+            to note that", and similar padding. Cut straight to the substance.
+        13. Do not force ideas into groups of three, and do not end with an uplifting
+            summary that adds nothing.
+        14. Vary sentence length. Short sentences are good. Plain words are good.
+        15. When you quote Bhagavan or a text, quote it EXACTLY. Never smooth,
+            modernise or paraphrase inside quotation marks.
         """
     ).strip()
 
@@ -1574,7 +1603,7 @@ async def _guest_chat_stream(
     response_content = ""
     try:
         response = await model.chat_async(master_thread)
-        response_content = response.content if hasattr(response, "content") else str(response)
+        response_content = humanize_response(response.content if hasattr(response, "content") else str(response))
 
         if is_non_english:
             # === PHASE 1B (guest): translate full English response then stream translated words ===
