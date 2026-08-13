@@ -80,19 +80,18 @@ COPY backend/src ./src
 COPY --from=frontend-builder /frontend/dist ./src/ui
 
 # Smoke test: verify the server factory can be imported and initialised.
-# This runs get_app() so any startup crash (missing module, bad attribute, etc.)
-# fails the Docker BUILD with a visible error rather than silently crashing the
-# container at runtime.
-RUN python3 -c "
-import sys, os
-sys.path.insert(0, '.')
-# Provide enough env to let Settings construct without crashing
-os.environ.setdefault('ASAM_DB_URL', 'postgresql+asyncpg://x:x@localhost/x')
-os.environ.setdefault('ASAM_JWT_SECRET', 'smoke-test-secret')
-from src.server import get_app
-app = get_app()
-print('[SMOKE TEST] get_app() succeeded — server startup is clean.')
-" 2>&1 | tee /tmp/smoke.log || (cat /tmp/smoke.log && exit 1)
+# Uses printf+pipe so the Python spans multiple lines without Dockerfile parse errors.
+# Any startup crash (missing module, bad attribute, etc.) fails the BUILD here,
+# giving a clear error rather than a silent container crash at runtime.
+RUN printf '%s\n' \
+    'import sys, os' \
+    'sys.path.insert(0, ".")' \
+    'os.environ.setdefault("ASAM_DB_URL", "postgresql+asyncpg://x:x@localhost/x")' \
+    'os.environ.setdefault("ASAM_JWT_SECRET", "smoke-test")' \
+    'from src.server import get_app' \
+    'app = get_app()' \
+    'print("[SMOKE TEST] get_app() succeeded — server startup is clean.")' \
+    | python3
 
 # Change ownership to non-root user
 # Change ownership to non-root user - using a more efficient approach
