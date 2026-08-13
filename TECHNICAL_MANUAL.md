@@ -110,6 +110,41 @@ search is a fallback for embedding **outages** only, and while it is active
 
 ---
 
+## 4a. Answer presentation (humanizer)
+
+Every chat reply, guest and paid, in all languages, is cleaned of AI-writing
+tells before the seeker sees it. Two layers, neither costing an extra LLM call:
+
+1. **Generation time** — both system prompts carry explicit writing rules: no
+   praising the question, no "I hope this helps", no em dashes, no emojis or
+   bold decoration, no "serves as"/"stands as", no padding vocabulary, no forced
+   rule of three, vary sentence length, quote sources exactly.
+2. **Display time** — `src/humanize.py` deterministically strips what slips
+   through: em dashes, emojis, curly quotes, sycophantic openers, chatbot
+   artifacts, signposting, filler, copula avoidance.
+
+**Verbatim quotations are never modified.** Blockquotes, quoted spans and inline
+code are masked out before any transformation and restored byte-for-byte, so
+Bhagavan's recorded words keep their original wording *and* punctuation —
+including em dashes.
+
+**Negative parallelism is deliberately not rewritten.** Every regex form of
+"it's not just X, it's Y" inverts meaning; an early draft turned "self-enquiry
+is not just about technique" into "is about technique", the opposite of the
+teaching. It is handled in the prompt instead.
+
+Safety rails: emoji stripping excludes Indic script ranges; if filters would
+remove more than half a reply the original is returned; any exception falls back
+to the original text. Presentation polish must never cost a seeker their answer.
+
+Tests: `backend/tests/test_humanize.py` (14 tests), ordered by priority —
+meaning preservation, then quote protection, then tell removal.
+
+Tuning: edit the pattern lists in `humanize.py`. Anything that could change
+meaning belongs in the prompt, not in a regex.
+
+---
+
 ## 5. Free-question quota (guests)
 
 Limit: **3 questions** per browser session per day *and* per IP per day
