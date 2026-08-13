@@ -1,5 +1,6 @@
 """
 llm_shim.py — Replaces tuneapi (tt / ta / tu namespaces) entirely.
+Deployed: 2026-08-13 — includes SimplerTimes and OpenAI→Anthropic model ID map.
 
 Uses only:
   - anthropic  (official SDK, direct API calls)
