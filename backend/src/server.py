@@ -291,7 +291,7 @@ def get_app() -> FastAPI:
             "version": os.getenv("GIT_SHA", "unknown"),
         }
 
-    @app.get("/api/health/llm", tags=["health"])
+    @app.get("/health/llm", tags=["health"])
     async def llm_health_check():
         """Diagnostic: make a minimal Anthropic call and report the real error.
 
@@ -332,7 +332,7 @@ def get_app() -> FastAPI:
                 "key": fingerprint,
             }
 
-    @app.get("/api/health/embedding", tags=["health"])
+    @app.get("/health/embedding", tags=["health"])
     async def embedding_health_check():
         """Diagnostic: verify the embedding backend used for vector search."""
         from src.settings import get_settings as _gs
