@@ -240,8 +240,9 @@ class TranscriptionResult:
 
 class ImageResponse:
     """Returned by image_gen_async. Callers read `.image` as a PIL Image."""
-    def __init__(self, image):
+    def __init__(self, image, model: str = ""):
         self.image = image
+        self.model = model
 
 
 class EmbeddingResponse:
@@ -505,11 +506,12 @@ class AnthropicModel(ModelInterface):
 
         from PIL import Image
         item = resp.data[0]
+        used_model = candidate
 
         b64 = getattr(item, "b64_json", None)
         if b64:
             raw = base64.b64decode(b64)
-            return ImageResponse(Image.open(io.BytesIO(raw)))
+            return ImageResponse(Image.open(io.BytesIO(raw)), used_model)
 
         url = getattr(item, "url", None)
         if not url:
@@ -518,7 +520,7 @@ class AnthropicModel(ModelInterface):
         async with httpx.AsyncClient(timeout=60) as http:
             r = await http.get(url)
             r.raise_for_status()
-            return ImageResponse(Image.open(io.BytesIO(r.content)))
+            return ImageResponse(Image.open(io.BytesIO(r.content)), used_model)
 
 
 class _TA:

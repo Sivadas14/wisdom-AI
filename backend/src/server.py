@@ -429,7 +429,8 @@ def get_app() -> FastAPI:
                 size="1024x1024",
             )
             results["image_generation"] = {
-                "status": "ok", "size": list(img.image.size), "model": "dall-e-3"
+                "status": "ok", "size": list(img.image.size),
+                "model": getattr(img, "model", "unknown")
             }
         except Exception as e:
             results["image_generation"] = {
