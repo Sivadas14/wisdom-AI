@@ -167,6 +167,34 @@ Check for a text layer before uploading.
 
 ---
 
+## 4c. Which model does what
+
+Every piece of *text* is Anthropic. Everything else is OpenAI, because Anthropic
+serves no speech, image or embedding API.
+
+| Feature | Text / reasoning | Media |
+|---|---|---|
+| Chat answers | Anthropic `claude-haiku-4-5` | — |
+| Meditation script (audio, video) | Anthropic `claude-haiku-4-5` | OpenAI `gpt-4o-mini-tts` |
+| Video meditation | Anthropic (script) | OpenAI TTS + `gpt-image-1` frames, assembled with ffmpeg |
+| Contemplation card | Anthropic (quote + image prompt) | OpenAI `gpt-image-1` |
+| RAG retrieval | — | OpenAI `text-embedding-3-small` |
+| Voice input | — | OpenAI `whisper-1` |
+
+**The `gpt-4o` names in the code are misleading.** Call sites still read
+`get_llm("gpt-4o")`, a leftover from when TuneAPI proxied OpenAI. The shim maps
+those ids to Claude through `_OPENAI_TO_ANTHROPIC`, so nothing reaches OpenAI
+for text. Renaming them is cosmetic and deliberately deferred.
+
+Image model is set by `ASAM_IMAGE_MODEL` (default `gpt-image-1`). Call sites were
+written for dall-e-3, so sizes and quality words are translated rather than
+rejected: `1792x1024` becomes `1536x1024`, `standard` becomes `medium`.
+
+Check both media paths with `/health/media`, which calls speech and image
+generation for real and reports the actual error and model.
+
+---
+
 ## 5. Free-question quota (guests)
 
 Limit: **3 questions** per browser session per day *and* per IP per day
@@ -239,6 +267,10 @@ behind the previous one:
 | 9 | Guests charged a free question for our failures | Charge only on success + one-time refund |
 | 10 | Vector search returned top-N regardless of relevance | Distance threshold |
 | 11 | Production admin login advertised `admin` / `admin` and forged a session | Bypass removed |
+| 12 | Shim never reimplemented TTS, image gen or transcription, so audio, video and cards had been dead since the TuneAPI removal | Methods added, routed to OpenAI |
+| 13 | `Thread(id=...)` rejected by the shim, failing meditation jobs | Thread accepts id and extras |
+| 14 | Account has no `dall-e-3` | Default to `gpt-image-1`, translate sizes |
+| 15 | Guest generations charged before the job ran | Charge on success only, plus refund |
 
 **Lesson.** Defects 5–8 were invisible because failures were swallowed into a
 friendly message and retrieval degraded silently. Diagnostics that report the
