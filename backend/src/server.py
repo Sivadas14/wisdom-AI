@@ -170,11 +170,15 @@ async def _startup_tasks(app: FastAPI):
 
 # Sentinel written into guest_sessions so the refund runs exactly once across
 # every App Runner instance and restart.
-_QUOTA_REFUND_SENTINEL = "__quota_refund_v1__"
+_QUOTA_REFUND_SENTINEL = "__quota_refund_v2__"
 
 
 async def _refund_outage_guest_quota(session_factory):
-    """Zero out guest message counts wrongly charged during the AI outage.
+    """Zero out guest counts wrongly charged during the outages.
+
+    Covers both dimensions: chat questions charged while the LLM was failing,
+    and content generations charged while audio, video and card generation were
+    broken by the missing shim methods. Neither was the seeker's fault.
 
     Idempotent: a sentinel row is inserted in the same transaction, so if it
     already exists the refund is skipped. Safe to run on every instance.
