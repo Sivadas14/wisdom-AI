@@ -15,6 +15,7 @@ from src import wire as w
 from src.db import (
     get_db_session_fa,
     UserProfile,
+    UserRole,
     Subscription,
     SubscriptionStatus,
     Plan,
@@ -201,6 +202,29 @@ async def get_usage(
     Returns:
         UserUsageResponse with all usage statistics
     """
+    # ── Admin override ──────────────────────────────────────────────────────
+    # Admins need to exercise contemplation cards and audio/video meditations
+    # regularly to confirm the pipelines still work, and those pipelines break
+    # quietly (a background job that never finishes rather than an error). A
+    # plan quota would stop that checking after a handful of runs, so admins get
+    # unlimited use of everything. This is the single place every quota check
+    # reads from, so it covers the API, the UI counters and the backend guards
+    # at once.
+    if current_user.role == UserRole.ADMIN:
+        unlimited = w.UsageLimit(limit="Unlimited", used=0, remaining="Unlimited")
+        return w.UserUsageResponse(
+            plan_name="Admin",
+            plan_type="ADMIN",
+            conversations=unlimited,
+            chat_tokens=unlimited,
+            image_cards=unlimited,
+            meditation_duration=unlimited,
+            addon_cards=unlimited,
+            addon_minutes=unlimited,
+            audio_enabled=True,
+            video_enabled=True,
+        )
+
     # Get user's active subscription and plan
     query = (
         select(Subscription, Plan)
