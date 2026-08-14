@@ -145,6 +145,28 @@ meaning belongs in the prompt, not in a regex.
 
 ---
 
+## 4b. The corpus
+
+53 source documents, all active, embedded with OpenAI `text-embedding-3-small`
+into a `VECTOR(1536)` pgvector column. Ingestion happens through
+`/admin` (Knowledge Base), which extracts text, chunks it, embeds each chunk and
+writes to `document_chunks`.
+
+**Indexing fails quietly.** `_index_pdf_background` embeds chunk by chunk and
+catches per-chunk failures so one bad chunk cannot abort a whole book. The
+consequence is that a document uploaded while embeddings are unavailable is
+saved with status `completed` and **zero chunks**. It looks correct in the admin
+list and is invisible to search. After any embedding outage, check
+`/health/embedding` first, then re-upload anything added during the window.
+
+Verify an upload functionally, not by its status: ask the chat something only
+the new book can answer and confirm it cites that book.
+
+Scanned PDFs with no text layer extract nothing and will index as zero chunks.
+Check for a text layer before uploading.
+
+---
+
 ## 5. Free-question quota (guests)
 
 Limit: **3 questions** per browser session per day *and* per IP per day
@@ -216,6 +238,7 @@ behind the previous one:
 | 8 | OpenAI credits exhausted → embeddings dead, silent FTS fallback | Loud logging + `/health` reporting |
 | 9 | Guests charged a free question for our failures | Charge only on success + one-time refund |
 | 10 | Vector search returned top-N regardless of relevance | Distance threshold |
+| 11 | Production admin login advertised `admin` / `admin` and forged a session | Bypass removed |
 
 **Lesson.** Defects 5–8 were invisible because failures were swallowed into a
 friendly message and retrieval degraded silently. Diagnostics that report the
@@ -225,6 +248,10 @@ any individual fix here.
 ---
 
 ## 9. Runbook
+
+**A book was uploaded but the chat cannot find it**
+→ Indexing skips failed chunks, so it may hold zero chunks. Check
+`/health/embedding`, confirm the PDF has a text layer, then re-upload.
 
 **Chat returns "Something unexpected interrupted the response"**
 → `GET /health/llm`. It names the real cause: `AuthenticationError` (wrong or
