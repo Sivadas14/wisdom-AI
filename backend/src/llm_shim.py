@@ -448,13 +448,34 @@ class AnthropicModel(ModelInterface):
         import io
 
         client = self._openai()
-        resp = await client.images.generate(
-            model=model, prompt=prompt, n=n, size=size,
-            quality=quality, response_format="b64_json",
-        )
+        kwargs: dict = dict(model=model, prompt=prompt, n=n, size=size, quality=quality)
+
+        # Older image models return a URL unless response_format asks for
+        # base64; newer ones reject the parameter outright and always return
+        # base64. Try with it, then without, so either generation works.
+        try:
+            resp = await client.images.generate(**kwargs, response_format="b64_json")
+        except Exception as e:
+            if "response_format" not in str(e):
+                raise
+            resp = await client.images.generate(**kwargs)
+
         from PIL import Image
-        raw = base64.b64decode(resp.data[0].b64_json)
-        return ImageResponse(Image.open(io.BytesIO(raw)))
+        item = resp.data[0]
+
+        b64 = getattr(item, "b64_json", None)
+        if b64:
+            raw = base64.b64decode(b64)
+            return ImageResponse(Image.open(io.BytesIO(raw)))
+
+        url = getattr(item, "url", None)
+        if not url:
+            raise RuntimeError("Image API returned neither b64_json nor url")
+        import httpx
+        async with httpx.AsyncClient(timeout=60) as http:
+            r = await http.get(url)
+            r.raise_for_status()
+            return ImageResponse(Image.open(io.BytesIO(r.content)))
 
 
 class _TA:
