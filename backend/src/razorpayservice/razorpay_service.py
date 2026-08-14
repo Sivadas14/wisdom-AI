@@ -37,11 +37,10 @@ from src.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
-# This Razorpay account is shared with another product (AstroPal). Razorpay
-# delivers every subscribed event to EVERY webhook registered on the account, so
-# this service receives that product's events too. Tag everything we create and
-# ignore anything that is not ours, quietly, so the other product's traffic does
-# not masquerade as errors in our logs.
+# Tags the subscriptions this service creates. Razorpay delivers every
+# subscribed event to EVERY webhook registered on an account, so if a second
+# product is ever added to this account its events would arrive here too. The
+# tag lets the webhook tell ours apart without relying on the plan lookup alone.
 PRODUCT_TAG = "arunachala-samudra"
 
 # ---------------------------------------------------------------------------
@@ -191,8 +190,7 @@ class RazorpayService:
             "notes": {
                 "user_id": user_id,
                 "user_email": user_email,
-                # Lets the webhook tell our events apart from the other
-                # product's on this shared account.
+                # Lets the webhook confirm an event originated here.
                 "product": PRODUCT_TAG,
             },
         }
@@ -413,10 +411,9 @@ class RazorpayService:
         notes            = sub_entity.get("notes", {})
         user_id          = notes.get("user_id")
 
-        # Events for the other product on this shared account are not ours to
-        # act on. Newer subscriptions carry an explicit product tag; older ones
-        # predate it, so fall back to the plan lookup below, which only ever
-        # matches plan ids that exist in OUR Plan table.
+        # Ignore anything explicitly tagged as another product. Subscriptions
+        # created before the tag existed do not carry it, so those fall through
+        # to the plan lookup below, which only matches ids in our Plan table.
         product = notes.get("product")
         if product and product != PRODUCT_TAG:
             logger.info(
@@ -433,12 +430,11 @@ class RazorpayService:
             select(Plan).where(Plan.razorpay_plan_id == razorpay_plan_id)
         )).scalar_one_or_none()
         if not plan_row:
-            # Almost certainly the other product's plan arriving on the shared
-            # account. Logged at info, not error, so genuine failures stay
-            # visible instead of drowning in the other product's traffic.
+            # Not one of our plans. Logged at info rather than error: this is
+            # an event we simply do not own, not a failure on our side.
             logger.info(
                 "[RAZORPAY] Ignoring event for unknown razorpay_plan_id=%s "
-                "(not one of our plans; likely the other product on this account)",
+                "(not one of our plans)",
                 razorpay_plan_id,
             )
             return "plan_not_found"
