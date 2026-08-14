@@ -109,6 +109,17 @@ def test_filler_removed():
     assert "important to note" not in out.lower()
 
 
+def test_nested_masks_restore_correctly():
+    """Regression: a quoted span inside a blockquote must survive unmasking.
+
+    Masks nest, and restoring them forwards dropped the inner quotation.
+    """
+    q = '"He said the mind\u2014turned inward\u2014is the Self, and it is important to note that."'
+    src = "Some introductory prose here to pad the reply out properly.\n\n> " + q
+    out = H(src)
+    assert q in out, f"nested quotation lost: {out}"
+
+
 # ── 4. Safety rails ──────────────────────────────────────────────────────────
 
 def test_empty_and_none_safe():

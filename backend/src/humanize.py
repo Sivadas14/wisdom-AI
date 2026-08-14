@@ -54,8 +54,19 @@ def _mask(text: str) -> tuple[str, list[str]]:
 
 
 def _unmask(text: str, store: list[str]) -> str:
-    for i, original in enumerate(store):
-        text = text.replace(_MARK.format(i), original)
+    """Restore protected spans.
+
+    Masks can nest: a blockquote may be stored while already containing the
+    mark of a quoted span inside it. Restoring forwards would substitute the
+    inner mark before the outer span reappeared, silently dropping a quotation.
+    Restore in reverse and repeat until stable.
+    """
+    for _ in range(len(store) + 2):
+        before = text
+        for i in reversed(range(len(store))):
+            text = text.replace(_MARK.format(i), store[i])
+        if text == before:
+            break
     return text
 
 
