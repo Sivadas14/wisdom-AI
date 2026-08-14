@@ -86,7 +86,58 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, 
         crumbs_html = "<nav class='crumbs'>" + " › ".join(parts) + "</nav>"
 
     hero_html = ""
-    if hero_image:
+    hero_images = md.get("hero_images") or []
+
+    if hero_images:
+        # Rotating hero. Pure CSS crossfade, no JavaScript, so it works in the
+        # server-rendered HTML and costs nothing at runtime. Each slide gets an
+        # equal slice of the cycle and a negative delay to stagger it.
+        hero_position = md.get("hero_position") or "center"
+        hero_size = md.get("hero_size") or "cover"
+        n = len(hero_images)
+        each = 7  # seconds per image
+        total = each * n
+        slot = 100.0 / n
+        hold = slot * 0.82           # fully opaque for most of the slot
+        gone = slot                  # faded out by the end of the slot
+        fade = gone - hold           # crossfade length, as a percentage
+        back = 100.0 - fade          # fade back in over the final stretch
+
+        # Negative delays stagger the slides. The offset is (total - each*i) so
+        # the images appear in the order they are listed rather than 1, 3, 2.
+        slides = "".join(
+            f"<div class='hero-slide' style=\"background-image:url('{e(src)}');"
+            f"background-position:{hero_position};background-size:{hero_size};"
+            f"animation-delay:{0 if i == 0 else -each * (n - i)}s\"></div>"
+            for i, src in enumerate(hero_images)
+        )
+
+        hero_html = f"""
+    <header class="hero hero-rotating">
+      <style>
+        .hero-rotating{{position:relative;overflow:hidden}}
+        .hero-rotating .hero-slide{{position:absolute;inset:0;background-repeat:no-repeat;
+          opacity:0;animation:heroFade {total}s infinite;will-change:opacity}}
+        .hero-rotating .hero-veil{{position:absolute;inset:0;
+          background:linear-gradient(rgba(26,20,16,.28),rgba(26,20,16,.55))}}
+        .hero-rotating .hero-inner{{position:relative;z-index:2}}
+        @keyframes heroFade{{
+          0%{{opacity:1}} {hold:.2f}%{{opacity:1}} {gone:.2f}%{{opacity:0}}
+          {back:.2f}%{{opacity:0}} 100%{{opacity:1}}
+        }}
+        @media (prefers-reduced-motion: reduce){{
+          .hero-rotating .hero-slide{{animation:none}}
+          .hero-rotating .hero-slide:first-child{{opacity:1}}
+        }}
+      </style>
+      {slides}
+      <div class="hero-veil"></div>
+      <div class="hero-inner">
+        <h1>{e(title)}</h1>
+        {f'<p class="hero-sub">{e(subtitle)}</p>' if subtitle else ''}
+      </div>
+    </header>"""
+    elif hero_image:
         hero_position = md.get("hero_position") or "center"
         hero_size = md.get("hero_size") or "cover"
         hero_repeat = md.get("hero_repeat") or "no-repeat"

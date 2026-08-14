@@ -50,6 +50,9 @@ def json_to_row(j):
     canonical = j.get("canonical_path") or "/" + j["slug"]
     metadata = {
         "hero_image": j.get("hero_image"),
+        # Optional list of images for a rotating hero. The renderer prefers
+        # this over hero_image when present.
+        "hero_images": j.get("hero_images") or [],
         "hero_position": j.get("hero_position"),
         "hero_size": j.get("hero_size"),
         "hero_repeat": j.get("hero_repeat"),
