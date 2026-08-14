@@ -239,7 +239,7 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, 
     {faq_html}
     <div class="cta">
       <strong>Continue this inquiry with the Wisdom AI</strong>
-      <div>Ask anything about Ramana Maharshi's teachings — grounded in the source texts.</div>
+      <div>Ask anything about Ramana Maharshi's teachings, grounded in the source texts.</div>
       <a href="/">Open the Wisdom AI →</a>
     </div>
   </main>
