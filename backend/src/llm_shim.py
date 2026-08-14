@@ -140,8 +140,15 @@ def system(content: str) -> Message:
 class Thread:
     """Drop-in for tt.Thread — an ordered list of Messages."""
 
-    def __init__(self, *messages: Message):
+    def __init__(self, *messages: Message, id: Optional[str] = None, **kwargs):
+        # TuneAPI's Thread carried metadata alongside the messages, and four
+        # call sites still pass id=<conversation_id>. Rejecting it raised
+        # "unexpected keyword argument 'id'" inside background jobs, which
+        # surfaced to the user only as a meditation that never finished.
+        # Unknown extras are absorbed for the same reason.
         self.chats: List[Message] = list(messages)
+        self.id = id
+        self.meta = kwargs
 
     def append(self, msg: Message) -> None:
         self.chats.append(msg)
