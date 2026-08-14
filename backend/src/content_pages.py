@@ -207,6 +207,11 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, 
   .crumbs a{{color:var(--ember);text-decoration:none}}
   .body{{margin-top:18px}}
   .body :is(p,li){{font-size:1.08rem}}
+  /* Body links had no rule at all, so every content page rendered them in
+     default browser blue. Match the site's ember palette. */
+  .body a{{color:var(--ember);text-decoration:none;border-bottom:1px solid rgba(160,74,32,.35);
+           transition:border-color .15s ease}}
+  .body a:hover{{border-bottom-color:var(--ember)}}
   .body h2{{font-size:1.55rem;color:var(--ember);margin:1.7em 0 .35em}}
   .body h3,.body h4{{margin:1.3em 0 .3em}}
   .body img{{max-width:100%;height:auto;border-radius:10px;margin:1.4em 0;display:block}}
