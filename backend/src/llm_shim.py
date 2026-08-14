@@ -434,31 +434,74 @@ class AnthropicModel(ModelInterface):
             resp = await client.audio.transcriptions.create(model=model, file=fh)
         return TranscriptionResult(getattr(resp, "text", "") or "")
 
+    # gpt-image-1 accepts a different set of sizes and quality words than
+    # dall-e-3, so call sites written for dall-e-3 need translating rather than
+    # failing. Landscape maps to landscape, portrait to portrait.
+    _GPT_IMAGE_SIZES = {
+        "1792x1024": "1536x1024",
+        "1024x1792": "1024x1536",
+        "1536x1024": "1536x1024",
+        "1024x1536": "1024x1536",
+        "1024x1024": "1024x1024",
+        "512x512":   "1024x1024",
+        "256x256":   "1024x1024",
+    }
+    _GPT_IMAGE_QUALITY = {
+        "standard": "medium", "hd": "high",
+        "low": "low", "medium": "medium", "high": "high", "auto": "auto",
+    }
+
     async def image_gen_async(
         self,
         prompt: str,
         n: int = 1,
         size: str = "1024x1024",
         quality: str = "standard",
-        model: str = "dall-e-3",
+        model: Optional[str] = None,
         **_kwargs,
     ) -> "ImageResponse":
         """Generate an image. Callers read `.image` as a PIL Image."""
         import base64
         import io
+        import os
 
         client = self._openai()
-        kwargs: dict = dict(model=model, prompt=prompt, n=n, size=size, quality=quality)
 
-        # Older image models return a URL unless response_format asks for
-        # base64; newer ones reject the parameter outright and always return
-        # base64. Try with it, then without, so either generation works.
-        try:
-            resp = await client.images.generate(**kwargs, response_format="b64_json")
-        except Exception as e:
-            if "response_format" not in str(e):
-                raise
-            resp = await client.images.generate(**kwargs)
+        # Not every account has every image model. Try the configured one, then
+        # fall back, so a model retirement does not silently break meditations.
+        configured = model or os.getenv("ASAM_IMAGE_MODEL", "") or "gpt-image-1"
+        candidates = [configured] + [
+            m for m in ("gpt-image-1", "dall-e-3") if m != configured
+        ]
+
+        last_error: Optional[Exception] = None
+        resp = None
+        for candidate in candidates:
+            if candidate.startswith("gpt-image"):
+                kwargs = dict(
+                    model=candidate, prompt=prompt, n=n,
+                    size=self._GPT_IMAGE_SIZES.get(size, "1024x1024"),
+                    quality=self._GPT_IMAGE_QUALITY.get(quality, "medium"),
+                )
+                attempts = [kwargs]           # always returns base64
+            else:
+                kwargs = dict(model=candidate, prompt=prompt, n=n,
+                              size=size, quality=quality)
+                attempts = [dict(kwargs, response_format="b64_json"), kwargs]
+
+            for attempt in attempts:
+                try:
+                    resp = await client.images.generate(**attempt)
+                    break
+                except Exception as e:
+                    last_error = e
+                    if "response_format" not in str(e):
+                        break
+            if resp is not None:
+                break
+
+        if resp is None:
+            raise last_error or RuntimeError("Image generation failed")
 
         from PIL import Image
         item = resp.data[0]
