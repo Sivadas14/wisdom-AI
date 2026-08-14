@@ -194,29 +194,11 @@ async def _db_check_and_bump(
             logger.info(f"[GUEST_CONTENT] Session limit reached: {sid[:16]}… count={sid_row.message_count}")
             raise HTTPException(status_code=429, detail=_LIMIT)
 
-        # ── Both passed — increment ───────────────────────────────────────────
-        if ip_row:
-            ip_row.message_count += 1
-            ip_row.updated_at = _dt.datetime.utcnow()
-            db_session.add(ip_row)
-        else:
-            db_session.add(GuestSession(
-                ip_hash=ip_key, session_id=sid_key,
-                session_date=today, message_count=1,
-            ))
-
-        if sid_row:
-            sid_row.message_count += 1
-            sid_row.updated_at = _dt.datetime.utcnow()
-            db_session.add(sid_row)
-        else:
-            if ip_row is not None or sid_key != ip_key:
-                db_session.add(GuestSession(
-                    ip_hash=ip_key, session_id=sid_key,
-                    session_date=today, message_count=1,
-                ))
-
-        await db_session.commit()
+        # ── Both passed. The counter is NOT incremented here. ─────────────────
+        # It is charged only once the generation actually succeeds, in
+        # _charge_guest_content. Charging up-front meant that a meditation or
+        # card which failed on our side still cost the seeker one of their
+        # free generations.
 
     except HTTPException:
         raise
@@ -224,6 +206,60 @@ async def _db_check_and_bump(
         # DB error — log and allow (don't punish the user for infra issues)
         logger.error(f"[GUEST_CONTENT] DB rate-limit check failed: {exc}")
         await db_session.rollback()
+
+
+async def _charge_guest_content(ip_hash: str, sid: str, today: str) -> None:
+    """Record one used generation. Called ONLY after a successful result.
+
+    Opens its own session: the request that authorised the work has long
+    returned by the time the background job finishes.
+    """
+    from src.db import get_background_session
+
+    ip_key  = hashlib.sha256((ip_hash + _CONTENT_NS).encode()).hexdigest()
+    sid_key = f"content:{sid}"
+
+    try:
+        async with get_background_session() as s:
+            ip_row = (await s.execute(
+                select(GuestSession).where(
+                    GuestSession.ip_hash == ip_key,
+                    GuestSession.session_date == today,
+                ).limit(1)
+            )).scalar_one_or_none()
+
+            sid_row = (await s.execute(
+                select(GuestSession).where(
+                    GuestSession.session_id == sid_key,
+                    GuestSession.session_date == today,
+                ).limit(1)
+            )).scalar_one_or_none()
+
+            if ip_row:
+                ip_row.message_count += 1
+                ip_row.updated_at = _dt.datetime.utcnow()
+                s.add(ip_row)
+            else:
+                s.add(GuestSession(
+                    ip_hash=ip_key, session_id=sid_key,
+                    session_date=today, message_count=1,
+                ))
+
+            if sid_row:
+                if ip_row is None or sid_row.id != ip_row.id:
+                    sid_row.message_count += 1
+                    sid_row.updated_at = _dt.datetime.utcnow()
+                    s.add(sid_row)
+            elif ip_row is not None and ip_row.session_id != sid_key:
+                s.add(GuestSession(
+                    ip_hash=ip_key, session_id=sid_key,
+                    session_date=today, message_count=1,
+                ))
+
+            await s.commit()
+    except Exception as e:
+        # Never fail a good generation because metering failed.
+        logger.error(f"[GUEST_CONTENT] Failed to record usage: {e}")
 
 
 def _is_junk(sentence: str) -> bool:
@@ -346,7 +382,7 @@ def _signed_url(spb_client, path: str) -> str | None:
 
 
 # ── Background generators ──────────────────────────────────────────────────────
-async def _gen_image(content_id: str, question: str, answer: str):
+async def _gen_image(content_id: str, question: str, answer: str, charge=None):
     _STORE[content_id]["status"] = "processing"
     try:
         from src.content.image import (
@@ -382,11 +418,14 @@ async def _gen_image(content_id: str, question: str, answer: str):
         _STORE[content_id].update(
             status="complete", content_url=_signed_url(spb, path), content_type="image"
         )
+        # A real result was produced, so it is now fair to charge the seeker.
+        if charge is not None:
+            await charge()
     except Exception as exc:
         _STORE[content_id].update(status="failed", error=str(exc))
 
 
-async def _gen_audio(content_id: str, question: str, answer: str):
+async def _gen_audio(content_id: str, question: str, answer: str, charge=None):
     _STORE[content_id]["status"] = "processing"
     try:
         from src.content.audio import (
@@ -408,11 +447,14 @@ async def _gen_audio(content_id: str, question: str, answer: str):
         _STORE[content_id].update(
             status="complete", content_url=_signed_url(spb, path), content_type="audio"
         )
+        # A real result was produced, so it is now fair to charge the seeker.
+        if charge is not None:
+            await charge()
     except Exception as exc:
         _STORE[content_id].update(status="failed", error=str(exc))
 
 
-async def _gen_video(content_id: str, question: str, answer: str):
+async def _gen_video(content_id: str, question: str, answer: str, charge=None):
     _STORE[content_id]["status"] = "processing"
     try:
         import os
@@ -455,6 +497,9 @@ async def _gen_video(content_id: str, question: str, answer: str):
         _STORE[content_id].update(
             status="complete", content_url=_signed_url(spb, path), content_type="video"
         )
+        # A real result was produced, so it is now fair to charge the seeker.
+        if charge is not None:
+            await charge()
     except Exception as exc:
         _STORE[content_id].update(status="failed", error=str(exc))
 
@@ -497,12 +542,16 @@ async def create_guest_content(
     }
 
     q, a = request.question, request.answer
+
+    async def _charge():
+        await _charge_guest_content(ip_hash, sid, today)
+
     if mode == "image":
-        asyncio.ensure_future(_gen_image(cid, q, a))
+        asyncio.ensure_future(_gen_image(cid, q, a, charge=_charge))
     elif mode == "audio":
-        asyncio.ensure_future(_gen_audio(cid, q, a))
+        asyncio.ensure_future(_gen_audio(cid, q, a, charge=_charge))
     else:
-        asyncio.ensure_future(_gen_video(cid, q, a))
+        asyncio.ensure_future(_gen_video(cid, q, a, charge=_charge))
 
     return GuestContentResponse(content_id=cid)
 
