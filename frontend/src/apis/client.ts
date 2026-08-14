@@ -86,11 +86,15 @@ apiClient.interceptors.response.use(
 
             switch (status) {
                 case 401:
-                    // Check if using mock admin token
                     const token = localStorage.getItem('accessToken');
+
+                    // A stale forged token from the removed admin bypass would
+                    // otherwise sit in localStorage and silently swallow real
+                    // 401s, so clear it and treat the user as signed out.
                     if (token === 'mock-admin-token') {
-                        console.warn('Mock admin token rejected by backend (expected). Ignoring redirect.');
-                        return Promise.reject(error);
+                        localStorage.removeItem('accessToken');
+                        localStorage.removeItem('refreshToken');
+                        localStorage.removeItem('supabase.auth.token');
                     }
 
                     // If no token exists in local storage, this was likely a public request that failed.

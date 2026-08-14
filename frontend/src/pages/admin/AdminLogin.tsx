@@ -43,49 +43,14 @@ const AdminLogin: React.FC = () => {
         setIsLoading(true);
 
         try {
-            // Check for hardcoded admin credentials
-            if (email === "admin" && password === "admin") {
-                console.log('🔐 Admin credentials detected, creating mock session...');
-
-                // Create a mock admin session in localStorage
-                const mockAdminUser = {
-                    id: 'admin-user-id',
-                    email: 'admin@system.local',
-                    user_metadata: {
-                        is_super_admin: true,
-                        name: 'System Administrator'
-                    },
-                    aud: 'authenticated',
-                    role: 'authenticated'
-                };
-
-                // Store mock session data
-                const mockSession = {
-                    currentSession: {
-                        access_token: 'mock-admin-token',
-                        refresh_token: 'mock-admin-refresh',
-                        user: mockAdminUser
-                    },
-                    expiresAt: Date.now() + 3600000 // 1 hour from now
-                };
-
-                localStorage.setItem('supabase.auth.token', JSON.stringify(mockSession));
-                localStorage.setItem('accessToken', 'mock-admin-token');
-                localStorage.setItem('refreshToken', 'mock-admin-refresh');
-                console.log('✅ Mock admin session stored:', mockSession);
-
-                setSuccess("Admin access granted! Redirecting...");
-                setIsLoading(false);
-
-                // Use window.location to force a full reload and trigger AuthContext
-                setTimeout(() => {
-                    console.log('🔄 Redirecting to /admin...');
-                    window.location.href = '/admin';
-                }, 500);
-                return;
-            }
-
-            // Normal authentication flow for other users
+            // The hardcoded "admin" / "admin" bypass that used to sit here has
+            // been removed. It forged a session in localStorage with a fake
+            // access token, and the login screen advertised the credentials in
+            // plain sight. Backend admin routes always verified a real Supabase
+            // JWT and an ADMIN role, so the bypass only ever produced a shell
+            // that could not call the API, but publishing default credentials on
+            // a production login page invites probing. Authentication now goes
+            // through Supabase for everyone.
             const response = await signInWithEmailPassword(email, password);
 
             if (response.success) {
@@ -211,11 +176,6 @@ const AdminLogin: React.FC = () => {
                                     : `Verification code sent to: ${email}`
                             }
                         </CardDescription>
-                        {authMethod === 'password' && (
-                            <div className="text-center mt-2">
-                                <p className="text-xs text-gray-500">Dev: Use "admin" / "admin"</p>
-                            </div>
-                        )}
                     </CardHeader>
 
                     <CardContent>
@@ -228,10 +188,10 @@ const AdminLogin: React.FC = () => {
                                     </Label>
                                     <Input
                                         id="email-password"
-                                        type="text"
+                                        type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="admin"
+                                        placeholder="you@example.com"
                                         className="mt-1 bg-gray-900 border-gray-800 text-white placeholder:text-gray-600 focus:border-orange-500"
                                         disabled={isLoading}
                                         required
@@ -247,7 +207,7 @@ const AdminLogin: React.FC = () => {
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="admin"
+                                        placeholder="Your password"
                                         className="mt-1 bg-gray-900 border-gray-800 text-white placeholder:text-gray-600 focus:border-orange-500"
                                         disabled={isLoading}
                                         required
