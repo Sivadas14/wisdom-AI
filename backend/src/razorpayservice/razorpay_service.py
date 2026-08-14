@@ -37,6 +37,13 @@ from src.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+# This Razorpay account is shared with another product (AstroPal). Razorpay
+# delivers every subscribed event to EVERY webhook registered on the account, so
+# this service receives that product's events too. Tag everything we create and
+# ignore anything that is not ours, quietly, so the other product's traffic does
+# not masquerade as errors in our logs.
+PRODUCT_TAG = "arunachala-samudra"
+
 # ---------------------------------------------------------------------------
 # INR plan configuration
 # ALL string values MUST be ASCII. The Razorpay SDK sends HTTP requests whose
@@ -184,6 +191,9 @@ class RazorpayService:
             "notes": {
                 "user_id": user_id,
                 "user_email": user_email,
+                # Lets the webhook tell our events apart from the other
+                # product's on this shared account.
+                "product": PRODUCT_TAG,
             },
         }
         # Note: callback_url is not supported by Razorpay subscription API in live mode.
@@ -350,26 +360,22 @@ class RazorpayService:
         """
         Verify the X-Razorpay-Signature header using HMAC-SHA256.
 
-        Verification is enforced automatically as soon as
-        ASAM_RAZORPAY_WEBHOOK_SECRET is set.
+        Fails CLOSED when no secret is configured.
 
-        While it is unset the request is accepted, so that live renewals and
-        cancellations are never silently dropped, but this is logged as an error
-        because the gap is real: the handler reads user_id straight from the
-        payload and activates a paid subscription, so anyone able to POST this
-        endpoint could grant themselves a paid plan. Set the secret, then this
-        should be switched to fail closed so it cannot regress.
+        This handler activates paid subscriptions from a user_id read straight
+        out of the payload, so accepting an unverified request would let anyone
+        who can reach the endpoint grant themselves a paid plan. The secret is
+        configured, so there is no reason to ever accept an unsigned request
+        again. The `prod` flag defaults to False and cannot be used to gate this.
         """
         settings = get_settings()
         secret = settings.razorpay_webhook_secret
         if not secret:
             logger.error(
-                "[RAZORPAY] ASAM_RAZORPAY_WEBHOOK_SECRET is not set, so this "
-                "webhook cannot be verified and is being accepted unverified. "
-                "Anyone able to reach this endpoint could grant themselves a "
-                "paid subscription. Set the secret in App Runner."
+                "[RAZORPAY] Rejecting webhook: ASAM_RAZORPAY_WEBHOOK_SECRET is "
+                "not set, so the signature cannot be verified."
             )
-            return True
+            return False
 
         expected = hmac.new(
             secret.encode("utf-8"),
@@ -407,6 +413,18 @@ class RazorpayService:
         notes            = sub_entity.get("notes", {})
         user_id          = notes.get("user_id")
 
+        # Events for the other product on this shared account are not ours to
+        # act on. Newer subscriptions carry an explicit product tag; older ones
+        # predate it, so fall back to the plan lookup below, which only ever
+        # matches plan ids that exist in OUR Plan table.
+        product = notes.get("product")
+        if product and product != PRODUCT_TAG:
+            logger.info(
+                "[RAZORPAY] Ignoring subscription.activated for product=%r "
+                "(this service handles %r only)", product, PRODUCT_TAG,
+            )
+            return "not_our_product"
+
         if not razorpay_sub_id or not user_id:
             logger.error("[RAZORPAY] activated: missing sub_id or user_id in payload")
             return "missing_fields"
@@ -415,8 +433,12 @@ class RazorpayService:
             select(Plan).where(Plan.razorpay_plan_id == razorpay_plan_id)
         )).scalar_one_or_none()
         if not plan_row:
-            logger.error(
-                "[RAZORPAY] activated: no Plan found for razorpay_plan_id=%s",
+            # Almost certainly the other product's plan arriving on the shared
+            # account. Logged at info, not error, so genuine failures stay
+            # visible instead of drowning in the other product's traffic.
+            logger.info(
+                "[RAZORPAY] Ignoring event for unknown razorpay_plan_id=%s "
+                "(not one of our plans; likely the other product on this account)",
                 razorpay_plan_id,
             )
             return "plan_not_found"
