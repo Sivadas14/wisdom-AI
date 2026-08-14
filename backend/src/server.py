@@ -443,6 +443,56 @@ def get_app() -> FastAPI:
 
         return results
 
+    @app.get("/health/payments", tags=["health"])
+    async def payments_health_check():
+        """Diagnostic: is the payment gateway configured and reachable.
+
+        Strictly read-only. It authenticates and lists existing records; it
+        never creates an order, a plan or a subscription, and never moves money.
+        """
+        from src.settings import get_settings as _gs
+
+        s = _gs()
+        out: dict = {}
+
+        # ── Razorpay ────────────────────────────────────────────────────────
+        key_id = s.razorpay_key_id or ""
+        rzp: dict = {
+            "key_id": (key_id[:14] + "…") if key_id else "(not set)",
+            "mode": ("live" if key_id.startswith("rzp_live_")
+                     else "test" if key_id.startswith("rzp_test_") else "unknown"),
+            "key_secret_set": bool(s.razorpay_key_secret),
+            "webhook_secret_set": bool(s.razorpay_webhook_secret),
+        }
+        try:
+            from src.razorpayservice.razorpay_client import (
+                get_razorpay_client, is_razorpay_enabled,
+            )
+            if not is_razorpay_enabled():
+                rzp["status"] = "not_configured"
+                rzp["hint"] = "Set ASAM_RAZORPAY_KEY_ID and ASAM_RAZORPAY_KEY_SECRET"
+            else:
+                client = get_razorpay_client()
+                # Read-only auth probe.
+                orders = await asyncio.to_thread(client.order.all, {"count": 1})
+                rzp["status"] = "ok"
+                rzp["auth"] = "credentials accepted"
+                rzp["orders_visible"] = orders.get("count", 0)
+        except Exception as e:
+            rzp["status"] = "error"
+            rzp["error_type"] = type(e).__name__
+            rzp["error"] = str(e)[:300]
+        out["razorpay"] = rzp
+
+        # ── Polar ───────────────────────────────────────────────────────────
+        out["polar"] = {
+            "access_token_set": bool(s.polar_access_token),
+            "webhook_secret_set": bool(s.polar_webhook_secret),
+            "organization_id_set": bool(s.polar_organization_id),
+            "status": "configured" if s.polar_access_token else "not_configured",
+        }
+        return out
+
     @app.get("/health/embedding", tags=["health"])
     async def embedding_health_check():
         """Diagnostic: verify the embedding backend used for vector search."""
