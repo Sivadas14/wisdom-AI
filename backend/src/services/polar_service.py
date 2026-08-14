@@ -129,3 +129,56 @@ class PolarService:
             return True
         except:
             return False
+
+
+def verify_polar_webhook(body: bytes, headers) -> bool:
+    """Verify a Polar webhook using the Standard Webhooks scheme.
+
+    Signed content is "{id}.{timestamp}.{body}", HMAC-SHA256 with the secret,
+    base64 encoded. The signature header may carry several space separated
+    versioned values ("v1,<sig> v1,<sig>"), any one of which may match.
+
+    Returns False when a secret is configured but the signature does not match.
+    When no secret is configured it returns True and logs loudly, so that
+    enabling verification is a matter of setting the secret rather than a code
+    change, and so live payments are never silently dropped.
+    """
+    import base64
+    import hashlib
+    import hmac
+    import logging
+
+    log = logging.getLogger("polar.webhook")
+    secret = get_settings().polar_webhook_secret
+    if not secret:
+        log.error(
+            "[POLAR] ASAM_POLAR_WEBHOOK_SECRET is not set, so webhooks cannot be "
+            "verified. Anyone who can reach this endpoint could grant a paid "
+            "subscription. Set the secret to enable verification."
+        )
+        return True
+
+    msg_id = headers.get("webhook-id") or headers.get("svix-id") or ""
+    ts = headers.get("webhook-timestamp") or headers.get("svix-timestamp") or ""
+    sig_header = headers.get("webhook-signature") or headers.get("svix-signature") or ""
+    if not (msg_id and ts and sig_header):
+        log.warning("[POLAR] Missing webhook signature headers; rejecting.")
+        return False
+
+    # Polar secrets are usually base64, sometimes prefixed with whsec_.
+    raw = secret[len("whsec_"):] if secret.startswith("whsec_") else secret
+    try:
+        key = base64.b64decode(raw)
+    except Exception:
+        key = raw.encode("utf-8")
+
+    signed = b"%s.%s.%s" % (msg_id.encode(), ts.encode(), body)
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
+
+    for part in sig_header.split():
+        candidate = part.split(",", 1)[1] if "," in part else part
+        if hmac.compare_digest(expected, candidate):
+            return True
+
+    log.warning("[POLAR] Webhook signature did not match; rejecting.")
+    return False

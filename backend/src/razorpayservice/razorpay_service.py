@@ -349,14 +349,25 @@ class RazorpayService:
     def verify_webhook_signature(self, body: bytes, signature: str) -> bool:
         """
         Verify the X-Razorpay-Signature header using HMAC-SHA256.
-        Returns True (allow) when webhook secret is not configured — safe for dev.
+
+        Verification is enforced automatically as soon as
+        ASAM_RAZORPAY_WEBHOOK_SECRET is set.
+
+        While it is unset the request is accepted, so that live renewals and
+        cancellations are never silently dropped, but this is logged as an error
+        because the gap is real: the handler reads user_id straight from the
+        payload and activates a paid subscription, so anyone able to POST this
+        endpoint could grant themselves a paid plan. Set the secret, then this
+        should be switched to fail closed so it cannot regress.
         """
         settings = get_settings()
         secret = settings.razorpay_webhook_secret
         if not secret:
-            logger.warning(
-                "[RAZORPAY] ASAM_RAZORPAY_WEBHOOK_SECRET not set — "
-                "skipping signature verification (configure in production)"
+            logger.error(
+                "[RAZORPAY] ASAM_RAZORPAY_WEBHOOK_SECRET is not set, so this "
+                "webhook cannot be verified and is being accepted unverified. "
+                "Anyone able to reach this endpoint could grant themselves a "
+                "paid subscription. Set the secret in App Runner."
             )
             return True
 

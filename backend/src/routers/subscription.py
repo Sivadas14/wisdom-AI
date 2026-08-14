@@ -119,6 +119,15 @@ async def polar_webhook(
 ):
     print("🔔 Polar webhook received")
 
+    # Verify before trusting anything in the body. This handler grants paid
+    # subscriptions and addon credits using ids taken straight from the payload,
+    # so an unverified request was enough to award a paid plan.
+    from src.services.polar_service import verify_polar_webhook
+    body = await request.body()
+    if not verify_polar_webhook(body, request.headers):
+        logger.warning("[POLAR] Webhook signature verification failed")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
     try:
         payload = await request.json()
     except Exception as e:
