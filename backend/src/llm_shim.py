@@ -226,6 +226,24 @@ class LLMResponse:
         self.content = content
 
 
+class TranscriptionResult:
+    """Returned by speech_to_text_async. TuneAPI callers use `.to("text")`."""
+    def __init__(self, text: str):
+        self.text = text
+
+    def to(self, key: str = "text"):
+        return self.text if key == "text" else {"text": self.text}
+
+    def __str__(self) -> str:
+        return self.text
+
+
+class ImageResponse:
+    """Returned by image_gen_async. Callers read `.image` as a PIL Image."""
+    def __init__(self, image):
+        self.image = image
+
+
 class EmbeddingResponse:
     """Returned by AnthropicModel.embedding_async() — mirrors the TuneAPI shape.
 
@@ -294,12 +312,28 @@ class AnthropicModel(ModelInterface):
         chat_key = os.getenv("ASAM_ANTHROPIC_TOKEN", "") or (api_token or "")
         self._client = anthropic.AsyncAnthropic(api_key=chat_key)
 
-        # Embeddings need a genuine OpenAI key — kept separate on purpose.
+        # Embeddings, speech and images need a genuine OpenAI key. Anthropic
+        # serves none of those, so this is kept separate from the chat key.
         self._embedding_token = os.getenv("ASAM_EMBEDDING_TOKEN", "")
         if not self._embedding_token and (api_token or "").startswith("sk-") \
                 and not (api_token or "").startswith("sk-ant-"):
             # The configured token is actually an OpenAI key — reuse it.
             self._embedding_token = api_token
+
+    def _openai(self):
+        """AsyncOpenAI client for the endpoints Anthropic does not provide."""
+        import os
+
+        key = self._embedding_token or os.getenv("ASAM_EMBEDDING_TOKEN", "") \
+            or os.getenv("ASAM_OPENAI_TOKEN", "")
+        if not key or not key.startswith("sk-") or key.startswith("sk-ant-"):
+            raise RuntimeError(
+                "No OpenAI key configured. Speech, transcription and image "
+                "generation require ASAM_OPENAI_TOKEN (or ASAM_EMBEDDING_TOKEN) "
+                "to hold a real OpenAI key; Anthropic offers no equivalent API."
+            )
+        from openai import AsyncOpenAI
+        return AsyncOpenAI(api_key=key)
 
     async def chat_async(
         self,
@@ -359,6 +393,68 @@ class AnthropicModel(ModelInterface):
         inputs = [text] if isinstance(text, str) else list(text)
         resp = await client.embeddings.create(model=model, input=inputs)
         return EmbeddingResponse(embedding=[d.embedding for d in resp.data])
+
+    # ── Speech, transcription and images ────────────────────────────────────
+    # Anthropic provides none of these, so they go to OpenAI. Signatures match
+    # the old TuneAPI exactly so no call site needed changing.
+
+    async def text_to_speech_async(
+        self,
+        prompt: str,
+        voice: str = "onyx",
+        model: str = "gpt-4o-mini-tts",
+        instructions: Optional[str] = None,
+        **_kwargs,
+    ) -> bytes:
+        """tt speech. Returns raw MP3 bytes, as the meditation pipeline expects."""
+        client = self._openai()
+        kwargs: dict = dict(model=model, voice=voice, input=prompt)
+        if instructions:
+            kwargs["instructions"] = instructions
+        try:
+            resp = await client.audio.speech.create(**kwargs)
+        except Exception:
+            # `instructions` is only supported by the gpt-4o-*-tts models. Retry
+            # without it so an older model id still produces audio.
+            kwargs.pop("instructions", None)
+            resp = await client.audio.speech.create(**kwargs)
+        content = getattr(resp, "content", None)
+        return content if isinstance(content, (bytes, bytearray)) else await resp.aread()
+
+    async def speech_to_text_async(
+        self,
+        prompt: str = "",
+        audio: Optional[str] = None,
+        model: str = "whisper-1",
+        **_kwargs,
+    ) -> "TranscriptionResult":
+        """Transcribe an audio file path. Callers use `.to("text")`."""
+        client = self._openai()
+        with open(audio, "rb") as fh:
+            resp = await client.audio.transcriptions.create(model=model, file=fh)
+        return TranscriptionResult(getattr(resp, "text", "") or "")
+
+    async def image_gen_async(
+        self,
+        prompt: str,
+        n: int = 1,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        model: str = "dall-e-3",
+        **_kwargs,
+    ) -> "ImageResponse":
+        """Generate an image. Callers read `.image` as a PIL Image."""
+        import base64
+        import io
+
+        client = self._openai()
+        resp = await client.images.generate(
+            model=model, prompt=prompt, n=n, size=size,
+            quality=quality, response_format="b64_json",
+        )
+        from PIL import Image
+        raw = base64.b64decode(resp.data[0].b64_json)
+        return ImageResponse(Image.open(io.BytesIO(raw)))
 
 
 class _TA:

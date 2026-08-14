@@ -397,6 +397,47 @@ def get_app() -> FastAPI:
         except Exception as e:
             return {"error_type": type(e).__name__, "error": str(e)[:600]}
 
+    @app.get("/health/media", tags=["health"])
+    async def media_health_check():
+        """Diagnostic: the OpenAI-backed pipelines behind meditations and cards.
+
+        Text-to-speech and image generation are what audio meditations, video
+        meditations and contemplation cards depend on. Anthropic serves neither,
+        so both need a funded OpenAI key. Failures here surface to the user as a
+        stuck 'processing' job, which is why they get their own check.
+        """
+        from src.settings import get_llm as _gl
+
+        results = {}
+        try:
+            m = _gl()
+            audio = await m.text_to_speech_async(
+                prompt="Om.", voice="onyx", model="gpt-4o-mini-tts"
+            )
+            results["text_to_speech"] = {
+                "status": "ok", "bytes": len(audio), "model": "gpt-4o-mini-tts"
+            }
+        except Exception as e:
+            results["text_to_speech"] = {
+                "status": "error", "error_type": type(e).__name__, "error": str(e)[:300]
+            }
+
+        try:
+            m = _gl()
+            img = await m.image_gen_async(
+                prompt="A single still lamp flame against a dark background.",
+                size="1024x1024",
+            )
+            results["image_generation"] = {
+                "status": "ok", "size": list(img.image.size), "model": "dall-e-3"
+            }
+        except Exception as e:
+            results["image_generation"] = {
+                "status": "error", "error_type": type(e).__name__, "error": str(e)[:300]
+            }
+
+        return results
+
     @app.get("/health/embedding", tags=["health"])
     async def embedding_health_check():
         """Diagnostic: verify the embedding backend used for vector search."""
