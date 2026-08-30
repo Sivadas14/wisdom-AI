@@ -447,6 +447,25 @@ async def _index_pdf_background(
         chunks = await extract_pdf_text(content)
         tu.logger.info(f"[INDEX_BG] Extracted {len(chunks)} chunks from {filename}")
 
+        # Verse-aware regrouping for numbered works (Upadesa Saram, Ulladu
+        # Narpadu). Page chunks carry no verse label, so "verse 21" has nothing
+        # to match on and retrieval falls back to the contents page. Regrouping
+        # by verse puts the number in both the label and the embedded text.
+        # Returns None for anything unrecognised, in which case the ordinary
+        # page chunks are kept.
+        try:
+            from src.verse_index import regroup_by_verse
+            regrouped = regroup_by_verse(chunks, filename)
+            if regrouped:
+                tu.logger.info(
+                    f"[INDEX_BG] Verse-aware chunking applied to {filename}: "
+                    f"{len(chunks)} pages -> {len(regrouped)} chunks"
+                )
+                chunks = regrouped
+        except Exception as e:
+            # Never let this cost us the whole document.
+            tu.logger.error(f"[INDEX_BG] Verse regrouping failed for {filename}: {e}")
+
         if chunks:
             model = get_llm()
             saved = 0

@@ -1094,7 +1094,47 @@ async def _embedding_search_optimized(
     model: tt.ModelInterface,
     query: str,
 ) -> list[tuple[str, str]]:
-    """Vector similarity search; falls back to full-text search on embedding failure."""
+    """Vector similarity search; falls back to full-text search on embedding failure.
+
+    A "verse N of <work>" question is answered by an exact lookup first, because
+    asking for a numbered verse is a lookup rather than a similarity problem.
+    Vector search still runs and its hits are appended, so the surrounding
+    commentary stays available.
+    """
+
+    # --- Verse lookup: exact, for numbered works indexed by verse ---
+    verse_rows: list[tuple[str, str]] = []
+    try:
+        from src.verse_index import parse_verse_query, title_for
+
+        parsed = parse_verse_query(query)
+        if parsed:
+            work_key, verse_no = parsed
+            title = title_for(work_key)
+            # Locations read "Upadesa Saram · Verse 21 (pp. 128-129)". Matching
+            # that exact prefix stops verse 2 from also matching verse 21.
+            pattern = f"{title} · Verse {verse_no} (%"
+            stmt = (
+                select(db.DocumentChunk.content, db.SourceDocument.filename)
+                .join(db.SourceDocument)
+                .where(db.SourceDocument.active == True)
+                .where(db.DocumentChunk.location.like(pattern))
+                .limit(4)
+            )
+            verse_rows = list((await session.execute(stmt)).all())
+            if verse_rows:
+                tu.logger.info(
+                    f"[VERSE_LOOKUP] {title} verse {verse_no}: "
+                    f"{len(verse_rows)} chunk(s) matched exactly"
+                )
+            else:
+                tu.logger.info(
+                    f"[VERSE_LOOKUP] {title} verse {verse_no}: no verse-tagged "
+                    f"chunk. The work may not have been re-indexed since "
+                    f"verse-aware chunking was added."
+                )
+    except Exception as e:
+        tu.logger.error(f"[VERSE_LOOKUP] failed: {e}")
 
     # --- Primary: OpenAI vector embeddings ---
     try:
@@ -1144,6 +1184,9 @@ async def _embedding_search_optimized(
         # threshold just rejected. FTS is a fallback for embedding OUTAGES only.
         RETRIEVAL_STATE["mode"] = "vector"
         RETRIEVAL_STATE["last_error"] = None
+        if verse_rows:
+            seen = {c for c, _ in verse_rows}
+            return verse_rows + [r for r in chunks if r[0] not in seen]
         return chunks
 
     except Exception as e:
@@ -1159,7 +1202,11 @@ async def _embedding_search_optimized(
         )
 
     # --- Fallback: PostgreSQL full-text search (no API calls needed) ---
-    return await _fulltext_search_fallback(session, query)
+    fts = await _fulltext_search_fallback(session, query)
+    if verse_rows:
+        seen = {c for c, _ in verse_rows}
+        return verse_rows + [r for r in fts if r[0] not in seen]
+    return fts
 
 
 
