@@ -806,8 +806,13 @@ async def economics_report(
     async def _one(query, **params):
         return (await session.execute(_sql(query), params)).first()
 
+    # role is a Postgres enum persisted by NAME ('ASSISTANT'), not by the
+    # Python value ('assistant'). Comparing against the value raised
+    # 'invalid input value for enum' and 500'd the whole report. Cast to text
+    # and compare case-insensitively so it cannot depend on which convention
+    # the enum was created under.
     msgs = await _one(
-        "SELECT COUNT(*) FROM messages WHERE role='assistant' AND created_at >= :m",
+        "SELECT COUNT(*) FROM messages WHERE UPPER(role::text)='ASSISTANT' AND created_at >= :m",
         m=month_start)
     askers = await _one(
         """SELECT COUNT(DISTINCT c.user_id) FROM messages msg

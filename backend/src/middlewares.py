@@ -606,6 +606,8 @@ async def jwt_auth_middleware(request: Request, call_next):
         "/robots.txt",            # SEO — must be publicly crawlable by Googlebot
         "/api/addon/",            # Public add-on types — no auth required
         "/api/features/",         # Public features list — no auth required
+        "/api/public-config",     # Public — the landing page asks which model is live
+        "/api/credits/razorpay-webhook",  # Razorpay signs with HMAC, not JWT
     ]
 
     if any(request.url.path.startswith(path) for path in public_paths):
