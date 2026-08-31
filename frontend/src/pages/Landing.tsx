@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { installGtClickHandler } from "@/lib/gtranslateClicks";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/contexts/AuthContext";
@@ -2218,8 +2219,12 @@ export default function Landing() {
     script.defer = true;
     script.dataset.scope = "landing-gtranslate";
     document.body.appendChild(script);
+        // float.js's own option-click handlers do not fire on this site
+        // (verified live); ours does the selection. See gtranslateClicks.ts.
+        const removeGtClicks = installGtClickHandler();
 
     return () => {
+      removeGtClicks();
       script.remove();
       document.querySelectorAll(".gt_float_switcher, .gtranslate_wrapper, .gt-current-lang, .gt_widget_wrapper")
         .forEach(el => el.remove());

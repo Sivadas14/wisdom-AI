@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
+import { installGtClickHandler } from "@/lib/gtranslateClicks";
 import Sidebar from "@/components/Sidebar";
 import UserMenu from "@/components/UserMenu";
 import { Menu } from "lucide-react";
@@ -50,9 +51,13 @@ const MainLayout = ({ children }: MainLayoutProps) => {
         script.defer = true;
         script.dataset.scope = "app-gtranslate";
         document.body.appendChild(script);
+        // float.js's own option-click handlers do not fire on this site
+        // (verified live); ours does the selection. See gtranslateClicks.ts.
+        const removeGtClicks = installGtClickHandler();
 
         return () => {
             document.body.classList.remove("app-shell");
+            removeGtClicks();
             script.remove();
             document.querySelectorAll(".gt_float_switcher, .gtranslate_wrapper, .gt-current-lang, .gt_widget_wrapper")
                 .forEach(el => el.remove());
