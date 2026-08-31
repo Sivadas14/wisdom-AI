@@ -29,6 +29,10 @@ const MainLayout = ({ children }: MainLayoutProps) => {
     // Cleanup runs on unmount (e.g. user signs out and SPA hits a route
     // without MainLayout). The googtrans cookie persists across logout.
     useEffect(() => {
+        // Lets CSS distinguish the signed-in shell (which has a user menu at
+        // the header's right on mobile) from the public landing, so the
+        // GTranslate pill can sit beside one and flush-right on the other.
+        document.body.classList.add("app-shell");
         if (document.querySelector('script[data-scope="app-gtranslate"]')) return;
 
         (window as any).gtranslateSettings = {
@@ -48,6 +52,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
         document.body.appendChild(script);
 
         return () => {
+            document.body.classList.remove("app-shell");
             script.remove();
             document.querySelectorAll(".gt_float_switcher, .gtranslate_wrapper, .gt-current-lang, .gt_widget_wrapper")
                 .forEach(el => el.remove());

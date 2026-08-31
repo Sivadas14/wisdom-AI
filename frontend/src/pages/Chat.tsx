@@ -1474,7 +1474,7 @@ const Chat = () => {
                     ))}
 
                     {overflow.length > 0 && (
-                      <div style={{ position: "relative" }}>
+                      <>
                         <button
                           onClick={() => setShowMoreTopics(prev => !prev)}
                           onMouseEnter={e => hover(e, true)}
@@ -1488,13 +1488,16 @@ const Chat = () => {
                           {showMoreTopics ? "Hide topics ↑" : `More topics ↓ (${overflow.length})`}
                         </button>
 
+                        {/* IN document flow, not an absolute overlay. The old
+                            dropdown floated over whatever sat beneath it —
+                            including the sticky composer, which then cut
+                            through the middle of the list. Expanding in flow
+                            pushes the page down instead, and nothing can
+                            overlap anything. */}
                         {showMoreTopics && (
                           <div
                             style={{
-                              position: "absolute",
-                              top: "calc(100% + 6px)",
-                              left: 0,
-                              zIndex: 20,
+                              flexBasis: "100%",
                               backgroundColor: T.card,
                               border: `1px solid ${T.border}`,
                               borderRadius: "10px",
@@ -1502,8 +1505,7 @@ const Chat = () => {
                               display: "flex",
                               flexWrap: "wrap",
                               gap: "0.4rem",
-                              width: "min(440px, 92vw)",
-                              boxShadow: "0 4px 20px rgba(71,43,32,0.12)",
+                              marginTop: "0.25rem",
                             }}
                           >
                             {overflow.map((topic, i) => (
@@ -1521,7 +1523,7 @@ const Chat = () => {
                             ))}
                           </div>
                         )}
-                      </div>
+                      </>
                     )}
                   </div>
                 );

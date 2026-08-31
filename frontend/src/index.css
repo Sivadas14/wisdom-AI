@@ -172,3 +172,29 @@
     scrollbar-color: #472b20 #f5f0ec;
   }
 }
+/* ── GTranslate floating widget: pinned INSIDE the header, not over it ─────
+   float.js positions its switcher `fixed` at the viewport's top-right, which
+   floated it half over the sticky header on the landing page and let page
+   content (topic panels, the composer) scroll straight underneath it in the
+   app. Both headers are 56px tall, so the pill is pinned into that band and
+   raised above the sticky headers' z-index (50). Its own dropdown opens
+   downward and may cover content while open — that is what menus do; the
+   standing pill must not. */
+.gt_float_switcher {
+  position: fixed !important;
+  top: 8px !important;
+  right: 12px !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 60 !important;
+  font-size: 14px !important;
+  box-shadow: 0 1px 4px rgba(71, 43, 32, 0.15) !important;
+}
+
+/* In the signed-in app on mobile, the header's right side holds the user
+   menu; shift the pill left of it so the two never stack. */
+@media (max-width: 767px) {
+  body.app-shell .gt_float_switcher {
+    right: 56px !important;
+  }
+}
