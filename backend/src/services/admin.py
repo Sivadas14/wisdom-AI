@@ -779,6 +779,104 @@ async def get_dynamic_topics(
 # fixing a document does not create a duplicate the way re-uploading does.
 # ─────────────────────────────────────────────────────────────────────────────
 
+async def economics_report(
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """GET /api/admin/economics — is the model working?
+
+    The question this exists to answer: does making Wisdom free grow use
+    enough, and do credits and patronage cover what that use costs? Every
+    figure is computed from the database now, not accumulated in a counter
+    that can drift.
+
+    Costs are estimates from measured unit prices (chat ~Rs 0.66/answer,
+    media ~Rs 1.50/min at Rs 12.01 per 5-min credit). Infrastructure is an
+    env var (ASAM_MONTHLY_INFRA_INR) because nothing in this codebase can see
+    the AWS invoice; the report says so rather than pretending.
+    """
+    import datetime as _dt
+    import os as _os
+
+    from sqlalchemy import text as _sql
+
+    month_start = _dt.datetime.now(_dt.timezone.utc).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+
+    async def _one(query, **params):
+        return (await session.execute(_sql(query), params)).first()
+
+    msgs = await _one(
+        "SELECT COUNT(*) FROM messages WHERE role='assistant' AND created_at >= :m",
+        m=month_start)
+    askers = await _one(
+        """SELECT COUNT(DISTINCT c.user_id) FROM messages msg
+             JOIN conversations c ON c.id = msg.conversation_id
+            WHERE msg.created_at >= :m""", m=month_start)
+    media = (await session.execute(_sql(
+        """SELECT content_type, COUNT(*), COALESCE(SUM(duration_seconds),0)
+             FROM content_generations WHERE created_at >= :m
+            GROUP BY content_type"""), {"m": month_start})).all()
+    credits_sold = await _one(
+        """SELECT COALESCE(SUM(credits),0), COALESCE(SUM(amount_minor),0)
+             FROM credit_purchases WHERE status='paid' AND created_at >= :m
+              AND currency='INR'""", m=month_start)
+    credits_sold_usd = await _one(
+        """SELECT COALESCE(SUM(credits),0), COALESCE(SUM(amount_minor),0)
+             FROM credit_purchases WHERE status='paid' AND created_at >= :m
+              AND currency='USD'""", m=month_start)
+    consumed = await _one(
+        """SELECT COALESCE(-SUM(delta),0) FROM credit_transactions
+            WHERE kind='MEDIA_DEBIT' AND created_at >= :m""", m=month_start)
+    refunded = await _one(
+        """SELECT COALESCE(SUM(delta),0) FROM credit_transactions
+            WHERE kind='REFUND' AND created_at >= :m""", m=month_start)
+    liability = await _one("SELECT COALESCE(SUM(balance),0) FROM credit_wallets")
+
+    answers = int(msgs[0] if msgs else 0)
+    media_rows = {str(r[0]): {"count": int(r[1]), "seconds": int(r[2])} for r in media}
+    media_minutes = sum(v["seconds"] for v in media_rows.values()) / 60
+
+    CHAT_COST_INR = 0.66
+    MEDIA_COST_PER_MIN_INR = 12.01 / 5
+    chat_cost = round(answers * CHAT_COST_INR, 2)
+    media_cost = round(media_minutes * MEDIA_COST_PER_MIN_INR, 2)
+    infra = float(_os.getenv("ASAM_MONTHLY_INFRA_INR", "0") or 0)
+    revenue_inr = (credits_sold[1] or 0) / 100
+    revenue_usd = (credits_sold_usd[1] or 0) / 100
+
+    # Reconciliation: the one number that must always be zero rows.
+    from src.services.credits import reconcile
+    drift = await reconcile(session)
+
+    return {
+        "month_start": month_start.isoformat(),
+        "wisdom": {"answers": answers, "unique_askers": int(askers[0] if askers else 0),
+                   "estimated_cost_inr": chat_cost},
+        "media": {"by_type": media_rows, "minutes": round(media_minutes, 1),
+                  "estimated_cost_inr": media_cost},
+        "credits": {
+            "sold_inr": {"credits": int(credits_sold[0] or 0), "revenue": revenue_inr},
+            "sold_usd": {"credits": int(credits_sold_usd[0] or 0), "revenue": revenue_usd},
+            "consumed": int(consumed[0] if consumed else 0),
+            "refunded": int(refunded[0] if refunded else 0),
+            "unspent_liability": int(liability[0] if liability else 0),
+        },
+        "costs": {
+            "chat_inr": chat_cost,
+            "media_inr": media_cost,
+            "infrastructure_inr": infra,
+            "infrastructure_note": (
+                None if infra else
+                "ASAM_MONTHLY_INFRA_INR is unset; total excludes the fixed floor."
+            ),
+            "total_inr": round(chat_cost + media_cost + infra, 2),
+        },
+        "contribution_inr": round(revenue_inr + revenue_usd * 88 - chat_cost - media_cost - infra, 2),
+        "ledger_drift": drift,
+    }
+
+
 async def audit_corpus(
     session: AsyncSession = Depends(get_db_session_fa),
 ):
