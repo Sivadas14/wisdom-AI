@@ -3,7 +3,8 @@ from src.llm_shim import tu
 from fastapi import Depends, Query, HTTPException, UploadFile, BackgroundTasks
 from uuid import UUID
 from supabase import Client
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, literal_column
+from sqlalchemy.dialects.postgresql import aggregate_order_by
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import UploadFile, File, Depends, HTTPException, BackgroundTasks
@@ -811,6 +812,33 @@ async def audit_corpus(
         }
         for r in rows
     ]
+    # Chunk counts alone cannot prove two records hold the same book: two
+    # different translations can chunk to the same length by coincidence, and
+    # the same book uploaded twice under different filenames looks like two
+    # works. Fingerprint the actual text so duplicates are identified by
+    # content, not by guessing from titles.
+    fp_rows = (await session.execute(
+        select(
+            DocumentChunk.source_document_id,
+            func.sum(func.length(DocumentChunk.content)).label("chars"),
+            # Ordered by content, NOT by chunk id. Chunk ids are generated at
+            # index time, so the same book uploaded twice would hash
+            # differently under id order and the duplicate would hide.
+            func.md5(func.string_agg(
+                aggregate_order_by(
+                    func.left(DocumentChunk.content, 400),
+                    func.left(DocumentChunk.content, 400).asc(),
+                ),
+                literal_column("''"),
+            )).label("digest"),
+        ).group_by(DocumentChunk.source_document_id)
+    )).all()
+    fps = {str(r.source_document_id): (int(r.chars or 0), r.digest) for r in fp_rows}
+    for d in docs:
+        chars, digest = fps.get(d["id"], (0, None))
+        d["chars"] = chars
+        d["digest"] = digest
+
     empty = [d for d in docs if d["chunks"] == 0]
     return {
         "documents": len(docs),
