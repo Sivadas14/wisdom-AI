@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
+import { classify403 } from './classify403';
 import { supabase } from '@/lib/supabase';
 
 // Create axios instance
@@ -152,11 +153,24 @@ apiClient.interceptors.response.use(
                         window.location.href = '/';
                     }
                     break;
-                case 403:
-                    // Forbidden - might be deactivation
-                    console.error('Access forbidden (403) - potentially deactivated account');
+                case 403: {
+                    // Two very different things arrive as 403. See
+                    // classify403.ts for why they must not be conflated: the
+                    // old handler signed out on both, so a seeker who reached
+                    // their conversation limit was logged out and told their
+                    // account had been deactivated.
+                    const verdict = classify403(error.response?.data);
 
-                    // Trigger sign out
+                    if (verdict === 'quota') {
+                        return Promise.reject(new Error('QUOTA_EXCEEDED'));
+                    }
+
+                    if (verdict === 'other') {
+                        console.error('Access forbidden (403):', error.response?.data);
+                        return Promise.reject(error);
+                    }
+
+                    console.error('Account deactivated (403) — signing out');
                     localStorage.removeItem('accessToken');
                     localStorage.removeItem('refreshToken');
                     localStorage.removeItem('userProfile');
@@ -173,6 +187,7 @@ apiClient.interceptors.response.use(
                         window.location.href = '/signin?error=deactivated';
                     }
                     break;
+                }
                 case 429:
                     // Quota exceeded - return a standardised error so all callers can detect it
                     return Promise.reject(new Error('QUOTA_EXCEEDED'));

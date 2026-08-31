@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npx serve -s dist -l 8080"
+    "start": "npx serve -s dist -l 8080",
+    "test:classify403": "esbuild src/apis/classify403.ts --bundle --format=esm --outfile=dist-test/classify403.js --log-level=error && node tests/classify403.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
