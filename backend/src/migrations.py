@@ -233,6 +233,92 @@ async def _create_ramana_images_table(session: AsyncSession) -> None:
     _log("ramana_images table verified/created.")
 
 
+async def _create_credit_tables(session: AsyncSession) -> None:
+    """
+    Idempotently create the credit wallet, ledger and purchase tables.
+
+    The constraints here are the safety mechanism, not decoration:
+
+      CHECK (balance >= 0)
+        A negative balance is unrepresentable, so an over-spend fails at the
+        database rather than depending on every call site checking first.
+
+      UNIQUE (content_generation_id, kind)
+        One MEDIA_DEBIT and one REFUND per generation. A double-clicked
+        Generate cannot debit twice; a retried failure handler cannot refund
+        twice.
+
+      UNIQUE (provider, provider_event_id)
+        A replayed webhook cannot pay twice. This is the guard the existing
+        add-on path lacks: pollor_service.handle_webhook accepts BOTH
+        checkout.created and order.created, and Polar sends both for a single
+        purchase, so it credits that purchase twice.
+    """
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS credit_wallets (
+            id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            user_id    UUID        NOT NULL UNIQUE
+                       REFERENCES user_profiles(id) ON DELETE CASCADE,
+            balance    INTEGER     NOT NULL DEFAULT 0,
+            CONSTRAINT ck_credit_wallet_non_negative CHECK (balance >= 0)
+        )
+    """))
+
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS credit_purchases (
+            id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            user_id           UUID        NOT NULL
+                              REFERENCES user_profiles(id) ON DELETE CASCADE,
+            provider          VARCHAR     NOT NULL,
+            provider_event_id VARCHAR     NOT NULL,
+            pack_key          VARCHAR     NOT NULL,
+            credits           INTEGER     NOT NULL,
+            amount_minor      INTEGER     NOT NULL,
+            currency          CHAR(3)     NOT NULL,
+            status            VARCHAR     NOT NULL DEFAULT 'pending',
+            CONSTRAINT uq_credit_purchase_provider_event
+                UNIQUE (provider, provider_event_id)
+        )
+    """))
+
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS credit_transactions (
+            id                    UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at            TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            wallet_id             UUID        NOT NULL
+                                  REFERENCES credit_wallets(id) ON DELETE CASCADE,
+            delta                 INTEGER     NOT NULL,
+            kind                  VARCHAR     NOT NULL,
+            balance_after         INTEGER     NOT NULL,
+            content_generation_id UUID,
+            purchase_id           UUID,
+            note                  TEXT,
+            CONSTRAINT uq_credit_txn_generation_kind
+                UNIQUE (content_generation_id, kind)
+        )
+    """))
+
+    await session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_credit_txn_wallet_created
+            ON credit_transactions (wallet_id, created_at)
+    """))
+    await session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_credit_txn_generation
+            ON credit_transactions (content_generation_id)
+    """))
+    await session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_credit_purchase_user
+            ON credit_purchases (user_id)
+    """))
+    await session.commit()
+    _log("credit_wallets / credit_transactions / credit_purchases verified.")
+
+
 async def _create_trial_grants_table(session: AsyncSession) -> None:
     """
     Idempotently create trial_grants: time-boxed free access by email address.
@@ -998,6 +1084,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_create_guest_sessions_table", _create_guest_sessions_table)
         await _safe_migration(session, "_create_daily_contemplations_table", _create_daily_contemplations_table)
         await _safe_migration(session, "_create_trial_grants_table", _create_trial_grants_table)
+        await _safe_migration(session, "_create_credit_tables", _create_credit_tables)
         await _safe_migration(session, "_add_razorpay_columns", _add_razorpay_columns)
         await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
         await _safe_migration(session, "_create_suggested_topics_table", _create_suggested_topics_table)

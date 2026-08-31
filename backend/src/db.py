@@ -30,6 +30,9 @@ from sqlalchemy import (
     Text,
     select,
     and_,
+    CheckConstraint,
+    UniqueConstraint,
+    text as sa_text,
 )
 from sqlalchemy.dialects.postgresql import (
     JSONB,
@@ -980,6 +983,143 @@ class SourceDocument(Base):
             status=self.status.value,
             created_at=self.created_at,
         )
+
+
+class CreditWallet(Base):
+    """A seeker's credit balance. One row per user.
+
+    The balance is materialised rather than summed from the ledger on every
+    read, because it is read on every media screen and the ledger only grows.
+    Both are written in the same transaction, and a reconciliation job asserts
+    they agree — if they ever drift, we find out from the check rather than
+    from someone's complaint.
+
+    The CHECK constraint is the point: a negative balance is not merely
+    guarded against in code, it is unrepresentable.
+    """
+
+    __tablename__ = "credit_wallets"
+
+    id: Mapped[pkey_uuid]
+    # CURRENT_TIMESTAMP rather than the project's Postgres-specific
+    # default, so these three tables can be created on SQLite and the
+    # money constraints exercised in tests without a live Postgres.
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa_text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa_text("CURRENT_TIMESTAMP")
+    )
+
+    user_id: Mapped[fkey_uuid] = mapped_column(
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False, unique=True, index=True,
+    )
+    balance: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        CheckConstraint("balance >= 0", name="ck_credit_wallet_non_negative"),
+    )
+
+
+class CreditTransaction(Base):
+    """The ledger. Append-only; every credit movement is traceable.
+
+    Nothing mutates a balance without writing one of these. A refund is a
+    REFUND row, not a silent addition — "the balance went back up" is not an
+    answer to "why".
+
+    The unique constraint on (content_generation_id, kind) is what makes
+    double-charging physically impossible rather than merely unlikely: a
+    double-clicked Generate cannot produce two MEDIA_DEBIT rows for one
+    generation, and a retried failure handler cannot refund twice.
+    """
+
+    __tablename__ = "credit_transactions"
+
+    id: Mapped[pkey_uuid]
+    # CURRENT_TIMESTAMP rather than the project's Postgres-specific
+    # default, so these three tables can be created on SQLite and the
+    # money constraints exercised in tests without a live Postgres.
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa_text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa_text("CURRENT_TIMESTAMP")
+    )
+
+    wallet_id: Mapped[fkey_uuid] = mapped_column(
+        ForeignKey("credit_wallets.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    # Signed: negative for a debit, positive for a purchase or refund.
+    delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    # Recorded so the ledger can be audited on its own, without replaying it
+    # against the wallet.
+    balance_after: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    content_generation_id: Mapped[SQLAlchemyUUID | None] = mapped_column(
+        SQLAlchemyUUID, nullable=True, index=True
+    )
+    purchase_id: Mapped[SQLAlchemyUUID | None] = mapped_column(
+        SQLAlchemyUUID, nullable=True, index=True
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "content_generation_id", "kind",
+            name="uq_credit_txn_generation_kind",
+        ),
+        Index("idx_credit_txn_wallet_created", "wallet_id", "created_at"),
+    )
+
+
+class CreditPurchase(Base):
+    """One paid credit pack.
+
+    The unique constraint on (provider, provider_event_id) is the whole
+    idempotency story. Both payment providers can deliver the same event more
+    than once — Polar sends checkout.created AND order.created for a single
+    purchase — and the existing add-on handler has no such guard, so it credits
+    that purchase twice. Here a replayed webhook violates a constraint and the
+    transaction rolls back, which is the behaviour we want and does not depend
+    on anyone remembering to check first.
+    """
+
+    __tablename__ = "credit_purchases"
+
+    id: Mapped[pkey_uuid]
+    # CURRENT_TIMESTAMP rather than the project's Postgres-specific
+    # default, so these three tables can be created on SQLite and the
+    # money constraints exercised in tests without a live Postgres.
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa_text("CURRENT_TIMESTAMP")
+    )
+    updated_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=sa_text("CURRENT_TIMESTAMP")
+    )
+
+    user_id: Mapped[fkey_uuid] = mapped_column(
+        ForeignKey("user_profiles.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    provider: Mapped[str] = mapped_column(String, nullable=False)
+    provider_event_id: Mapped[str] = mapped_column(String, nullable=False)
+    pack_key: Mapped[str] = mapped_column(String, nullable=False)
+    credits: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Minor units: paise for INR, cents for USD. Never a float.
+    amount_minor: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider", "provider_event_id",
+            name="uq_credit_purchase_provider_event",
+        ),
+    )
 
 
 class TrialGrant(Base):
