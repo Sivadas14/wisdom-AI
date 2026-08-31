@@ -256,7 +256,8 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
               previously fixed to the viewport, where it escaped every
               stacking context and painted over open modals; in flex flow it
               can neither outrank a dialog nor overlap a sibling. */}
-            </div>
+          <div className="gtranslate_wrapper" />
+        </div>
         {/* Mobile hamburger */}
         <button
           className="md:hidden p-2"
