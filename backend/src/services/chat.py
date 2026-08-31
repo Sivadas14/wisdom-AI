@@ -1,5 +1,5 @@
 from src.llm_shim import tt, ta, tu
-from src.legacy_script import strip_legacy_tamil
+from src.legacy_script import keep_english_only
 from src.humanize import humanize_response
 
 import os
@@ -1117,21 +1117,22 @@ async def _embedding_search_optimized(
     model: tt.ModelInterface,
     query: str,
 ) -> list[tuple[str, str]]:
-    """Retrieve context, with legacy-encoded Tamil stripped out.
+    """Retrieve context, keeping only the English.
 
     Every chat path reaches the corpus through here, so this is the one place
-    the cleanup has to happen. Some PDFs set their Tamil in the pre-Unicode
-    Bamini font, and the extracted bytes are ASCII gibberish rather than Tamil
-    ("ehndDQ; nrhw;nghU"). It was reaching the model, and the model was
-    faithfully reproducing it in front of the English translation.
+    the cleanup has to happen. Two kinds of noise get dropped: non-Latin
+    script, and the ASCII gibberish that comes out of PDFs which set their
+    Tamil in the pre-Unicode Bamini font ("ehndDQ; nrhw;nghU"). Both were
+    reaching the model, and the model was faithfully reproducing them ahead of
+    the English.
 
-    A chunk that is nothing but Tamil cleans down to nothing and is dropped
-    rather than passed on as an empty passage.
+    A chunk that cleans down to nothing is dropped rather than passed on as an
+    empty passage.
     """
     rows = await _embedding_search_raw(session, model, query)
     cleaned: list[tuple[str, str]] = []
     for content, filename in rows:
-        text = strip_legacy_tamil(content)
+        text = keep_english_only(content)
         if text and text.strip():
             cleaned.append((text, filename))
     return cleaned

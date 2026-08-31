@@ -1,28 +1,28 @@
 """Tests for src/legacy_script.py.
 
 The Bamini samples are real: they are the text actually extracted from
-Upadesa_Undiyar.pdf and served in the verse 21 answer.
+Upadesa_Undiyar.pdf and served in live answers.
 
-Priority under test:
-  1. Never remove English. A lost sentence of Bhagavan's teaching is far worse
-     than a line of leftover gibberish.
-  2. Never touch Unicode Tamil. The site answers in Tamil.
-  3. Then, remove the Bamini.
+Priority under test, in order:
+  1. Never lose the vocabulary of these texts. "vichara", "Ramanasramam" and
+     "I-I" are not gibberish. Dropping a word of the teaching is a far worse
+     failure than leaving a stray token behind.
+  2. Then, drop everything that is not English.
 """
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from src.legacy_script import strip_legacy_tamil  # noqa: E402
+from src.legacy_script import keep_english_only  # noqa: E402
 
 
+# Verse 21, from a live answer.
 VERSE_21 = ("ehndDQ; nrhw;nghU shkJ ehSNk ehdw;w J}f;fj;J Ke;jPgw "
             "ekjpd;ik ePf;fj;jh Ye;jPgw")
 
-# Verse 5, taken from a live answer. This one broke the first implementation:
-# "thnkd", "topgl" and "g+rid" carry no semicolon, no brace and no mid-word
-# capital, so marker-based span growth stopped short and left them behind.
+# Verse 5, from a live answer. "thnkd", "topgl" and "g+rid" carry no
+# semicolon, brace or mid-word capital, so a marker-based rule missed them.
 VERSE_5 = ("vz;ZU ahT kpiwAU thnkd ntz;zp topgl Ye;jPgw "
            "tPrdw; g+rid Ae;jPgw")
 
@@ -30,135 +30,169 @@ VERSE_5 = ("vz;ZU ahT kpiwAU thnkd ntz;zp topgl Ye;jPgw "
 VERSE_5_GLOSS = "vz; cU ahTk; iw cU Mk; vd vz;zp topgly; ey; g+rid"
 
 
-# ── 1. English must survive ──────────────────────────────────────────────────
+# ── 1. The teaching must survive ─────────────────────────────────────────────
 
 def test_plain_english_is_untouched():
     s = ("The true import of the word 'I' is always 'I-I'. We do not become "
          "non-existent even in sleep, when the mind does not exist.")
-    assert strip_legacy_tamil(s) == s
+    assert keep_english_only(s) == s
+
+
+def test_sanskrit_and_tamil_vocabulary_in_latin_script_survives():
+    """These are the words the corpus is written in. Losing them is the worst
+    outcome this module could produce."""
+    s = ("Bhagavan taught vichara at Sri Ramanasramam in Tiruvannamalai. "
+         "The jnani abides as the Self; Muruganar recorded it in Guru Vachaka "
+         "Kovai, and Upadesa Undiyar says the same.")
+    assert keep_english_only(s) == s
+
+
+def test_iast_diacritics_survive():
+    s = "Upadeśa Sāram speaks of the Ātman, and of mokṣa."
+    assert keep_english_only(s) == s
+
+
+def test_hyphenated_and_possessive_words_survive():
+    s = "Self-enquiry is Bhagavan's method; the 'I-I' shines as the Self."
+    assert keep_english_only(s) == s
+
+
+def test_all_caps_headings_survive():
+    s = "UPADESA SARAM\nVERSE 21\nThe import of the word I."
+    assert keep_english_only(s) == s
 
 
 def test_english_with_ordinary_semicolons_is_untouched():
     s = "He asked; Bhagavan was silent; the question dissolved."
-    assert strip_legacy_tamil(s) == s
+    assert keep_english_only(s) == s
 
 
-def test_midword_capitals_alone_are_not_enough():
-    """iPhone and McDonald have mid-word capitals. Without a semicolon anchor
-    beside them they must never be removed."""
-    s = "He read it on his iPhone outside McDonald's in Tiruvannamalai."
-    assert strip_legacy_tamil(s) == s
+def test_english_paragraph_is_never_majority_dropped():
+    s = ("Bhagavan said; the Self alone is; all else is thought. Enquire "
+         "within; hold to the I; and the rest falls away.")
+    assert keep_english_only(s) == s
 
 
-def test_code_like_text_without_the_anchor_survives():
-    s = "See verse 21; the commentary follows on page 20."
-    assert strip_legacy_tamil(s) == s
+# ── 2. Gibberish must go ─────────────────────────────────────────────────────
+
+def test_verse_21_is_removed_entirely():
+    assert keep_english_only(VERSE_21) == ""
 
 
-# ── 2. Unicode Tamil must survive ────────────────────────────────────────────
-
-def test_unicode_tamil_is_untouched():
-    s = "நான் யார்? Who am I?"
-    assert strip_legacy_tamil(s) == s
+def test_verse_5_is_removed_entirely():
+    assert keep_english_only(VERSE_5) == ""
 
 
-def test_unicode_tamil_next_to_english_semicolon():
-    s = "உபதேச உந்தியார்; the Tamil original."
-    assert strip_legacy_tamil(s) == s
+def test_verse_5_word_gloss_is_removed():
+    assert keep_english_only(VERSE_5_GLOSS) == ""
 
 
-# ── 3. Bamini must go ────────────────────────────────────────────────────────
-
-def test_verse_21_bamini_is_removed_entirely():
-    assert strip_legacy_tamil(VERSE_21) == ""
-
-
-def test_bamini_removed_english_kept_on_one_line():
-    s = f"Here is verse 21: {VERSE_21} The word 'I' always has that import."
-    out = strip_legacy_tamil(s)
-    assert "ehndDQ" not in out and "J}f" not in out and ";nghU" not in out
-    assert "Here is verse 21:" in out
-    assert "The word 'I' always has that import." in out
-
-
-def test_bamini_line_dropped_english_lines_kept():
+def test_gibberish_line_dropped_english_lines_kept():
     s = f"Verse 21\n{VERSE_21}\nThe word 'I' always has the import of that 'I'."
-    out = strip_legacy_tamil(s)
+    out = keep_english_only(s)
     assert "Verse 21" in out
     assert "The word 'I' always has the import of that 'I'." in out
     assert "ehndDQ" not in out
 
 
-def test_the_whole_run_goes_not_just_the_semicolon_tokens():
-    """'shkJ' and 'ehSNk' carry no semicolon. They are still Bamini and must be
-    removed along with the run, or the answer keeps half the gibberish."""
-    out = strip_legacy_tamil(VERSE_21)
-    for tok in ["shkJ", "ehSNk", "Ke", "Ye"]:
+def test_markerless_gibberish_goes_too():
+    """'thnkd' and 'shkJ' carry no semicolon but are still not English."""
+    out = keep_english_only(VERSE_5 + "\n" + VERSE_21)
+    for tok in ["thnkd", "topgl", "g+rid", "shkJ", "ehSNk"]:
         assert tok not in out, f"{tok} survived: {out!r}"
 
 
-def test_verse_5_markerless_tokens_are_removed_too():
-    """The case that broke the first version."""
-    out = strip_legacy_tamil(VERSE_5)
-    assert out == "", f"survived: {out!r}"
-
-
-def test_verse_5_word_gloss_is_removed():
-    assert strip_legacy_tamil(VERSE_5_GLOSS) == ""
-
-
-def test_verse_5_line_dropped_english_kept():
-    s = f"Verse 5 reads:\n{VERSE_5}\nWorship of any of the eight forms is good worship."
-    out = strip_legacy_tamil(s)
-    assert "thnkd" not in out and "topgl" not in out and "g+rid" not in out
-    assert "Verse 5 reads:" in out
-    assert "Worship of any of the eight forms is good worship." in out
-
-
-def test_english_sentence_with_tamil_set_into_it_keeps_its_english():
-    s = ("The teaching is this: vz;ZU ahT kpiwAU thnkd ntz;zp topgl "
-         "and worship of every form is good worship.")
-    out = strip_legacy_tamil(s)
+def test_gibberish_inside_an_english_sentence_goes():
+    s = ("The teaching is this: vz;ZU ahT kpiwAU thnkd ntz;zp and worship "
+         "of every form is good worship.")
+    out = keep_english_only(s)
     assert "The teaching is this:" in out
     assert "worship of every form is good worship." in out
-    for tok in ["vz;ZU", "kpiwAU", "thnkd"]:
+    for tok in ["vz;ZU", "ahT", "kpiwAU", "thnkd", "ntz;zp"]:
         assert tok not in out, f"{tok} survived: {out!r}"
 
 
-def test_an_english_shaped_bamini_token_can_survive_inline():
-    """A known and deliberate limit, recorded rather than papered over.
+# ── 3. Non-Latin script ──────────────────────────────────────────────────────
 
-    "topgl" is Bamini, but it is lower case, starts with a letter and has a
-    vowel, so it is indistinguishable from an English word by shape. Catching
-    it would need a consonant-cluster rule, and "thoughts" has a four
-    consonant cluster too. Dropping a word of Bhagavan's teaching is a worse
-    failure than leaving one token of gibberish, so the token stays.
-
-    This only bites when Tamil is set INSIDE an English sentence. In the
-    corpus the Tamil sits on its own line, where the whole line is dropped and
-    the leftover cannot arise; test_verse_5_line_dropped_english_kept covers
-    that, which is the case that actually occurs.
-    """
-    s = ("The teaching is this: vz;ZU ahT kpiwAU thnkd ntz;zp topgl "
-         "and worship of every form is good worship.")
-    assert "topgl" in strip_legacy_tamil(s)
+def test_tamil_script_is_removed():
+    out = keep_english_only("நான் யார்? Who am I?")
+    assert "நான்" not in out
+    assert "Who am I?" in out
 
 
-def test_a_real_english_paragraph_is_never_majority_dropped():
-    """Guard against the line rule firing on prose that merely has a semicolon."""
-    s = ("Bhagavan said; the Self alone is; all else is thought. Enquire "
-         "within; hold to the I; and the rest falls away.")
-    assert strip_legacy_tamil(s) == s
+def test_devanagari_is_removed_english_kept():
+    out = keep_english_only("अहम् ब्रह्मास्मि — I am Brahman.")
+    assert "ब्रह्मास्मि" not in out
+    assert "I am Brahman." in out
 
 
-def test_no_semicolon_means_no_work_done():
-    s = "shkJ ehSNk"  # no anchor anywhere
-    assert strip_legacy_tamil(s) == s
+def test_a_line_that_is_only_script_disappears():
+    s = "Verse 21\nநான் யார் நான் யார் நான்\nThe import of the word I."
+    out = keep_english_only(s)
+    assert "Verse 21" in out
+    assert "The import of the word I." in out
+    assert "நான்" not in out
 
+
+# ── 4. Edges ─────────────────────────────────────────────────────────────────
 
 def test_empty_and_none_safe():
-    assert strip_legacy_tamil("") == ""
-    assert strip_legacy_tamil(None) is None
+    assert keep_english_only("") == ""
+    assert keep_english_only(None) is None
+
+
+def test_numbers_and_punctuation_do_not_swing_a_line():
+    s = "1. 2. 3. The Self alone is."
+    assert keep_english_only(s) == s
+
+
+# ── 5. Regressions found by running this over 48 real documents ──────────────
+# Every case below is a word this module actually deleted from real English
+# prose at some point while being built.
+
+def test_abbreviations_with_full_stops_survive():
+    """"e.g." was read as one malformed word and deleted mid-sentence."""
+    s = "Offer a button (e.g., transform this into a video) after the reply."
+    assert keep_english_only(s) == s
+
+
+def test_vowelless_acronyms_survive():
+    """"LLM" has no vowel. The no-vowel rule was deleting it."""
+    s = "Title generation uses an open LLM like Llama, and exports a PDF."
+    assert keep_english_only(s) == s
+
+
+def test_letter_digit_tokens_survive():
+    s = "Downloadable in MP3/MP4 format on the 21st of the month."
+    assert keep_english_only(s) == s
+
+
+def test_camel_case_names_survive():
+    s = "The ChatGPT and OpenAI comparison, built with FastAPI."
+    assert keep_english_only(s) == s
+
+
+def test_lower_camel_and_acronym_plurals_survive():
+    s = "Guides & eBooks, with URLs and CTAs on every page."
+    assert keep_english_only(s) == s
+
+
+def test_a_hyphenated_brand_does_not_take_the_english_with_it():
+    """"ChatGPT-like" was dropped whole, losing the ordinary word "like"."""
+    out = keep_english_only("A ChatGPT-like intuitive search covering the texts.")
+    assert "like" in out
+    assert "intuitive search covering the texts." in out
+
+
+def test_urls_survive():
+    s = "See https://www.arunachalasamudra.co.in for the library."
+    assert keep_english_only(s) == s
+
+
+def test_unchanged_lines_are_returned_byte_for_byte():
+    """No reflowing whitespace in passages it has no quarrel with."""
+    s = "  The Self   alone is.  "
+    assert keep_english_only(s) == s.strip()
 
 
 if __name__ == "__main__":
