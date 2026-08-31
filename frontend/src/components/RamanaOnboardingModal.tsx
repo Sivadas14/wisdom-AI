@@ -73,6 +73,8 @@ async function resolveWikimediaUrl(filename: string): Promise<string | null> {
 
 interface Props {
   onClose: () => void;
+  /** true when the credit model is live (guest media is cards-only) */
+  freeChat?: boolean;
 }
 
 // ── Individual screen components ───────────────────────────────────────────
@@ -201,7 +203,7 @@ function Screen2() {
   );
 }
 
-function Screen3({ onBegin }: { onBegin: () => void }) {
+function Screen3({ onBegin, freeChat }: { onBegin: () => void; freeChat: boolean }) {
   const features = [
     {
       icon: <MessageCircle style={{ width: 18, height: 18, color: T.accent }} />,
@@ -216,7 +218,11 @@ function Screen3({ onBegin }: { onBegin: () => void }) {
     {
       icon: <Headphones style={{ width: 18, height: 18, color: T.accent }} />,
       title: "Guided Meditations",
-      desc: "Generate a 3-minute audio or video meditation personalised to your question — a way to sit with the teaching, not just read it.",
+      // Under the credit model guests cannot generate audio/video, so the
+      // promise changes from "generate one now" to what an account offers.
+      desc: freeChat
+        ? "With a free account, create audio and video meditations personalised to your question — a way to sit with the teaching, not just read it."
+        : "Generate a 3-minute audio or video meditation personalised to your question — a way to sit with the teaching, not just read it.",
     },
   ];
 
@@ -279,7 +285,7 @@ function Screen3({ onBegin }: { onBegin: () => void }) {
 
 // ── Main modal ─────────────────────────────────────────────────────────────
 
-const RamanaOnboardingModal = ({ onClose }: Props) => {
+const RamanaOnboardingModal = ({ onClose, freeChat = false }: Props) => {
   const [screen, setScreen] = useState(0); // 0, 1, 2
   const [sliding, setSliding] = useState<"left" | "right" | null>(null);
   const [portraitUrl, setPortraitUrl] = useState<string | null>(null);
@@ -383,7 +389,7 @@ const RamanaOnboardingModal = ({ onClose }: Props) => {
         <div style={slideStyle}>
           {screen === 0 && <Screen1 portraitUrl={portraitUrl} />}
           {screen === 1 && <Screen2 />}
-          {screen === 2 && <Screen3 onBegin={handleBegin} />}
+          {screen === 2 && <Screen3 onBegin={handleBegin} freeChat={freeChat} />}
         </div>
 
         {/* Navigation */}

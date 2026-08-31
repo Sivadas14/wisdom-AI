@@ -421,7 +421,7 @@ function HeroSection({ isAuthenticated, onNewToRamana }: { isAuthenticated: bool
           )}
         </div>
         <p style={{ fontFamily: T.sans, color: "rgba(200,170,140,0.5)", fontSize: "0.78rem", marginTop: "1.5rem" }}>
-          No credit card required · Free plan available · Answers from authenticated texts only
+          No credit card required · Free to begin · Answers from authenticated texts only
         </p>
         {/* "New to Ramana?" ghost link — shown only to unauthenticated visitors */}
         {!isAuthenticated && (
@@ -747,7 +747,10 @@ function GuestChatSection() {
     catch { return 0; }
   });
   const [showModal, setShowModal] = useState(false);
-  const [freeChat, setFreeChat]   = useState(false);
+  // Tri-state: null until /api/public-config answers. While null, NEITHER
+  // model's commercial copy is painted — a cold load must not flash the old
+  // pricing and quota for one round-trip before the truth arrives.
+  const [freeChat, setFreeChat]   = useState<boolean | null>(null);
   useEffect(() => { fetchFreeChat().then(setFreeChat); }, []);
   const bottomRef = useRef<HTMLDivElement>(null);
   const msgLenRef = useRef(0);
@@ -901,7 +904,7 @@ function GuestChatSection() {
   const handleSend = async () => {
     const q = input.trim();
     if (!q || loading) return;
-    if (!freeChat && count >= GUEST_LIMIT) { setShowModal(true); return; }
+    if (freeChat === false && count >= GUEST_LIMIT) { setShowModal(true); return; }
 
     const sid = getGuestSessionId();
     // NOTE: the free-question counter is deliberately NOT incremented here.
@@ -1007,7 +1010,7 @@ function GuestChatSection() {
       // Mark the language these messages are now in (used by the retranslation
       // effect below to know what to translate FROM if the user switches).
       setMessagesLangStored(lang);
-      if (!freeChat && isRealAnswer && newCount >= GUEST_LIMIT) {
+      if (freeChat === false && isRealAnswer && newCount >= GUEST_LIMIT) {
         setTimeout(() => setShowModal(true), 1800);
       }
     } catch {
@@ -1121,7 +1124,9 @@ function GuestChatSection() {
         </h2>
         <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.9rem", lineHeight: 1.7, marginBottom: "2rem", textAlign: "center" }}>
           Answers drawn exclusively from the authenticated Ramana Maharshi library — not the internet, not general AI.
-          {freeChat
+          {freeChat === null
+            ? null
+            : freeChat
             ? <span style={{ color: T.accent, fontWeight: 600 }}> Free · no question limit.</span>
             : remaining > 0
             ? <span style={{ color: T.accent, fontWeight: 600 }}> {remaining} free question{remaining !== 1 ? "s" : ""} remaining.</span>
@@ -1171,7 +1176,7 @@ function GuestChatSection() {
 
           {/* Input */}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.875rem 1rem", display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
-            {(freeChat || remaining > 0) ? (
+            {(freeChat !== false || remaining > 0) ? (
               <>
                 <textarea
                   value={input}
@@ -1235,7 +1240,7 @@ function GuestChatSection() {
                     // Under the credit model, guest audio/video are withdrawn:
                     // they are real TTS money for someone we cannot even ask
                     // to sign in. Cards stay, free for everyone.
-                  ]).filter(({ mode }) => !freeChat || mode === "image").map(({ mode, icon, label, sub }) => (
+                  ]).filter(({ mode }) => freeChat === false || mode === "image").map(({ mode, icon, label, sub }) => (
                     <button
                       key={mode}
                       onClick={() => handleGenerate(mode)}
@@ -1266,10 +1271,12 @@ function GuestChatSection() {
             {!isGenerating && !genDone && contentCount >= GUEST_CONTENT_LIMIT && (
               <div style={{ backgroundColor: "rgba(184,90,45,0.1)", border: "1px solid rgba(184,90,45,0.25)", borderRadius: "8px", padding: "1.25rem 1.5rem", textAlign: "center" }}>
                 <p style={{ fontFamily: T.sans, color: "#F5F0EC", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.4rem" }}>
-                  You've used your 3 free generations
+                  {freeChat ? "You've created your 3 free cards for today" : "You've used your 3 free generations"}
                 </p>
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.82rem", lineHeight: 1.6, marginBottom: "1rem" }}>
-                  Sign up free to get unlimited cards, audio meditations and videos for every question you ask.
+                  {freeChat
+                    ? "Sign up free to keep a card for every question you ask, and to create personalised audio and video meditations with credits."
+                    : "Sign up free to get unlimited cards, audio meditations and videos for every question you ask."}
                 </p>
                 <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.85rem", padding: "0.6rem 1.5rem" }}>
                   Create free account →
@@ -1324,10 +1331,10 @@ function GuestChatSection() {
                   </a>
                 </div>
                 <p style={{ fontFamily: T.sans, color: "#9A8070", fontSize: "0.78rem", marginTop: "0.75rem" }}>
-                  Subscribers get a new card for every question they ask.
+                  {freeChat ? "Signed-in seekers get a card for every question they ask." : "Subscribers get a new card for every question they ask."}
                 </p>
                 {/* Format switch buttons — only when quota remains */}
-                {!freeChat && contentCount < GUEST_CONTENT_LIMIT && (
+                {freeChat === false && contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("audio")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1343,7 +1350,7 @@ function GuestChatSection() {
                   <button onClick={resetResult} style={{ fontFamily: T.sans, color: "#9A8070", background: "none", border: "1px solid rgba(154,128,112,0.35)", borderRadius: "6px", padding: "0.4rem 1rem", fontSize: "0.8rem", cursor: "pointer" }}>
                     ← Back to chat
                   </button>
-                  <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.4rem 1.1rem" }}>Sign up for unlimited →</Link>
+                  <Link to="/register" style={{ ...btn, display: "inline-block", fontSize: "0.8rem", padding: "0.4rem 1.1rem" }}>{freeChat ? "Sign up free to keep your cards →" : "Sign up for unlimited →"}</Link>
                 </div>
               </div>
             )}
@@ -1372,7 +1379,7 @@ function GuestChatSection() {
                   Subscribers get personalised meditations for every question they ask.
                 </p>
                 {/* Format switch buttons — only when quota remains */}
-                {!freeChat && contentCount < GUEST_CONTENT_LIMIT && (
+                {freeChat === false && contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1408,7 +1415,7 @@ function GuestChatSection() {
                   Subscribers get personalised meditation videos for every question they ask.
                 </p>
                 {/* Format switch buttons — only when quota remains */}
-                {!freeChat && contentCount < GUEST_CONTENT_LIMIT && (
+                {freeChat === false && contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1840,8 +1847,14 @@ function PricingSection() {
   // all: there are no plans to compare. What replaces it is deliberately NOT
   // a SaaS pricing grid — one quiet statement of how the site sustains
   // itself, and two doors.
-  const [freeChat, setFreeChat] = useState(false);
+  // Tri-state, same reason as the chat section: a cold load must not flash
+  // the Seeker/Devotee grid for a round-trip before the config answers.
+  const [freeChat, setFreeChat] = useState<boolean | null>(null);
   useEffect(() => { fetchFreeChat().then(setFreeChat); }, []);
+
+  if (freeChat === null) {
+    return <section id="pricing" style={{ backgroundColor: T.cream }} className="py-10" />;
+  }
 
   if (freeChat) {
     return (
@@ -2136,6 +2149,10 @@ export default function Landing() {
   const { isAuthenticated } = useAuth();
 
   // ── Atmospheric intro screen (once per session) ──────────────────────────
+  // Which commercial model is live — used only to keep first-run copy honest.
+  const [rootFreeChat, setRootFreeChat] = useState<boolean | null>(null);
+  useEffect(() => { fetchFreeChat().then(setRootFreeChat); }, []);
+
   const [showIntro, setShowIntro] = useState(() => {
     try {
       return !sessionStorage.getItem(INTRO_SESSION_KEY);
@@ -2333,7 +2350,7 @@ export default function Landing() {
         <script type="application/ld+json">{JSON.stringify(schemaOrg)}</script>
       </Helmet>
       {showIntro && <IntroScreen onDone={handleIntroDone} />}
-      {showOnboarding && <RamanaOnboardingModal onClose={handleOnboardingClose} />}
+      {showOnboarding && <RamanaOnboardingModal onClose={handleOnboardingClose} freeChat={rootFreeChat === true} />}
       <div className="gtranslate_wrapper" />
       <PublicHeader isAuthenticated={isAuthenticated} onNewToRamana={openOnboarding} />
       <main>

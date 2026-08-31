@@ -229,7 +229,10 @@ async def create_checkout(
             checkout = polar.checkouts.create(request={
                 "products": [_polar_product_for(pack)],
                 "customer_email": getattr(current_user, "email_id", None),
-                "success_url": f"{get_settings().frontend_url}/credits?purchase=success",
+                # /home, not /credits: there is no /credits route, and a purchase that
+                # ends on a 404 is a purchase the buyer believes failed. Chat.tsx
+                # watches for this param, thanks the buyer and refreshes the balance.
+                "success_url": f"{get_settings().frontend_url}/home?credits=purchased",
                 "metadata": {
                     "type": "credit_pack",
                     "user_id": str(current_user.id),

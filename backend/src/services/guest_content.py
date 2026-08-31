@@ -161,13 +161,27 @@ async def _db_check_and_bump(
     ip_key  = hashlib.sha256((ip_hash + _CONTENT_NS).encode()).hexdigest()
     sid_key = f"content:{sid}"
 
-    _LIMIT = {
-        "code": "GUEST_CONTENT_LIMIT_REACHED",
-        "message": (
-            f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
-            "Sign up for unlimited access."
-        ),
-    }
+    # What the refusal promises depends on the model in force. The old message
+    # sold "unlimited access" on sign-up; under credits that is untrue for
+    # audio and video, and a promise the product cannot keep is worse than no
+    # promise.
+    from src.services.credits import credits_mode
+    if credits_mode() == "on":
+        _LIMIT = {
+            "code": "GUEST_CONTENT_LIMIT_REACHED",
+            "message": (
+                f"You've created your {GUEST_CONTENT_LIMIT} free cards for today. "
+                "Sign up free to keep a card for every question you ask."
+            ),
+        }
+    else:
+        _LIMIT = {
+            "code": "GUEST_CONTENT_LIMIT_REACHED",
+            "message": (
+                f"You've used all {GUEST_CONTENT_LIMIT} free generations for today. "
+                "Sign up for unlimited access."
+            ),
+        }
 
     try:
         # ── IP check ──────────────────────────────────────────────────────────

@@ -37,7 +37,9 @@ export const BillingPage: React.FC = () => {
         setShowPlansModal,
         setShowAddonsModal,
         setAddonsModalMode,
-        refreshSubscription
+        refreshSubscription,
+        creditsActive,
+        openCreditsModal
     } = useUsage();
     const location = useLocation();
     useAddonsQuery();
@@ -197,6 +199,60 @@ export const BillingPage: React.FC = () => {
     const isFree = usageData?.plan_type === 'FREE' || !usageData;
     const hasAddons = usageData ? ((usageData.addon_cards?.limit > 0 || usageData.addon_cards?.used > 0) ||
         (usageData.addon_minutes?.limit > 0 || usageData.addon_minutes?.used > 0)) : false;
+
+    // ── The credit model has no plans to manage ─────────────────────────────
+    // Everything below this branch is the subscription page: current plan,
+    // quotas, upgrade buttons, provider sync. Under credits every one of
+    // those either lies (quota meters reading 0/0) or routes to a plans modal
+    // for plans no longer sold. Legacy paid accounts (plan_type != FREE) keep
+    // the old page, since their subscription is still real and cancellable.
+    if (creditsActive && isFree) {
+        return (
+            <div className="min-h-full h-full overflow-y-auto bg-[#F5F0EC] p-4 sm:p-6 lg:p-8">
+                <div className="max-w-2xl mx-auto space-y-6">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-[#472b20]">Billing & Credits</h1>
+                        <p className="text-sm text-[#472b20]/60 mt-1">
+                            Wisdom conversations and contemplation cards are free, without limit.
+                            Personalised audio and video meditations use credits.
+                        </p>
+                    </div>
+
+                    <section className="bg-white/60 backdrop-blur-sm rounded-lg shadow-sm border border-[#ECE5DF] p-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-[#472b20]">Media credits</h2>
+                                <p className="text-sm text-[#472b20]/60 mt-1">
+                                    One credit is five minutes of audio or video.
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-3xl font-semibold text-[#472b20]">
+                                    {usageData?.credits_balance ?? 0}
+                                </p>
+                                <p className="text-xs text-[#472b20]/50">credits</p>
+                            </div>
+                        </div>
+                        <Button
+                            onClick={() => openCreditsModal()}
+                            className="mt-5 bg-[#D05E2D] hover:bg-[#b84f24] text-white"
+                        >
+                            Get credits
+                        </Button>
+                        <p className="mt-3 text-xs text-[#472b20]/50">
+                            Credits do not expire. If a generation fails, the credit is returned.
+                        </p>
+                    </section>
+
+                    <section className="bg-white/40 rounded-lg border border-[#ECE5DF] p-5">
+                        <p className="text-sm text-[#472b20]/70">
+                            Signed in as <span className="font-medium">{userProfile?.email || ''}</span>
+                        </p>
+                    </section>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-full h-full overflow-y-auto bg-[#F5F0EC] p-4 sm:p-6 lg:p-8">

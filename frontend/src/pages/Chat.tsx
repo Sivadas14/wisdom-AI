@@ -174,6 +174,15 @@ const Chat = () => {
     const sessionId = urlParams.get('session_id');
     const customerSessionToken = urlParams.get('customer_session_token');
 
+    // A Polar credit-pack purchase returns here with ?credits=purchased. The
+    // webhook has already credited the wallet (or will within seconds).
+    if (urlParams.get('credits') === 'purchased') {
+      refreshUsage();
+      toast.success("Thank you. Your credits will appear in a moment.");
+      navigate(location.pathname, { replace: true });
+      return;
+    }
+
     if (checkoutSuccess === 'true' || sessionId || customerSessionToken) {
       console.log('🎉 [Chat] Checkout success detected, refreshing usage...');
 
@@ -728,7 +737,10 @@ const Chat = () => {
         let errorMessage = "Sorry, I encountered an error while processing your message. Please try again.";
 
         if (error instanceof Error) {
-          if (error.message === 'QUOTA_EXCEEDED') {
+          if (error.message === 'QUOTA_EXCEEDED' && !creditsActive) {
+            // Under credits chat has no quota; a stray 429 here is a rate
+            // limit or transient error, and opening a plans modal for retired
+            // plans would be worse than the generic message below.
             errorMessage = "You've reached your plan limit. Please upgrade to continue chatting.";
             setShowPlansModal(true);
           } else if (error.message === 'CONVERSATION_DEPTH_REACHED') {
@@ -878,7 +890,7 @@ const Chat = () => {
       // Polling will start automatically via the useEffect hook
     } catch (error) {
       console.error("Failed to initiate image generation:", error);
-      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
+      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED' && !creditsActive) {
         setImageGenerationError("You've reached your contemplation card limit. Please upgrade your plan.");
         setShowPlansModal(true);
       } else {
@@ -1261,7 +1273,11 @@ const Chat = () => {
           );
 
           // ── State 1: FREE / unsubscribed — Portal Welcome Screen ───────────
-          if (isFree) {
+          // NOT under credits. In that model every account has plan_type FREE
+          // and full chat access, so this paywall welcome would greet every
+          // user with a "Begin Your Journey" button pointing at billing.
+          // Credits users fall through to the normal topic-chip home.
+          if (isFree && !creditsActive) {
             const firstName = userProfile?.name?.split(" ")[0] || null;
             const features = [
               {

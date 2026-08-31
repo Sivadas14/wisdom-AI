@@ -50,6 +50,12 @@ async def chat_limit_middleware(request: Request, call_next):
     
     Checks chat_limit against current token usage.
     """
+    # Not registered today (see setup_middlewares), but if anyone re-enables
+    # it, it must not resurrect the token quota under the credit model.
+    from src.services.credits import credits_mode
+    if credits_mode() == "on":
+        return await call_next(request)
+
     tu.logger.info(f"[CHAT_LIMIT] Processing request: {request.method} {request.url.path}")
     
     # Apply to chat/message endpoints - adjust paths as needed

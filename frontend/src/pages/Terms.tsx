@@ -207,17 +207,21 @@ const Terms = () => {
                     <h2 className="text-2xl md:text-3xl font-heading text-brand-heading mb-4">
                         7. SUBSCRIPTION AND PAYMENT TERMS
                     </h2>
-                    <h3 className="text-xl font-heading text-brand-heading mb-3">Subscription Plans</h3>
+                    <h3 className="text-xl font-heading text-brand-heading mb-3">Free Access and Media Credits</h3>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        Certain features of the Services require a paid subscription. Subscription plans, pricing, and features are described on the Services and may change from time to time. We will provide reasonable notice of any changes to subscription pricing.
+                        Wisdom conversations and contemplation cards are provided free of charge, subject to reasonable protections against automated abuse. Personalised audio and video meditation generation requires the purchase of media credits. Credits are one-time purchases (not subscriptions), do not expire, are non-transferable, and hold no cash value. Credit pack pricing is described on the Services and may change from time to time; changes do not affect credits already purchased.
                     </p>
-                    <h3 className="text-xl font-heading text-brand-heading mb-3">Billing and Auto-Renewal</h3>
+                    <h3 className="text-xl font-heading text-brand-heading mb-3">Legacy Subscription Plans</h3>
+                    <p className="text-brand-body font-body mb-4 leading-relaxed">
+                        Certain accounts hold subscription plans purchased before the introduction of media credits. These accounts retain the features of the plan they purchased. Legacy plans are no longer offered for new purchase. We will provide reasonable notice of any changes affecting legacy subscriptions.
+                    </p>
+                    <h3 className="text-xl font-heading text-brand-heading mb-3">Billing and Auto-Renewal (Legacy Subscriptions)</h3>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
                         Subscriptions are billed in advance on a recurring basis (monthly or annually, depending on the plan you select). By subscribing, you authorise us (or our payment processors — currently Polar for international payments and Razorpay for Indian payments) to charge your chosen payment method automatically at the start of each billing cycle until you cancel. It is your responsibility to ensure that your payment information is accurate and up to date.
                     </p>
-                    <h3 className="text-xl font-heading text-brand-heading mb-3">Free Tier</h3>
+                    <h3 className="text-xl font-heading text-brand-heading mb-3">Free Access</h3>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        We offer a free tier with limited access to the Services. We reserve the right to modify or discontinue the free tier at any time, with reasonable notice where practicable.
+                        Free access to Wisdom conversations and contemplation cards is offered in the spirit of making the teachings available to all. We reserve the right to apply technical safeguards against abuse, and to modify the scope of free access with reasonable notice where practicable.
                     </p>
                     <h3 className="text-xl font-heading text-brand-heading mb-3">Taxes</h3>
                     <p className="text-brand-body font-body leading-relaxed">
@@ -236,7 +240,11 @@ const Terms = () => {
                     </p>
                     <h3 className="text-xl font-heading text-brand-heading mb-3">Refunds</h3>
                     <p className="text-brand-body font-body mb-4 leading-relaxed">
-                        All subscription fees are <strong>non-refundable</strong> except as expressly required by applicable law or at our sole discretion. We do not provide pro-rated refunds for unused portions of a subscription period. Add-on purchases (additional meditation minutes, image cards, etc.) are non-refundable once consumed.
+                        All subscription fees are <strong>non-refundable</strong> except as expressly required by applicable law or at our sole discretion. We do not provide pro-rated refunds for unused portions of a subscription period.
+                    </p>
+                    <h3 className="text-xl font-heading text-brand-heading mb-3">Media Credits</h3>
+                    <p className="text-brand-body font-body mb-4 leading-relaxed">
+                        Media credit purchases are non-refundable once the credits have been consumed. If a generation fails after a credit is deducted, that credit is automatically restored to your balance. Unused credits from an accidental or duplicate purchase may be refunded at our discretion — contact us within 14 days of the charge.
                     </p>
                     <p className="text-brand-body font-body leading-relaxed">
                         If you believe you were charged in error, please contact us within 14 days of the charge and we will investigate in good faith.

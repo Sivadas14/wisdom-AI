@@ -339,7 +339,12 @@ const Sidebar = () => {
                                         {userProfile?.name || user?.email?.split('@')[0] || "User"}
                                     </span>
                                     <span className="text-xs text-gray-500 truncate w-full text-left capitalize">
-                                        {planName === null ? (
+                                        {creditsActive ? (
+                                            // No plan hierarchy under credits;
+                                            // "Free Plan" would read as a
+                                            // downgrade that does not exist.
+                                            `${usage?.credits_balance ?? 0} credits`
+                                        ) : planName === null ? (
                                             <div className="w-30 h-4 bg-[#ECE5DF] rounded mt-2 animate-pulse" />
                                         ) : planName}
                                     </span>

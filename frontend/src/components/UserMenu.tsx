@@ -6,7 +6,7 @@ import { User, LogOut, CreditCard, Loader2 } from "lucide-react";
 
 const UserMenu: React.FC = () => {
     const { user, userProfile, logout } = useAuth();
-    const { usage, loading: loadingUsage } = useUsage();
+    const { usage, loading: loadingUsage, creditsActive } = useUsage();
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
 
@@ -50,15 +50,27 @@ const UserMenu: React.FC = () => {
                     <div className="px-4 py-3 border-b border-gray-200">
                         <p className="text-sm text-gray-600">Signed in as</p>
                         <p className="text-sm font-medium text-gray-900 truncate">{displayName}</p>
-                        <p className="text-xs text-orange-600 font-semibold capitalize mt-1">{planName}</p>
+                        <p className="text-xs text-orange-600 font-semibold capitalize mt-1">{creditsActive ? `${usage?.credits_balance ?? 0} credits` : planName}</p>
                     </div>
 
                     <div className="px-4 py-3 border-b border-gray-200 text-xs">
-                        <p className="font-semibold text-gray-900 mb-2">Usage This Month</p>
+                        <p className="font-semibold text-gray-900 mb-2">{creditsActive ? "Your Credits" : "Usage This Month"}</p>
                         {loadingUsage ? (
                             <div className="flex items-center gap-2 text-gray-400">
                                 <Loader2 className="w-3 h-3 animate-spin" />
                                 <span>Loading usage...</span>
+                            </div>
+                        ) : usage && creditsActive ? (
+                            // No quota meters under credits: conversations and
+                            // cards are unlimited and a 0/0 meditation meter
+                            // would read as a bug. The balance is the only
+                            // number that means anything here.
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Media credits</span>
+                                    <span className="font-medium">{usage.credits_balance ?? 0}</span>
+                                </div>
+                                <p className="text-gray-400">Conversations and cards are free.</p>
                             </div>
                         ) : usage ? (
                             <div className="space-y-2">
@@ -87,7 +99,7 @@ const UserMenu: React.FC = () => {
                             className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                         >
                             <CreditCard className="w-4 h-4" />
-                            <span>Manage Subscription</span>
+                            <span>{creditsActive ? 'Billing & Credits' : 'Manage Subscription'}</span>
                         </button>
 
                         <button
