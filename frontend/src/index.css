@@ -226,12 +226,33 @@
   position: absolute !important;
   right: 0 !important;
   top: calc(100% + 6px) !important;
-  max-height: 60vh;
+  /* The pill is 83px wide and the dropdown inherited that width, cutting
+     every language name to a sliver. A menu must be wide enough to read. */
+  min-width: 180px;
+  max-height: min(60vh, 340px) !important;
   overflow-y: auto;
   background: #fff;
   border: 1px solid #ECE5DF;
   border-radius: 8px;
   box-shadow: 0 6px 24px rgba(71, 43, 32, 0.15);
+  /* Above both 56px headers (z-50) and anything that scrolls beneath them,
+     but still inside the header's stacking context, so any modal overlay
+     (z-1000) covers it as it should. */
+  z-index: 70;
+}
+
+.gt_float_switcher .gt_options a {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 7px 12px !important;
+  font-size: 13px !important;
+  color: #472B20 !important;
+  white-space: nowrap;
+}
+
+.gt_float_switcher .gt_options a:hover {
+  background: #F5F0EC !important;
 }
 
 .gt_float_switcher .gt_options img {
