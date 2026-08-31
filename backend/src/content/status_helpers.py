@@ -53,6 +53,30 @@ async def mark_content_failed(content_id: str, error: Exception | str) -> None:
             tu.logger.info(
                 f"Marked content {content_id} as failed: {error_text[:120]}"
             )
+
+            # Give the credits back. This is the one place every generation
+            # failure passes through, which is exactly why the refund belongs
+            # here rather than at each of the several places that can fail.
+            #
+            # Safe to reach twice: refund_for_generation reads the original
+            # debit and is guarded by UNIQUE (content_generation_id, REFUND),
+            # so a retried failure handler cannot pay out twice. It is also a
+            # no-op when nothing was charged — admins, trials, legacy plans and
+            # contemplation cards all reach here with no debit to reverse.
+            try:
+                from src.services.credits import refund_for_generation
+
+                await refund_for_generation(
+                    content_id, session, note="Generation failed"
+                )
+            except Exception as credit_ex:      # noqa: BLE001
+                # A failed refund must be loud: the seeker has been charged for
+                # something they did not get, and only the log will say so.
+                tu.logger.error(
+                    f"[CREDITS] REFUND FAILED for {content_id} — a seeker has "
+                    f"been charged for a generation that did not complete: "
+                    f"{credit_ex}"
+                )
     except Exception as ex:
         # Never raise from the failure-recorder; if this fails we lose
         # observability but the request is already doomed.
