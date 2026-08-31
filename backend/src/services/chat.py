@@ -72,6 +72,27 @@ def generate_citation_url(filename: str, spb_client: Client) -> str:
         return f"{fallback_url}/storage/v1/object/public/source-files/{filename}"
 
 
+def _citation_sources(chunks, limit: int = 3) -> list[str]:
+    """Unique source filenames for the citation list, in retrieval order.
+
+    Retrieval often returns several pages of the SAME book, which is normal and
+    desirable: a verse and its commentary sit on adjacent pages. Citing the
+    filename once per chunk then printed the same book three times under an
+    answer drawn from one source. Deduplicate first, THEN take the top few, so
+    the limit counts distinct works rather than distinct pages.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for _, filename in chunks:
+        if filename in seen:
+            continue
+        seen.add(filename)
+        out.append(filename)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def refresh_message_citations(messages: list[w.Message], spb_client: Client) -> list[w.Message]:
     """Refresh citation URLs for a list of messages to ensure they haven't expired"""
     for msg in messages:
@@ -298,7 +319,7 @@ async def _llm_chat(
         # Add citations - USE ORIGINAL PYDANTIC MODELS
         citations = [
             w.CitationInfo(name=filename, url=generate_citation_url(filename, spb_client))
-            for _, filename in chunks[:3]
+            for filename in _citation_sources(chunks)
         ]
         ai_message.citations = citations  # Direct assignment
         
@@ -434,7 +455,7 @@ async def _llm_chat_optimized(
                 name=filename, 
                 url=generate_citation_url(filename, spb_client)
             )
-            for _, filename in chunks[:3]
+            for filename in _citation_sources(chunks)
         ]
         ai_message.citations = citations
 
@@ -699,7 +720,7 @@ async def _llm_chat_streaming_optimized(
                 name=filename, 
                 url=generate_citation_url(filename, spb_client)
             )
-            for _, filename in chunks[:3]
+            for filename in _citation_sources(chunks)
         ]
         ai_message.citations = citations
         
