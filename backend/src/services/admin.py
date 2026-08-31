@@ -3,8 +3,8 @@ from src.llm_shim import tu
 from fastapi import Depends, Query, HTTPException, UploadFile, BackgroundTasks
 from uuid import UUID
 from supabase import Client
-from sqlalchemy import select, or_, func, literal_column
-from sqlalchemy.dialects.postgresql import aggregate_order_by
+import hashlib
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import UploadFile, File, Depends, HTTPException, BackgroundTasks
@@ -817,27 +817,44 @@ async def audit_corpus(
     # the same book uploaded twice under different filenames looks like two
     # works. Fingerprint the actual text so duplicates are identified by
     # content, not by guessing from titles.
-    fp_rows = (await session.execute(
-        select(
-            DocumentChunk.source_document_id,
-            func.sum(func.length(DocumentChunk.content)).label("chars"),
-            # Ordered by content, NOT by chunk id. Chunk ids are generated at
-            # index time, so the same book uploaded twice would hash
-            # differently under id order and the duplicate would hide.
-            func.md5(func.string_agg(
-                aggregate_order_by(
-                    func.left(DocumentChunk.content, 400),
-                    func.left(DocumentChunk.content, 400).asc(),
-                ),
-                literal_column("''"),
-            )).label("digest"),
-        ).group_by(DocumentChunk.source_document_id)
-    )).all()
-    fps = {str(r.source_document_id): (int(r.chars or 0), r.digest) for r in fp_rows}
-    for d in docs:
-        chars, digest = fps.get(d["id"], (0, None))
-        d["chars"] = chars
-        d["digest"] = digest
+    #
+    # Hashed in Python, not in SQL. Postgres can do this with string_agg, but
+    # the aggregate has to be given an explicit sort and an explicit separator
+    # type, and getting that wrong takes the whole audit down with a 500 —
+    # which is exactly what the audit is for. Pulling prefixes and hashing here
+    # is a few megabytes of transfer and cannot fail in an interesting way.
+    #
+    # Sorted by content, NOT by chunk id: ids are generated at index time, so
+    # under id order the same book uploaded twice would hash differently and
+    # the duplicate would hide.
+    fingerprint_error = None
+    try:
+        fp_rows = (await session.execute(
+            select(
+                DocumentChunk.source_document_id,
+                DocumentChunk.content,
+            )
+        )).all()
+        acc: dict[str, list] = {}
+        for doc_id, content in fp_rows:
+            body = content or ""
+            entry = acc.setdefault(str(doc_id), [0, []])
+            entry[0] += len(body)
+            entry[1].append(body[:400])
+        for d in docs:
+            entry = acc.get(d["id"])
+            if entry is None:
+                d["chars"], d["digest"] = 0, None
+                continue
+            d["chars"] = entry[0]
+            d["digest"] = hashlib.md5(
+                "".join(sorted(entry[1])).encode("utf-8", "replace")
+            ).hexdigest()
+    except Exception as exc:  # noqa: BLE001 - the audit must still answer
+        fingerprint_error = f"{type(exc).__name__}: {exc}"
+        for d in docs:
+            d.setdefault("chars", 0)
+            d.setdefault("digest", None)
 
     empty = [d for d in docs if d["chunks"] == 0]
     return {
@@ -845,6 +862,7 @@ async def audit_corpus(
         "with_chunks": len(docs) - len(empty),
         "empty": len(empty),
         "total_chunks": sum(d["chunks"] for d in docs),
+        "fingerprint_error": fingerprint_error,
         "empty_documents": empty,
         "all": docs,
     }
