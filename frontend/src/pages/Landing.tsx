@@ -2206,7 +2206,7 @@ export default function Landing() {
       switcher_horizontal_position: "right",
       switcher_vertical_position: "top",
       float_switcher_open_direction: "bottom",
-      flag_size: 24,
+      flag_size: 16,
       flag_style: "3d",
     };
     const script = document.createElement("script");
