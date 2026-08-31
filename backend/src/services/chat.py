@@ -2,6 +2,7 @@ from src.llm_shim import tt, ta, tu
 from src.humanize import humanize_response
 
 import os
+import re
 import uuid
 import time
 import asyncio
@@ -1111,17 +1112,32 @@ async def _embedding_search_optimized(
         if parsed:
             work_key, verse_no = parsed
             title = title_for(work_key)
-            # Locations read "Upadesa Saram · Verse 21 (pp. 128-129)". Matching
-            # that exact prefix stops verse 2 from also matching verse 21.
-            pattern = f"{title} · Verse {verse_no} (%"
+            # Locations read "Upadesa Saram · Verse 21 · p. 129", one row per
+            # page. The " · " terminator stops verse 2 matching verse 21.
+            pattern = f"{title} · Verse {verse_no} · %"
             stmt = (
-                select(db.DocumentChunk.content, db.SourceDocument.filename)
+                select(
+                    db.DocumentChunk.content,
+                    db.SourceDocument.filename,
+                    db.DocumentChunk.location,
+                )
                 .join(db.SourceDocument)
                 .where(db.SourceDocument.active == True)
                 .where(db.DocumentChunk.location.like(pattern))
-                .limit(4)
+                .limit(40)
             )
-            verse_rows = list((await session.execute(stmt)).all())
+            rows = list((await session.execute(stmt)).all())
+
+            # Page order matters: the verse itself comes first, then its
+            # commentary in sequence. Sort numerically, since "p. 9" would sort
+            # after "p. 129" as text. Cap the number of pages so a long
+            # commentary cannot crowd out everything else in the context.
+            def _pg(loc: str) -> int:
+                m = re.search(r"p\.\s*(\d+)", loc or "")
+                return int(m.group(1)) if m else 0
+
+            rows.sort(key=lambda r: _pg(r[2]))
+            verse_rows = [(r[0], r[1]) for r in rows[:VERSE_PAGES_IN_CONTEXT]]
             if verse_rows:
                 tu.logger.info(
                     f"[VERSE_LOOKUP] {title} verse {verse_no}: "
@@ -1472,6 +1488,12 @@ RETRIEVAL_STATE: dict = {"mode": "unknown", "last_error": None}
 # confidently from them. Tune with ASAM_RAG_MAX_DISTANCE.
 RAG_MAX_DISTANCE = float(os.getenv("ASAM_RAG_MAX_DISTANCE", "0.65"))
 RAG_MAX_CHUNKS = int(os.getenv("ASAM_RAG_MAX_CHUNKS", "10"))
+# How many pages of a requested verse to place in context: the verse
+# itself plus the opening of its commentary. Upadesa Saram verse 10 runs
+# to twenty-three pages, and sending all of them would crowd out every
+# other passage. Vector search still surfaces deeper commentary pages
+# when the question is about a specific point within them.
+VERSE_PAGES_IN_CONTEXT = int(os.getenv("ASAM_VERSE_PAGES", "6"))
 
 
 class GuestChatMessage(BaseModel):

@@ -53,30 +53,55 @@ def _pages(total=165):
 def test_all_thirty_verses_captured_in_order():
     out = regroup_by_verse(_pages(), "sri_ramanas_upadesa_saram__ebook_.pdf")
     nums = [int(re.search(r"Verse (\d+)", c.loc).group(1))
-            for c in out if "Verse" in c.loc]
-    assert sorted(set(nums)) == list(range(1, 31)), nums
+            for c in out if "\u00b7 Verse " in c.loc]
+    assert sorted(set(nums)) == list(range(1, 31)), sorted(set(nums))
 
 
 def test_contents_page_is_not_treated_as_a_verse():
     """The contents page lists '_Verse 21_ 128' and must not become verse 21."""
     out = regroup_by_verse(_pages(), "sri_ramanas_upadesa_saram__ebook_.pdf")
-    v21 = [c for c in out if "Verse 21 (" in c.loc]
+    v21 = [c for c in out if "\u00b7 Verse 21 \u00b7" in c.loc]
     assert v21, "verse 21 missing"
     assert all("Page No: 7" not in c.content for c in v21)
 
 
-def test_verse_21_spans_the_right_pages():
+def test_verse_21_covers_verse_and_commentary_pages():
+    """Verse 21 sits on p.128 and its commentary runs to p.129."""
     out = regroup_by_verse(_pages(), "sri_ramanas_upadesa_saram__ebook_.pdf")
-    v21 = [c for c in out if "Verse 21 (" in c.loc][0]
-    assert "pp. 128-129" in v21.loc, v21.loc
-    assert v21.content.startswith("Upadesa Saram, Verse 21")
+    v21 = [c for c in out if c.loc.startswith("Upadesa Saram \u00b7 Verse 21 \u00b7")]
+    pages = sorted(int(re.search(r"p\. (\d+)", c.loc).group(1)) for c in v21)
+    assert pages == [128, 129], pages
+    assert v21[0].content.startswith("Upadesa Saram, Verse 21")
+
+
+def test_commentary_pages_stay_separate_chunks():
+    """Commentary must not be folded into one averaged chunk per verse.
+
+    Verse 10 carries the Ashtanga Yoga section over pages 72-94. Each of those
+    pages keeps its own embedding so a question about a specific point in the
+    commentary can still match it.
+    """
+    out = regroup_by_verse(_pages(), "sri_ramanas_upadesa_saram__ebook_.pdf")
+    v10 = [c for c in out if c.loc.startswith("Upadesa Saram \u00b7 Verse 10 \u00b7")]
+    assert len(v10) == 23, f"expected pages 72-94 as 23 chunks, got {len(v10)}"
+    assert sum(1 for c in v10 if "verse and commentary" in c.content) == 1
+    assert sum(1 for c in v10 if "(commentary," in c.content) == 22
+
+
+def test_every_page_survives_labelling():
+    pages = _pages()
+    out = regroup_by_verse(pages, "sri_ramanas_upadesa_saram__ebook_.pdf")
+    assert len(out) == len(pages), f"{len(pages)} pages in, {len(out)} out"
+    seen = {int(m.group(1)) for c in out
+            for m in [re.search(r"Page No: (\d+)", c.content)] if m}
+    assert seen == set(range(1, 166)), sorted(set(range(1, 166)) - seen)
 
 
 def test_verse_number_is_in_the_embedded_text_too():
     """So semantic search gets a handle on it, not only the exact lookup."""
     out = regroup_by_verse(_pages(), "sri_ramanas_upadesa_saram__ebook_.pdf")
     for c in out:
-        if "Verse 7 (" in c.loc:
+        if "\u00b7 Verse 7 \u00b7" in c.loc:
             assert "Upadesa Saram, Verse 7" in c.content
             return
     raise AssertionError("verse 7 not found")
@@ -86,36 +111,8 @@ def test_verse_number_is_in_the_embedded_text_too():
 
 def test_front_matter_is_preserved():
     out = regroup_by_verse(_pages(), "sri_ramanas_upadesa_saram__ebook_.pdf")
-    front = [c for c in out if "Verse" not in c.loc]
+    front = [c for c in out if "\u00b7 Verse " not in c.loc]
     assert len(front) == 25, f"expected pages 1-25, got {len(front)}"
-
-
-def test_long_verse_is_split_but_stays_addressable():
-    """A verse whose commentary exceeds the embedding budget must split.
-
-    Upadesa Saram verse 10 carries the whole Ashtanga Yoga section across pages
-    72-94, which sits near the cap. This fixture uses deliberately heavy pages
-    so the split path is exercised regardless of which tokeniser is available,
-    rather than depending on where the real text happens to land.
-    """
-    verse_at = {p: i + 1 for i, p in enumerate(STARTS)}
-    pages = []
-    for p in range(1, 166):
-        body = f"Page No: {p}\nPage Text:\n```\n"
-        if p in verse_at:
-            body += f"## Verse {verse_at[p]}\n\nSanskrit\n\nTranslation\n"
-        body += ("commentary " * 600) + "\n```"
-        pages.append(Chunk(p - 1, body, f"Page: {p}"))
-
-    out = regroup_by_verse(pages, "sri_ramanas_upadesa_saram__ebook_.pdf")
-    v10 = [c for c in out if re.search(r"Verse 10 \(", c.loc)]
-    assert len(v10) > 1, "expected the long verse to be split"
-    assert all("Verse 10" in c.loc for c in v10)
-    assert all("part" in c.loc for c in v10), [c.loc for c in v10]
-    # Splitting must not drop pages.
-    joined = " ".join(c.content for c in v10)
-    for page in (72, 85, 94):
-        assert f"Page No: {page}\n" in joined, f"page {page} lost in the split"
 
 
 # ── 3. Safety: unknown or malformed input falls back to page chunks ──────────

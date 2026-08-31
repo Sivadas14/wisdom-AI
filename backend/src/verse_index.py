@@ -96,14 +96,26 @@ def _count_tokens(text: str) -> int:
 
 
 def regroup_by_verse(chunks: list, source_name: str) -> Optional[list]:
-    """Regroup page chunks into verse chunks for a known numbered work.
+    """Label each page of a numbered work with the verse it belongs to.
 
-    Returns None when the work is not recognised or its structure does not
-    parse as expected, so the caller keeps the ordinary page chunks. Failing
-    back to page chunks is always safe; emitting wrongly numbered verses is not.
+    Pages are NOT merged into one chunk per verse. An early version did that,
+    and it traded one problem for another: Upadesa Saram verse 10 carries the
+    whole Ashtanga Yoga section over twenty-three pages, and folding that into a
+    single chunk gives it one averaged embedding, so a question about a specific
+    point in the commentary matches it less well than the individual page used
+    to. Retrieval granularity is the thing that makes commentary findable.
 
-    Pages before the first verse (title, dedication, contents, introduction) are
-    preserved unchanged, so nothing is dropped.
+    Instead each page keeps its own chunk and gains a verse label:
+
+        Upadesa Saram · Verse 21 · p. 129
+
+    That gives both behaviours at once. A "verse 21" question matches every page
+    of verse 21 on the label prefix, verse first and commentary after, while an
+    ordinary semantic question still searches at page resolution.
+
+    Returns None when the work is not recognised or its structure does not parse
+    as expected, so the caller keeps ordinary page chunks. Falling back to pages
+    is always safe; emitting wrongly numbered verses is not.
     """
     work = identify_work(source_name)
     if not work or not chunks:
@@ -111,10 +123,9 @@ def regroup_by_verse(chunks: list, source_name: str) -> Optional[list]:
 
     ordered = sorted(chunks, key=lambda c: (_page_no(getattr(c, "loc", "")) or 0))
 
-    # Locate the first heading on each page, in order, keeping verse numbers
-    # strictly increasing. An appendix that repeats "Verse 1" must not restart
-    # the sequence.
-    starts: list[tuple[int, int]] = []   # (index into ordered, verse number)
+    # Find where each verse begins, keeping the numbers strictly increasing so
+    # an appendix repeating "Verse 1" cannot restart the sequence.
+    starts: list[tuple[int, int]] = []
     highest = 0
     for idx, c in enumerate(ordered):
         nums = [int(n) for n in work.heading.findall(getattr(c, "content", "") or "")]
@@ -126,64 +137,39 @@ def regroup_by_verse(chunks: list, source_name: str) -> Optional[list]:
 
     verses_found = [n for _, n in starts]
     if len(verses_found) < max(3, work.expected_verses // 2):
-        # Too few to trust; the edition is probably laid out differently.
         return None
     if verses_found != sorted(verses_found):
         return None
 
-    out: list = []
-    ChunkCls = type(chunks[0])
-    next_id = 0
-
-    def emit(content: str, loc: str) -> None:
-        nonlocal next_id
-        out.append(ChunkCls(id=next_id, content=content, loc=loc))
-        next_id += 1
-
-    # Front matter, untouched.
-    for c in ordered[: starts[0][0]]:
-        emit(c.content, c.loc)
-
+    # Which verse does each page belong to?
+    verse_of: dict[int, int] = {}
     for i, (start_idx, verse_no) in enumerate(starts):
         end_idx = starts[i + 1][0] if i + 1 < len(starts) else len(ordered)
-        group = ordered[start_idx:end_idx]
-        first_page = _page_no(group[0].loc)
-        last_page = _page_no(group[-1].loc)
-        span = (
-            f"p. {first_page}" if first_page == last_page
-            else f"pp. {first_page}-{last_page}"
-        )
+        for j in range(start_idx, end_idx):
+            verse_of[j] = verse_no
 
-        body = "\n\n".join((getattr(c, "content", "") or "").strip() for c in group)
+    out: list = []
+    ChunkCls = type(chunks[0])
+    for idx, c in enumerate(ordered):
+        page = _page_no(getattr(c, "loc", ""))
+        body = (getattr(c, "content", "") or "").strip()
+        verse_no = verse_of.get(idx)
 
-        # The verse number goes into the embedded TEXT as well as the label, so
-        # semantic search gets a handle on it too, not just the exact lookup.
-        header = f"{work.title}, Verse {verse_no}"
-
-        if _count_tokens(body) <= _MAX_TOKENS_PER_CHUNK:
-            emit(f"{header}\n\n{body}", f"{work.title} · Verse {verse_no} ({span})")
+        if verse_no is None:
+            # Front matter: title, dedication, contents, introduction. Kept as is.
+            out.append(ChunkCls(id=len(out), content=body, loc=c.loc))
             continue
 
-        # Long commentary: split across several chunks, each still addressable
-        # as this verse.
-        parts: list[str] = []
-        current: list[str] = []
-        for c in group:
-            piece = (getattr(c, "content", "") or "").strip()
-            candidate = "\n\n".join(current + [piece])
-            if current and _count_tokens(candidate) > _MAX_TOKENS_PER_CHUNK:
-                parts.append("\n\n".join(current))
-                current = [piece]
-            else:
-                current.append(piece)
-        if current:
-            parts.append("\n\n".join(current))
-
-        for pi, part in enumerate(parts, start=1):
-            emit(
-                f"{header} (part {pi} of {len(parts)})\n\n{part}",
-                f"{work.title} · Verse {verse_no} ({span}, part {pi}/{len(parts)})",
-            )
+        is_first = any(idx == s for s, _ in starts)
+        role = "verse and commentary" if is_first else "commentary"
+        # The verse number goes into the embedded TEXT as well as the label, so
+        # semantic search gets a handle on it too, not only the exact lookup.
+        header = f"{work.title}, Verse {verse_no} ({role}, p. {page})"
+        out.append(ChunkCls(
+            id=len(out),
+            content=f"{header}\n\n{body}",
+            loc=f"{work.title} · Verse {verse_no} · p. {page}",
+        ))
 
     return out
 
