@@ -1535,6 +1535,19 @@ import datetime as _dt
 
 GUEST_MESSAGE_LIMIT = 3  # Per IP per day AND per session per day
 
+# When credits are ON, the guest limit stops being a sales device and becomes
+# an abuse threshold. A sincere seeker asking many questions in a day should
+# never hit it; a scraper should. It is enforced by the same per-IP and
+# per-session counters, but the refusal message no longer invites an upgrade,
+# because there is nothing to upgrade to — chat is free.
+GUEST_ABUSE_LIMIT = int(os.getenv("ASAM_GUEST_ABUSE_LIMIT", "100"))
+
+
+def _guest_limit_now() -> int:
+    """The commercial 3/day under the old model; the abuse cap once free."""
+    from src.services.credits import credits_mode
+    return GUEST_ABUSE_LIMIT if credits_mode() == "on" else GUEST_MESSAGE_LIMIT
+
 # Emitted at the START of any guest reply that must NOT consume a free question
 # (our AI errored, no passages found, or an off-topic refusal that cost no LLM
 # call). The frontend strips this tag and skips its local counter increment.
@@ -1826,14 +1839,31 @@ async def guest_chat_completion(
     )
     ip_hash = hashlib.sha256(client_ip.encode()).hexdigest()
 
-    _LIMIT_429 = {
-        "code": "GUEST_LIMIT_REACHED",
-        "message": (
-            f"You have used all {GUEST_MESSAGE_LIMIT} free questions for today. "
-            "Sign up for free to continue exploring the wisdom of Sri Ramana Maharshi."
-        ),
-        "limit": GUEST_MESSAGE_LIMIT,
-    }
+    def _limit_detail() -> dict:
+        """What a refused guest is told, which depends on WHY they are refused.
+
+        Old model: a commercial quota, so the message sells the sign-up.
+        Credits on: chat is free and this is an abuse stop, so the message
+        neither apologises with an upgrade pitch nor advertises the threshold
+        — a scraper does not need to be told the number to aim under.
+        """
+        from src.services.credits import credits_mode
+        if credits_mode() == "on":
+            return {
+                "code": "RATE_LIMITED",
+                "message": (
+                    "That is a great many questions for one day. Please "
+                    "return tomorrow — the teachings will still be here."
+                ),
+            }
+        return {
+            "code": "GUEST_LIMIT_REACHED",
+            "message": (
+                f"You have used all {GUEST_MESSAGE_LIMIT} free questions for today. "
+                "Sign up for free to continue exploring the wisdom of Sri Ramana Maharshi."
+            ),
+            "limit": GUEST_MESSAGE_LIMIT,
+        }
 
     try:
         # ── IP check: how many messages has this IP sent today? ────────────
@@ -1844,9 +1874,10 @@ async def guest_chat_completion(
             ).limit(1)
         )).scalar_one_or_none()
 
-        if ip_row and ip_row.message_count >= GUEST_MESSAGE_LIMIT:
-            tu.logger.info(f"[GUEST_CHAT] IP limit reached: ip_hash={ip_hash[:8]}… count={ip_row.message_count}")
-            raise HTTPException(status_code=429, detail=_LIMIT_429)
+        limit_now = _guest_limit_now()
+        if ip_row and ip_row.message_count >= limit_now:
+            tu.logger.info(f"[GUEST_CHAT] IP limit reached: ip_hash={ip_hash[:8]}… count={ip_row.message_count} limit={limit_now}")
+            raise HTTPException(status_code=429, detail=_limit_detail())
 
         # ── Session check: how many messages has this browser session sent? ─
         sid_row = (await session.execute(
@@ -1856,9 +1887,9 @@ async def guest_chat_completion(
             ).limit(1)
         )).scalar_one_or_none()
 
-        if sid_row and sid_row.message_count >= GUEST_MESSAGE_LIMIT:
-            tu.logger.info(f"[GUEST_CHAT] Session limit reached: sid={sid[:16]}… count={sid_row.message_count}")
-            raise HTTPException(status_code=429, detail=_LIMIT_429)
+        if sid_row and sid_row.message_count >= limit_now:
+            tu.logger.info(f"[GUEST_CHAT] Session limit reached: sid={sid[:16]}… count={sid_row.message_count} limit={limit_now}")
+            raise HTTPException(status_code=429, detail=_limit_detail())
 
         # ── Both checks passed. Do NOT increment yet. ──────────────────────
         # The counter is only incremented once the AI has actually produced an
@@ -1938,21 +1969,26 @@ async def create_conversation(
 ) -> w.Conversation:
     """POST /api/chat - Create a new conversation"""
 
-    # Backend quota enforcement — check conversation limit before creating
-    try:
-        usage = await get_usage(current_user=user, session=session)
-        conversations_remaining = usage.conversations.remaining
-        # Block if remaining is a number and is 0 or below (not "Unlimited")
-        if isinstance(conversations_remaining, int) and conversations_remaining <= 0:
-            raise HTTPException(
-                status_code=429,
-                detail="You have reached your conversation limit. Please upgrade your plan to continue."
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        # If usage check fails for any reason, log and allow (don't block users on system errors)
-        print(f"Warning: Could not check quota before creating conversation: {e}")
+    # Backend quota enforcement — check conversation limit before creating.
+    # With credits ON this whole check disappears: Wisdom chat is free for
+    # every signed-in account, and media is what credits meter. The quota only
+    # exists while the old plan model is still the one in force.
+    from src.services.credits import credits_mode
+    if credits_mode() != "on":
+        try:
+            usage = await get_usage(current_user=user, session=session)
+            conversations_remaining = usage.conversations.remaining
+            # Block if remaining is a number and is 0 or below (not "Unlimited")
+            if isinstance(conversations_remaining, int) and conversations_remaining <= 0:
+                raise HTTPException(
+                    status_code=429,
+                    detail="You have reached your conversation limit. Please upgrade your plan to continue."
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            # If usage check fails for any reason, log and allow (don't block users on system errors)
+            print(f"Warning: Could not check quota before creating conversation: {e}")
 
     try:
         # print("CREATE CONVERSTATION")

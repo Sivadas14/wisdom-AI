@@ -262,6 +262,36 @@ async def get_usage(
             video_enabled=True,
         )
 
+    # ── Credits ON: the plan hierarchy no longer describes access ───────────
+    # Chat and cards are free and unlimited for every signed-in account;
+    # audio and video are decided by the credit balance, reported here so the
+    # UI can show it. Legacy paid accounts fall through to their plan below,
+    # which still reports the media minutes they are keeping.
+    from src.services.credits import credits_mode, get_balance, MINUTES_PER_CREDIT
+    if credits_mode() == "on" and current_user.plan_type == PlanType.FREE:
+        unlimited = w.UsageLimit(limit="Unlimited", used=0, remaining="Unlimited")
+        balance = 0
+        try:
+            balance = await get_balance(current_user.id, session)
+        except Exception as e:
+            tu.logger.error(f"[CREDITS] balance read failed in get_usage: {e}")
+        return w.UserUsageResponse(
+            plan_name="Free",
+            plan_type="FREE",
+            conversations=unlimited,
+            chat_tokens=unlimited,
+            image_cards=unlimited,
+            meditation_duration=w.UsageLimit(limit=0, used=0, remaining=0),
+            addon_cards=None,
+            addon_minutes=None,
+            # Enabled means "the button works"; whether a given generation is
+            # affordable is the credit gate's question, answered per request.
+            audio_enabled=True,
+            video_enabled=True,
+            credits_balance=balance,
+            minutes_per_credit=MINUTES_PER_CREDIT,
+        )
+
     # Get user's active subscription and plan
     query = (
         select(Subscription, Plan)

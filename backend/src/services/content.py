@@ -178,45 +178,50 @@ async def create_content(
                     },
                 )
 
-    # Backend quota enforcement — check limits before generating any content
-    try:
-        usage = await get_usage(current_user=current_user, session=session)
+    # Backend quota enforcement — check limits before generating any content.
+    # Skipped entirely when credits are ON: cards are free in that model, and
+    # audio/video access was already decided by the credit gate above. Asking
+    # the plan tables as well would re-impose limits that no longer exist.
+    if C.credits_mode() != "on":
+        # Backend quota enforcement — check limits before generating any content
+        try:
+            usage = await get_usage(current_user=current_user, session=session)
 
-        if request.mode == "image":
-            # Check contemplation card (image) quota
-            cards_remaining = usage.image_cards.remaining
-            addon_remaining = getattr(usage.addon_cards, 'remaining', 0) or 0
-            if isinstance(cards_remaining, int) and cards_remaining <= 0 and addon_remaining <= 0:
-                raise HTTPException(
-                    status_code=429,
-                    detail="You have reached your contemplation card limit. Please upgrade your plan to generate more."
-                )
+            if request.mode == "image":
+                # Check contemplation card (image) quota
+                cards_remaining = usage.image_cards.remaining
+                addon_remaining = getattr(usage.addon_cards, 'remaining', 0) or 0
+                if isinstance(cards_remaining, int) and cards_remaining <= 0 and addon_remaining <= 0:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="You have reached your contemplation card limit. Please upgrade your plan to generate more."
+                    )
 
-        elif request.mode in ("audio", "video"):
-            # Check meditation (audio/video) quota
-            if request.mode == "audio" and not usage.audio_enabled:
-                raise HTTPException(
-                    status_code=429,
-                    detail="Audio meditation is not enabled in your plan. Please upgrade to access this feature."
-                )
-            if request.mode == "video" and not usage.video_enabled:
-                raise HTTPException(
-                    status_code=429,
-                    detail="Video meditation is not enabled in your plan. Please upgrade to access this feature."
-                )
-            minutes_remaining = usage.meditation_duration.remaining
-            addon_minutes = getattr(usage.addon_minutes, 'remaining', 0) or 0
-            if isinstance(minutes_remaining, int) and minutes_remaining <= 0 and addon_minutes <= 0:
-                raise HTTPException(
-                    status_code=429,
-                    detail="You have reached your free meditation limit. Please upgrade your plan for more."
-                )
+            elif request.mode in ("audio", "video"):
+                # Check meditation (audio/video) quota
+                if request.mode == "audio" and not usage.audio_enabled:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Audio meditation is not enabled in your plan. Please upgrade to access this feature."
+                    )
+                if request.mode == "video" and not usage.video_enabled:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Video meditation is not enabled in your plan. Please upgrade to access this feature."
+                    )
+                minutes_remaining = usage.meditation_duration.remaining
+                addon_minutes = getattr(usage.addon_minutes, 'remaining', 0) or 0
+                if isinstance(minutes_remaining, int) and minutes_remaining <= 0 and addon_minutes <= 0:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="You have reached your free meditation limit. Please upgrade your plan for more."
+                    )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        # If quota check fails for any reason, log and allow (don't block on system errors)
-        print(f"Warning: Could not check quota before creating content: {e}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            # If quota check fails for any reason, log and allow (don't block on system errors)
+            print(f"Warning: Could not check quota before creating content: {e}")
 
     content_id = "<failed>"
     match request.mode:

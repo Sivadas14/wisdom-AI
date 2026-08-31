@@ -518,6 +518,23 @@ async def create_guest_content(
         raise HTTPException(400, "session_id is required.")
     if mode not in ("image", "audio", "video"):
         raise HTTPException(400, "mode must be image, audio, or video.")
+
+    # With credits ON, guests keep contemplation cards — free for everyone —
+    # but audio and video require an account and credits. A guest generation
+    # is real TTS money spent by someone we cannot even ask to sign in, and
+    # under the old model 3/day of it was quietly free.
+    from src.services.credits import credits_mode
+    if credits_mode() == "on" and mode in ("audio", "video"):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "ACCOUNT_REQUIRED",
+                "message": (
+                    "Personalised audio and video meditations need a free "
+                    "account and credits. Contemplation cards are free to all."
+                ),
+            },
+        )
     if not request.question.strip() or not request.answer.strip():
         raise HTTPException(400, "question and answer are required.")
 

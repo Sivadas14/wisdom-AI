@@ -208,7 +208,15 @@ async def content_generation_limit_middleware(request: Request, call_next):
     - IMAGE mode: Validates against card_limit
     - AUDIO/VIDEO mode: Validates against max_meditation_duration
     - Plan feature flags: is_audio and is_video
+
+    Stands down entirely when credits are ON. Cards are free in that model,
+    and audio/video access is decided by the credit gate inside
+    create_content — the plan's is_audio/is_video flags and minute quotas no
+    longer describe anything.
     """
+    from src.services.credits import credits_mode
+    if credits_mode() == "on":
+        return await call_next(request)
     tu.logger.info(f"[CONTENT_GEN] Processing request: {request.method} {request.url.path}")
     
     # Only apply to content generation endpoint
@@ -802,7 +810,15 @@ async def conversation_limit_middleware(request: Request, call_next):
     """
     Middleware to enforce conversation creation limits based on user's plan.
     Only applies to POST /api/conversations endpoint.
+
+    Stands down entirely when credits are ON: there is no conversation quota
+    in that model — Wisdom chat is free — and this middleware's 403 is the
+    response the frontend interceptor historically read as a deactivated
+    account. The less it fires, the better.
     """
+    from src.services.credits import credits_mode
+    if credits_mode() == "on":
+        return await call_next(request)
     tu.logger.info(f"[CONVERSATION] Processing request: {request.method} {request.url.path}")
     
     # Only apply to conversation creation endpoint

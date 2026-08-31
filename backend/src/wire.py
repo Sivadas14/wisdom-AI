@@ -200,6 +200,10 @@ class UserUsageResponse(tt.BM):
     addon_minutes: UsageLimit | None = tt.F("Addon minutes usage statistics", None)
     audio_enabled: bool = tt.F("Whether audio generation is enabled")
     video_enabled: bool = tt.F("Whether video generation is enabled")
+    # Credits. None while the credit system is off, so nothing that reads this
+    # model changes behaviour until the flag moves.
+    credits_balance: int | None = tt.F("Credit balance, when credits are active", None)
+    minutes_per_credit: int | None = tt.F("Minutes of media one credit buys", None)
 
 
 
