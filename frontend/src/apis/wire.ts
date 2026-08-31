@@ -340,6 +340,9 @@ export interface UsageData {
     };
     audio_enabled: boolean;
     video_enabled: boolean;
+    // Present only when the credit system is active; null/absent otherwise.
+    credits_balance?: number | null;
+    minutes_per_credit?: number | null;
 }
 export interface PlanFeature {
     id: number;

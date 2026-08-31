@@ -118,7 +118,13 @@ export const chatAPI = {
                     localStorage.removeItem('userProfile');
                     window.location.href = '/signin?error=deactivated';
                 }
-                if (response.status === 429 || response.status === 402) {
+                if (response.status === 402) {
+                    // Not a subscription problem: the credit balance is short.
+                    // Kept distinct from QUOTA_EXCEEDED so the UI offers
+                    // credits, not a plans modal for plans that are retired.
+                    throw new Error('INSUFFICIENT_CREDITS');
+                }
+                if (response.status === 429) {
                     throw new Error('QUOTA_EXCEEDED');
                 }
                 if (response.status === 409) {
@@ -338,6 +344,69 @@ export const contentAPI = {
 };
 
 // Admin APIs
+export interface CreditPack {
+    key: string;
+    label: string;
+    credits: number;
+    minutes: number;
+    price_inr: number;
+    price_usd: number;
+}
+
+export interface CreditLedgerEntry {
+    delta: number;
+    kind: string;
+    balance_after: number;
+    note: string | null;
+    at: string | null;
+}
+
+export interface CreditsInfo {
+    balance: number;
+    minutes_per_credit: number;
+    packs: CreditPack[];
+    ledger: CreditLedgerEntry[];
+}
+
+export interface PublicConfig {
+    credits_mode: 'off' | 'shadow' | 'on';
+    free_chat: boolean;
+    guest_media: 'cards_only' | 'all';
+}
+
+// ── Credits ─────────────────────────────────────────────────────────────────
+// One credit buys five minutes of generated audio or video. The wallet is
+// server-authoritative: nothing here trusts a locally cached balance.
+export const creditsAPI = {
+    get: async (): Promise<CreditsInfo> => {
+        const response = await apiClient.get('/credits');
+        return response.data;
+    },
+    checkout: async (packKey: string, currency: 'INR' | 'USD') => {
+        const response = await apiClient.post('/credits/checkout', {
+            pack_key: packKey, currency,
+        });
+        return response.data;
+    },
+    verifyRazorpay: async (payload: {
+        razorpay_order_id: string;
+        razorpay_payment_id: string;
+        razorpay_signature: string;
+        pack_key: string;
+    }) => {
+        const response = await apiClient.post('/credits/razorpay-verify', payload);
+        return response.data;
+    },
+};
+
+export const publicConfigAPI = {
+    // Unauthenticated on purpose: the landing page needs it before sign-in.
+    get: async (): Promise<PublicConfig> => {
+        const response = await apiClient.get('/public-config');
+        return response.data;
+    },
+};
+
 export interface TrialGrant {
     id: string;
     email: string;

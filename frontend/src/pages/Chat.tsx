@@ -51,7 +51,7 @@ const Chat = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { conversationId } = useParams<{ conversationId: string }>();
-  const { usage, loading: usageLoading, refreshUsage, checkQuota, setShowPlansModal } = useUsage();
+  const { usage, loading: usageLoading, refreshUsage, checkQuota, setShowPlansModal, creditsActive, openCreditsModal } = useUsage();
   const { userProfile } = useAuth();
 
   // Plan state — used to drive the post-login welcome / paywall screens.
@@ -67,7 +67,9 @@ const Chat = () => {
   //   • they are on the FREE plan (must subscribe), OR
   //   • their paid plan quota is exhausted (must resubscribe)
   // We only evaluate this once usage has loaded to avoid flickering.
-  const isBlocked = !usageLoading && (isFree || paidExhausted);
+  // Under the credit model there is no such thing as a blocked chat: Wisdom
+  // conversation is free for every account, and only media costs anything.
+  const isBlocked = !usageLoading && !creditsActive && (isFree || paidExhausted);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentInput, setCurrentInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
@@ -935,7 +937,10 @@ const Chat = () => {
       refreshUsage();
     } catch (error) {
       console.error("Failed to initiate audio generation:", error);
-      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
+      if (error instanceof Error && error.message === 'INSUFFICIENT_CREDITS') {
+        setAudioGenerationError("This meditation needs credits.");
+        openCreditsModal('This audio meditation needs more credits than you have.');
+      } else if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
         setAudioGenerationError("You've reached your free meditation limit. Please upgrade your plan.");
         setShowPlansModal(true);
       } else {
@@ -994,7 +999,10 @@ const Chat = () => {
       refreshUsage();
     } catch (error) {
       console.error("Failed to initiate video generation:", error);
-      if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
+      if (error instanceof Error && error.message === 'INSUFFICIENT_CREDITS') {
+        setVideoGenerationError("This meditation needs credits.");
+        openCreditsModal('This video meditation needs more credits than you have.');
+      } else if (error instanceof Error && error.message === 'QUOTA_EXCEEDED') {
         setVideoGenerationError("You've reached your free meditation limit. Please upgrade your plan.");
         setShowPlansModal(true);
       } else {

@@ -628,6 +628,27 @@ const GUEST_CONTENT_LIMIT    = 3;
 // when our AI failed, so seekers were locked out by our own outage. On first
 // load after the fix we refund their counter exactly once.
 const GUEST_QUOTA_REPAIR_KEY = "as_guest_quota_repair_v1";
+
+// ── Which model is live? ──────────────────────────────────────────────────────
+// The backend's /api/public-config says whether chat is quota'd (the old
+// subscription model) or free (the credit model). Until the answer arrives we
+// assume the OLD model, because wrongly showing "3 questions" to a free-chat
+// visitor is a much smaller mistake than wrongly promising free chat under a
+// quota.
+let _freeChatCache: boolean | null = null;
+async function fetchFreeChat(): Promise<boolean> {
+  if (_freeChatCache !== null) return _freeChatCache;
+  try {
+    const r = await fetch(`${API_BASE}/public-config`);
+    if (r.ok) {
+      const j = await r.json();
+      _freeChatCache = !!j.free_chat;
+      return _freeChatCache;
+    }
+  } catch { /* backend older than this frontend — old model */ }
+  _freeChatCache = false;
+  return false;
+}
 const API_BASE               = (import.meta.env.VITE_API_BASE_URL as string || "/api").replace(/\/$/, "");
 
 type GMsg = { role: "user" | "assistant"; content: string };
@@ -726,6 +747,8 @@ function GuestChatSection() {
     catch { return 0; }
   });
   const [showModal, setShowModal] = useState(false);
+  const [freeChat, setFreeChat]   = useState(false);
+  useEffect(() => { fetchFreeChat().then(setFreeChat); }, []);
   const bottomRef = useRef<HTMLDivElement>(null);
   const msgLenRef = useRef(0);
 
@@ -878,7 +901,7 @@ function GuestChatSection() {
   const handleSend = async () => {
     const q = input.trim();
     if (!q || loading) return;
-    if (count >= GUEST_LIMIT) { setShowModal(true); return; }
+    if (!freeChat && count >= GUEST_LIMIT) { setShowModal(true); return; }
 
     const sid = getGuestSessionId();
     // NOTE: the free-question counter is deliberately NOT incremented here.
@@ -984,7 +1007,7 @@ function GuestChatSection() {
       // Mark the language these messages are now in (used by the retranslation
       // effect below to know what to translate FROM if the user switches).
       setMessagesLangStored(lang);
-      if (isRealAnswer && newCount >= GUEST_LIMIT) {
+      if (!freeChat && isRealAnswer && newCount >= GUEST_LIMIT) {
         setTimeout(() => setShowModal(true), 1800);
       }
     } catch {
@@ -1098,7 +1121,9 @@ function GuestChatSection() {
         </h2>
         <p style={{ fontFamily: T.sans, color: "#C4A892", fontSize: "0.9rem", lineHeight: 1.7, marginBottom: "2rem", textAlign: "center" }}>
           Answers drawn exclusively from the authenticated Ramana Maharshi library — not the internet, not general AI.
-          {remaining > 0
+          {freeChat
+            ? <span style={{ color: T.accent, fontWeight: 600 }}> Free · no question limit.</span>
+            : remaining > 0
             ? <span style={{ color: T.accent, fontWeight: 600 }}> {remaining} free question{remaining !== 1 ? "s" : ""} remaining.</span>
             : <span style={{ color: "#e8a070" }}> You've used all your free questions.</span>
           }
@@ -1146,7 +1171,7 @@ function GuestChatSection() {
 
           {/* Input */}
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "0.875rem 1rem", display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
-            {remaining > 0 ? (
+            {(freeChat || remaining > 0) ? (
               <>
                 <textarea
                   value={input}
@@ -1207,7 +1232,10 @@ function GuestChatSection() {
                     { mode: "image" as const, icon: <ImageIcon className="w-4 h-4" />, label: "Card",  sub: "Contemplation image"     },
                     { mode: "audio" as const, icon: <Volume2   className="w-4 h-4" />, label: "Audio", sub: "3-min guided meditation"  },
                     { mode: "video" as const, icon: <Video     className="w-4 h-4" />, label: "Video", sub: "3-min meditation video"   },
-                  ]).map(({ mode, icon, label, sub }) => (
+                    // Under the credit model, guest audio/video are withdrawn:
+                    // they are real TTS money for someone we cannot even ask
+                    // to sign in. Cards stay, free for everyone.
+                  ]).filter(({ mode }) => !freeChat || mode === "image").map(({ mode, icon, label, sub }) => (
                     <button
                       key={mode}
                       onClick={() => handleGenerate(mode)}
@@ -1299,7 +1327,7 @@ function GuestChatSection() {
                   Subscribers get a new card for every question they ask.
                 </p>
                 {/* Format switch buttons — only when quota remains */}
-                {contentCount < GUEST_CONTENT_LIMIT && (
+                {!freeChat && contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("audio")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1344,7 +1372,7 @@ function GuestChatSection() {
                   Subscribers get personalised meditations for every question they ask.
                 </p>
                 {/* Format switch buttons — only when quota remains */}
-                {contentCount < GUEST_CONTENT_LIMIT && (
+                {!freeChat && contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1380,7 +1408,7 @@ function GuestChatSection() {
                   Subscribers get personalised meditation videos for every question they ask.
                 </p>
                 {/* Format switch buttons — only when quota remains */}
-                {contentCount < GUEST_CONTENT_LIMIT && (
+                {!freeChat && contentCount < GUEST_CONTENT_LIMIT && (
                   <div style={{ marginTop: "1rem", display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
                     <p style={{ width: "100%", fontFamily: T.sans, color: "#9A8070", fontSize: "0.75rem", marginBottom: "0.25rem", textAlign: "center" }}>Also try from your question:</p>
                     <button onClick={() => handleGenerate("image")} style={{ ...btn, fontSize: "0.8rem", padding: "0.45rem 1.1rem", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
@@ -1808,6 +1836,43 @@ const PLAN_DEVOTEE: { text: string; highlight?: boolean }[] = [
 ];
 
 function PricingSection() {
+  // Under the credit model the plan-comparison table below is not shown at
+  // all: there are no plans to compare. What replaces it is deliberately NOT
+  // a SaaS pricing grid — one quiet statement of how the site sustains
+  // itself, and two doors.
+  const [freeChat, setFreeChat] = useState(false);
+  useEffect(() => { fetchFreeChat().then(setFreeChat); }, []);
+
+  if (freeChat) {
+    return (
+      <section id="pricing" style={{ backgroundColor: T.cream }} className="py-20 px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <p style={{ fontFamily: T.sans, color: T.accent, fontSize: "0.74rem", letterSpacing: "0.14em", textTransform: "uppercase", fontWeight: 600, marginBottom: "0.75rem" }}>
+            How this is sustained
+          </p>
+          <h2 style={{ fontFamily: T.serif, color: T.brown, fontSize: "clamp(2rem, 4vw, 3rem)", lineHeight: 1.2, marginBottom: "1rem" }}>
+            Wisdom is free.
+          </h2>
+          <p style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.95rem", lineHeight: 1.8, maxWidth: "560px", margin: "0 auto 2rem" }}>
+            Ask questions, read the teachings and return as often as you wish —
+            there is no question limit and no subscription. Personalised audio
+            and video meditations take significant computing to create, so those
+            use credits. If this work is valuable to you, you can also support
+            Arunachala Samudra as a patron. Neither is ever required to ask.
+          </p>
+          <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
+            <a href="/register" style={{ fontFamily: T.sans, backgroundColor: T.accent, color: "#fff", borderRadius: "6px", padding: "0.7rem 1.6rem", fontSize: "0.9rem", textDecoration: "none", fontWeight: 600 }}>
+              Begin — it's free
+            </a>
+            <a href="/register" style={{ fontFamily: T.sans, color: T.brown, border: `1px solid ${T.brown}33`, borderRadius: "6px", padding: "0.7rem 1.6rem", fontSize: "0.9rem", textDecoration: "none" }}>
+              Explore media credits
+            </a>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section id="pricing" style={{ backgroundColor: T.cream }} className="py-20 px-6">
       <div className="max-w-7xl mx-auto">
@@ -2231,7 +2296,10 @@ export default function Landing() {
           "@type": "Offer",
           "price": "0",
           "priceCurrency": "USD",
-          "description": "Free access to 20 conversations and 5 contemplation cards. Seeker and Devotee plans available.",
+          // Written for the credit model, and accurate under the old one too: the
+          // core offer really is free either way, and search engines cache this
+          // for weeks, so it must not name plans that are being retired.
+          "description": "Free Wisdom conversations and contemplation cards. Optional credits for personalised audio and video meditation.",
         },
       },
       {

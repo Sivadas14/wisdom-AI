@@ -656,6 +656,20 @@ def get_app() -> FastAPI:
     app.add_api_route("/api/credits/checkout", credit_pay_svc.create_checkout, methods=["POST"], tags=["credits"])
     app.add_api_route("/api/credits/razorpay-verify", credit_pay_svc.verify_razorpay_payment, methods=["POST"], tags=["credits"])
 
+    @app.get("/api/public-config", tags=["config"])
+    async def _public_config():
+        # The landing page is unauthenticated, so it cannot learn from
+        # /api/usage whether chat is quota'd or free. This tells it. Nothing
+        # secret lives here — it is the same fact every visitor discovers by
+        # asking a fourth question.
+        from src.services.credits import credits_mode
+        mode = credits_mode()
+        return {
+            "credits_mode": mode,
+            "free_chat": mode == "on",
+            "guest_media": "cards_only" if mode == "on" else "all",
+        }
+
     @app.post("/api/credits/razorpay-webhook", tags=["credits"])
     async def _credits_razorpay_webhook(request: Request, session=Depends(get_db_session_fa)):
         # Registered inline because the handler needs the RAW body for

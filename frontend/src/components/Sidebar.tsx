@@ -20,12 +20,13 @@ const Sidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { user, userProfile, logout } = useAuth();
-    const { usage, checkQuota, setShowPlansModal } = useUsage();
+    const { usage, checkQuota, setShowPlansModal, creditsActive, openCreditsModal } = useUsage();
     const isFree = usage?.plan_type === 'FREE';
 
-    // True when the user has exhausted their chat quota
+    // True when the user has exhausted their chat quota. Never true under
+    // credits — chat has no quota there.
     const chatExhausted = (() => {
-        if (!usage) return false;
+        if (!usage || creditsActive) return false;
         const rem = usage.conversations.remaining;
         return typeof rem === "number" && rem <= 0;
     })();
@@ -248,8 +249,27 @@ const Sidebar = () => {
                 </div>
             </ScrollArea>
 
+            {/* Credits strip — the wallet, when the credit model is live */}
+            {usage && creditsActive && (
+                <div
+                    className="mx-3 mb-2 p-3 rounded-lg bg-[#FDF4EF] border border-[#ECE5DF] cursor-pointer hover:bg-[#F5E6DC] transition-colors"
+                    onClick={() => openCreditsModal()}
+                >
+                    <div className="flex justify-between items-center">
+                        <span className="text-[11px] text-[#472b20]/70">Media credits</span>
+                        <span className="text-[11px] font-medium text-[#472b20]/60">
+                            {usage.credits_balance ?? 0}
+                        </span>
+                    </div>
+                    <p className="text-[10px] text-[#472b20]/40 mt-0.5">
+                        Conversations and cards are free
+                    </p>
+                    <p className="text-[10px] text-[#D05E2D] mt-1 font-medium">Get credits →</p>
+                </div>
+            )}
+
             {/* Usage strip — hidden for FREE plan (subscribe first, then see usage) */}
-            {usage && !isFree && (
+            {usage && !isFree && !creditsActive && (
                 <div
                     className="mx-3 mb-2 p-3 rounded-lg bg-[#FDF4EF] border border-[#ECE5DF] cursor-pointer hover:bg-[#F5E6DC] transition-colors"
                     onClick={() => navigate("/billing")}

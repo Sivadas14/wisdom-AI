@@ -93,7 +93,16 @@ const InlineMeditationCreator = ({
   const [currentContentType, setCurrentContentType] = useState<'audio' | 'video' | null>(null);
 
   // const lengths = ["5 min", "10 min", "15 min", "20 min"];
-  const { usage, refreshUsage } = useUsage();
+  const { usage, refreshUsage, creditsActive, openCreditsModal } = useUsage();
+
+  // ── Credit cost, shown BEFORE the button is pressed ─────────────────────
+  // One credit is five minutes, so the chosen length decides the cost. The
+  // seeker must never learn the price from a failed request.
+  const minutesPerCredit = usage?.minutes_per_credit ?? 5;
+  const selectedMinutes = parseInt(selectedLength) || 5;
+  const creditCost = Math.ceil(selectedMinutes / minutesPerCredit);
+  const creditBalance = usage?.credits_balance ?? 0;
+  const canAfford = !creditsActive || creditBalance >= creditCost;
 
   const lengths = ["5 min", "10 min", "15 min", "20 min"];
 
@@ -113,6 +122,11 @@ const InlineMeditationCreator = ({
     if (!usage) return true;
     const minutes = parseInt(lengthStr);
     if (isNaN(minutes)) return true;
+    if (creditsActive) {
+      // Every length is selectable; affordability is shown at the button,
+      // where the cost and balance sit side by side.
+      return true;
+    }
     const totalRemaining = usage.meditation_duration.remaining + (usage.addon_minutes?.remaining || 0);
     return minutes <= totalRemaining;
   };
@@ -498,8 +512,24 @@ const InlineMeditationCreator = ({
           </div>
 
           <div className="text-center">
+            {creditsActive && (
+              <p className="mb-3 text-sm text-brand-body">
+                {`Uses ${creditCost} credit${creditCost !== 1 ? 's' : ''} · Your balance: ${creditBalance}`}
+                {canAfford
+                  ? ` · After: ${creditBalance - creditCost}`
+                  : ''}
+              </p>
+            )}
             <Button
-              onClick={handleGenerateGuide}
+              onClick={() => {
+                if (creditsActive && !canAfford) {
+                  openCreditsModal(
+                    `You need ${creditCost} credit${creditCost !== 1 ? 's' : ''} to create this ${selectedMinutes}-minute meditation. Your balance: ${creditBalance}.`
+                  );
+                  return;
+                }
+                handleGenerateGuide();
+              }}
               disabled={!conversationId || !messageId}
               className="bg-brand-button hover:bg-brand-button/90 text-white px-8 py-3 rounded-full text-lg font-medium"
             >

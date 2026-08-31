@@ -188,6 +188,10 @@ apiClient.interceptors.response.use(
                     }
                     break;
                 }
+                case 402:
+                    // Insufficient credits — distinct from a plan quota so the
+                    // UI can offer credits rather than a retired subscription.
+                    return Promise.reject(new Error('INSUFFICIENT_CREDITS'));
                 case 429:
                     // Quota exceeded - return a standardised error so all callers can detect it
                     return Promise.reject(new Error('QUOTA_EXCEEDED'));
