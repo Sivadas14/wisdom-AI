@@ -44,6 +44,7 @@ import ImageLibrary from "./pages/admin/ImageLibrary";
 import KnowledgeBase from "./pages/admin/KnowledgeBase";
 import TopicSuggestions from "./pages/admin/TopicSuggestions";
 import TranslationsManager from "./pages/admin/TranslationsManager";
+import TrialAccess from "./pages/admin/TrialAccess";
 
 const queryClient = new QueryClient();
 
@@ -158,6 +159,7 @@ const App = () => {
                                             <Route path="knowledge-base" element={<KnowledgeBase />} />
                                             <Route path="topics"        element={<TopicSuggestions />} />
                                             <Route path="translations" element={<TranslationsManager />} />
+                                            <Route path="trials"       element={<TrialAccess />} />
                                         </Route>
 
                                         {/* Unknown paths → back to landing */}

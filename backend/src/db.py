@@ -982,6 +982,47 @@ class SourceDocument(Base):
         )
 
 
+class TrialGrant(Base):
+    """A time-boxed grant of full free access, keyed by EMAIL.
+
+    Keyed by email rather than by user id on purpose. The people these are for
+    are usually being invited to try the site, so at the moment the grant is
+    written they often have no account yet. An email survives that gap; a
+    foreign key to user_profiles would force the admin to wait for them to sign
+    up first, and then to come back and find them.
+
+    Grants are never deleted, only revoked. Who was given free access to a paid
+    product, by whom, and for how long is exactly the sort of thing worth being
+    able to answer later.
+    """
+
+    __tablename__ = "trial_grants"
+
+    id: Mapped[pkey_uuid]
+    created_at: Mapped[default_timestamp]
+    updated_at: Mapped[updated_timestamp]
+
+    # Stored lower-cased and trimmed; see normalise_email in the service.
+    email: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    starts_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    expires_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    granted_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    revoked_at: Mapped[datetime.datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        # Every request by a signed-in user asks "is there a live grant for
+        # this email", so that lookup has to be cheap.
+        Index("idx_trial_grant_email_expires", "email", "expires_at"),
+    )
+
+
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 

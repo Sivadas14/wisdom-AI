@@ -338,7 +338,35 @@ export const contentAPI = {
 };
 
 // Admin APIs
+export interface TrialGrant {
+    id: string;
+    email: string;
+    status: 'active' | 'expired' | 'revoked' | 'scheduled';
+    starts_at: string;
+    expires_at: string;
+    days_left: number;
+    note: string | null;
+    granted_by: string | null;
+    created_at: string | null;
+}
+
 export const adminAPI = {
+    // ── Trial access ────────────────────────────────────────────────────────
+    // Time-boxed free access for a named email, so someone can be invited to
+    // try or test the site without paying and without a permanent account
+    // change.
+    listTrials: async (): Promise<{ grants: TrialGrant[]; active: number }> => {
+        const response = await apiClient.get('/admin/trials');
+        return response.data;
+    },
+    createTrial: async (payload: { email: string; days?: number; expires_at?: string; note?: string }) => {
+        const response = await apiClient.post('/admin/trials', payload);
+        return response.data;
+    },
+    revokeTrial: async (grantId: string) => {
+        const response = await apiClient.delete(`/admin/trials/${grantId}`);
+        return response.data;
+    },
     listUsers: async (limit = 10, skip = 0): Promise<ListUsersResponse> => {
         const response = await apiClient.get('/admin/users', {
             params: { limit, skip }

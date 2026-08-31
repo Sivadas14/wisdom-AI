@@ -27,6 +27,7 @@ from src import db, middlewares
 from src.db import dispose_background_engine
 from src.services import (
     admin as admin_svc,
+    trials as trials_svc,
     audio as audio_svc,
     auth as auth_svc,
     chat as chat_svc,
@@ -641,6 +642,12 @@ def get_app() -> FastAPI:
     app.add_api_route("/api/admin/source-data/{document_id}/reindex", admin_svc.reindex_source_document, methods=["POST"], tags=["admin"])
     app.add_api_route("/api/admin/source-data/{document_id}/active", admin_svc.set_source_document_active, methods=["PATCH"], tags=["admin"])
     app.add_api_route("/api/admin/upload", admin_svc.upload_source_pdfs, methods=["POST"], tags=["admin"])
+    # Trial access: give a named email full free run of the site for a period.
+    app.add_api_route("/api/admin/trials", trials_svc.list_trial_grants, methods=["GET"], tags=["admin"])
+    app.add_api_route("/api/admin/trials", trials_svc.create_trial_grant, methods=["POST"], tags=["admin"])
+    app.add_api_route("/api/admin/trials/{grant_id}", trials_svc.revoke_trial_grant, methods=["DELETE"], tags=["admin"])
+    # So a person on a trial can see that they are, and when it ends.
+    app.add_api_route("/api/trial-status", trials_svc.my_trial_status, methods=["GET"], tags=["billing"])
     # Unauthenticated bootstrap — promotes a user to ADMIN via shared secret
     app.add_api_route("/api/admin/make-admin", admin_svc.make_admin, methods=["POST"], tags=["admin"])
     app.add_api_route("/api/admin/suggested-topics", admin_svc.list_suggested_topics, methods=["GET"], tags=["admin"])

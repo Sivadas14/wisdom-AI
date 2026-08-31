@@ -1,3 +1,4 @@
+from src.llm_shim import tu
 """
 Usage Tracking Service
 
@@ -215,6 +216,42 @@ async def get_usage(
         return w.UserUsageResponse(
             plan_name="Admin",
             plan_type="ADMIN",
+            conversations=unlimited,
+            chat_tokens=unlimited,
+            image_cards=unlimited,
+            meditation_duration=unlimited,
+            addon_cards=unlimited,
+            addon_minutes=unlimited,
+            audio_enabled=True,
+            video_enabled=True,
+        )
+
+    # ── Trial grant ─────────────────────────────────────────────────────────
+    # A named email can be given full free access for a fixed period. It is
+    # checked HERE, beside the admin override, because this function is the
+    # single place every quota decision in the product is made: conversations,
+    # contemplation cards, audio and video meditations all read from it. One
+    # check therefore opens everything, and when the grant lapses the account
+    # returns to whatever plan it had with nothing to undo.
+    #
+    # A failure to read the grant must not cost the user their access, but it
+    # must also not silently hand out free access to everybody, so the error is
+    # logged and the user falls through to their real plan.
+    try:
+        from src.services.trials import active_grant_for
+
+        grant = await active_grant_for(
+            getattr(current_user, "email_id", "") or "", session
+        )
+    except Exception as e:
+        tu.logger.error(f"[TRIAL] could not read trial grants: {e}")
+        grant = None
+
+    if grant is not None:
+        unlimited = w.UsageLimit(limit="Unlimited", used=0, remaining="Unlimited")
+        return w.UserUsageResponse(
+            plan_name=f"Trial until {grant.expires_at.strftime('%d %b %Y')}",
+            plan_type="TRIAL",
             conversations=unlimited,
             chat_tokens=unlimited,
             image_cards=unlimited,

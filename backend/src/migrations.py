@@ -233,6 +233,40 @@ async def _create_ramana_images_table(session: AsyncSession) -> None:
     _log("ramana_images table verified/created.")
 
 
+async def _create_trial_grants_table(session: AsyncSession) -> None:
+    """
+    Idempotently create trial_grants: time-boxed free access by email address.
+
+    Keyed by email rather than user id because a grant is usually written
+    BEFORE the person has an account. No foreign key for the same reason.
+
+    Grants are revoked, never deleted, so revoked_at is nullable rather than
+    the row disappearing: who was given free run of a paid product, by whom,
+    and for how long is worth being able to answer later.
+    """
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS trial_grants (
+            id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            email       VARCHAR     NOT NULL,
+            starts_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at  TIMESTAMPTZ NOT NULL,
+            note        TEXT,
+            granted_by  VARCHAR,
+            revoked_at  TIMESTAMPTZ
+        )
+    """))
+    # Every signed-in request asks "is there a live grant for this email", so
+    # that lookup has to be cheap.
+    await session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_trial_grant_email_expires
+            ON trial_grants (email, expires_at)
+    """))
+    await session.commit()
+    _log("trial_grants table verified/created.")
+
+
 async def _create_daily_contemplations_table(session: AsyncSession) -> None:
     """
     Idempotently create the daily_contemplations table.
@@ -963,6 +997,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_create_ramana_images_table", _create_ramana_images_table)
         await _safe_migration(session, "_create_guest_sessions_table", _create_guest_sessions_table)
         await _safe_migration(session, "_create_daily_contemplations_table", _create_daily_contemplations_table)
+        await _safe_migration(session, "_create_trial_grants_table", _create_trial_grants_table)
         await _safe_migration(session, "_add_razorpay_columns", _add_razorpay_columns)
         await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
         await _safe_migration(session, "_create_suggested_topics_table", _create_suggested_topics_table)
