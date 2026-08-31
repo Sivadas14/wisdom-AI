@@ -40,9 +40,27 @@ class Work:
     filename: re.Pattern
     heading: re.Pattern
     expected_verses: int
+    # Some editions print prefatory verses with their OWN numbering before the
+    # main text starts. Counting from the top would then attach the wrong
+    # numbers to everything. When set, verse counting only begins on the page
+    # where this matches.
+    start_after: Optional[re.Pattern] = None
 
 
 WORKS: tuple[Work, ...] = (
+    # Michael James / Sri Muruganar lineage edition. Verses are numbered "1."
+    # under a markdown heading, NOT "## Verse 1". Crucially the Payiram
+    # (prefatory verses) are numbered 1-6 before the main text, so counting
+    # starts only at the "Nul - Text" marker; a benedictory appendix restarts at
+    # 1 after verse 30 and is rejected by the strictly-increasing rule.
+    Work(
+        key="upadesa-saram",
+        title="Upadesa Saram",
+        filename=re.compile(r"upadesa[_\s-]*undiyar", re.I),
+        heading=re.compile(r"^#{1,6}\s*\**\s*(\d{1,2})\.\s", re.M),
+        expected_verses=30,
+        start_after=re.compile(r"Nul\s*[\u2013-]\s*Text|E\}y;", re.I),
+    ),
     Work(
         key="upadesa-saram",
         title="Upadesa Saram",
@@ -123,53 +141,109 @@ def regroup_by_verse(chunks: list, source_name: str) -> Optional[list]:
 
     ordered = sorted(chunks, key=lambda c: (_page_no(getattr(c, "loc", "")) or 0))
 
-    # Find where each verse begins, keeping the numbers strictly increasing so
-    # an appendix repeating "Verse 1" cannot restart the sequence.
-    starts: list[tuple[int, int]] = []
+    # Skip anything before the main text when the edition has prefatory verses
+    # under their own numbering.
+    begin = 0
+    if work.start_after is not None:
+        for idx, c in enumerate(ordered):
+            if work.start_after.search(getattr(c, "content", "") or ""):
+                begin = idx
+                break
+        else:
+            # Anchor never found: the edition is not laid out as expected.
+            return None
+
+    # Locate every verse heading, with the page it sits on and its offset in
+    # that page. Numbers must increase strictly, so a benedictory appendix that
+    # restarts at 1 after the last verse is ignored.
+    marks: list[tuple[int, int, int]] = []   # (page index, offset in page, verse)
     highest = 0
     for idx, c in enumerate(ordered):
-        nums = [int(n) for n in work.heading.findall(getattr(c, "content", "") or "")]
-        nums = [n for n in nums if n > highest]
-        if nums:
-            n = min(nums)
-            starts.append((idx, n))
-            highest = n
+        if idx < begin:
+            continue
+        for m in work.heading.finditer(getattr(c, "content", "") or ""):
+            n = int(m.group(1))
+            if n > highest and n <= work.expected_verses:
+                marks.append((idx, m.start(), n))
+                highest = n
 
-    verses_found = [n for _, n in starts]
+    verses_found = [n for _, _, n in marks]
     if len(verses_found) < max(3, work.expected_verses // 2):
         return None
     if verses_found != sorted(verses_found):
         return None
 
-    # Which verse does each page belong to?
-    verse_of: dict[int, int] = {}
-    for i, (start_idx, verse_no) in enumerate(starts):
-        end_idx = starts[i + 1][0] if i + 1 < len(starts) else len(ordered)
-        for j in range(start_idx, end_idx):
-            verse_of[j] = verse_no
-
     out: list = []
     ChunkCls = type(chunks[0])
-    for idx, c in enumerate(ordered):
-        page = _page_no(getattr(c, "loc", ""))
-        body = (getattr(c, "content", "") or "").strip()
-        verse_no = verse_of.get(idx)
 
-        if verse_no is None:
-            # Front matter: title, dedication, contents, introduction. Kept as is.
-            out.append(ChunkCls(id=len(out), content=body, loc=c.loc))
+    def emit(content: str, loc: str) -> None:
+        out.append(ChunkCls(id=len(out), content=content.strip(), loc=loc))
+
+    # Anything before the first verse (title, contents, introduction, and any
+    # prefatory verses under their own numbering) is kept untouched.
+    first_page = marks[0][0]
+    for c in ordered[:first_page]:
+        emit(getattr(c, "content", "") or "", c.loc)
+
+    by_page: dict[int, list[tuple[int, int]]] = {}
+    for page_idx, offset, n in marks:
+        by_page.setdefault(page_idx, []).append((offset, n))
+
+    current_verse: Optional[int] = None
+    for idx in range(first_page, len(ordered)):
+        c = ordered[idx]
+        page = _page_no(getattr(c, "loc", ""))
+        text = (getattr(c, "content", "") or "")
+        here = by_page.get(idx, [])
+
+        if not here:
+            # Continuation page: commentary belonging to the verse still open.
+            if current_verse is None:
+                emit(text, c.loc)
+            else:
+                emit(
+                    f"{work.title}, Verse {current_verse} (commentary, p. {page})\n\n{text}",
+                    f"{work.title} · Verse {current_verse} · p. {page}",
+                )
             continue
 
-        is_first = any(idx == s for s, _ in starts)
-        role = "verse and commentary" if is_first else "commentary"
-        # The verse number goes into the embedded TEXT as well as the label, so
-        # semantic search gets a handle on it too, not only the exact lookup.
-        header = f"{work.title}, Verse {verse_no} ({role}, p. {page})"
-        out.append(ChunkCls(
-            id=len(out),
-            content=f"{header}\n\n{body}",
-            loc=f"{work.title} · Verse {verse_no} · p. {page}",
-        ))
+        # One or more verses start on this page. Split at each heading so a page
+        # carrying two verses does not leave one of them unlabelled: this
+        # edition regularly prints two verses per page.
+        lead = text[: here[0][0]] if here[0][0] > 0 else ""
+        carry = ""
+        if lead.strip():
+            # Every page opens with "Page No: N / Page Text: / ```" scaffolding.
+            # On its own that is not commentary, and emitting it as its own
+            # chunk would add one noise chunk per verse. Judge the lead by what
+            # remains once the scaffold is removed.
+            bare = re.sub(r"Page No:\s*\d+|Page Text:|`+", "", lead).strip()
+            if len(bare) < 40:
+                # Scaffolding only: carry it into the first verse on this page
+                # so the page marker is preserved without a junk chunk.
+                carry = lead
+            elif current_verse is None:
+                # Real text before the first verse, such as the marker that
+                # opens the main text. Not part of any verse, but not droppable.
+                emit(lead, c.loc)
+            else:
+                emit(
+                    f"{work.title}, Verse {current_verse} (commentary, p. {page})\n\n{lead}",
+                    f"{work.title} · Verse {current_verse} · p. {page}",
+                )
+
+        for i, (offset, n) in enumerate(here):
+            end = here[i + 1][0] if i + 1 < len(here) else len(text)
+            body = text[offset:end]
+            if i == 0 and carry:
+                body = carry + body
+            if not body.strip():
+                continue
+            emit(
+                f"{work.title}, Verse {n} (verse and commentary, p. {page})\n\n{body}",
+                f"{work.title} · Verse {n} · p. {page}",
+            )
+            current_verse = n
 
     return out
 

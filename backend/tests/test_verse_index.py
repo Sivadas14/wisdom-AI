@@ -156,6 +156,75 @@ def test_verse_lookup_stays_conservative():
         assert parse_verse_query(q) is None, q
 
 
+# ── 5. The Michael James / Muruganar edition (Upadesa Undiyar) ───────────────
+# Upadesa Undiyar is the Tamil original that Bhagavan later rendered into
+# Sanskrit as Upadesa Saram, so it maps to the same work. Its layout is taken
+# from the live corpus: verses numbered "1." under a heading, TWO traps around
+# them, and roughly two verses to a page.
+
+JAMES_LAYOUT = {
+    6: [1, 2], 7: [3, 4, 5, 6],              # Payiram: prefatory, own numbering
+    8: [1, 2], 9: [3], 10: [4, 5], 11: [6, 7], 12: [8, 9], 13: [10, 11],
+    14: [12, 13], 15: [14], 16: [15], 17: [16, 17], 18: [18], 19: [19, 20],
+    20: [21], 21: [22], 22: [23, 24], 23: [25, 26], 24: [27, 28], 25: [29],
+    26: [30, 1, 2], 27: [3, 4, 5],           # benedictory appendix restarts
+}
+
+
+def _james_pages():
+    out = []
+    for p in range(1, 28):
+        b = f"Page No: {p}\nPage Text:\n```\n"
+        if p == 8:
+            b += "# E}y; **-** **Nul \u2013 Text**\n"
+        for n in JAMES_LAYOUT.get(p, []):
+            b += f"# {n}. # tamil\n\nEnglish of verse {n}\n\n**Note:** commentary {n}\n"
+        out.append(Chunk(p - 1, b + "```", f"Page: {p}"))
+    return out
+
+
+def test_james_edition_labels_all_thirty_verses():
+    """Two verses often share a page, so page-level labelling is not enough."""
+    out = regroup_by_verse(_james_pages(), "Upadesa_Undiyar.pdf")
+    got = sorted({int(re.search(r"Verse (\d+) \u00b7", c.loc).group(1))
+                  for c in out if "\u00b7 Verse " in c.loc})
+    assert got == list(range(1, 31)), [v for v in range(1, 31) if v not in got]
+
+
+def test_james_prefatory_verses_do_not_hijack_numbering():
+    """The Payiram numbers 1-6 BEFORE the main text and must be skipped.
+
+    Without the start anchor, verse 1 would be taken from page 6 and every
+    number after it would be wrong.
+    """
+    out = regroup_by_verse(_james_pages(), "Upadesa_Undiyar.pdf")
+    v1 = [c for c in out if "\u00b7 Verse 1 \u00b7" in c.loc]
+    pages = {int(re.search(r"p\. (\d+)", c.loc).group(1)) for c in v1}
+    assert pages == {8}, f"verse 1 should come from p.8, got {pages}"
+
+
+def test_james_verse_21_is_on_page_20():
+    out = regroup_by_verse(_james_pages(), "Upadesa_Undiyar.pdf")
+    v21 = [c for c in out if "\u00b7 Verse 21 \u00b7" in c.loc]
+    assert v21, "verse 21 missing"
+    assert all("p. 20" in c.loc for c in v21), [c.loc for c in v21]
+
+
+def test_james_appendix_does_not_restart_the_count():
+    """A benedictory appendix renumbers from 1 after verse 30."""
+    out = regroup_by_verse(_james_pages(), "Upadesa_Undiyar.pdf")
+    v1 = [c for c in out if "\u00b7 Verse 1 \u00b7" in c.loc]
+    assert not any("p. 26" in c.loc or "p. 27" in c.loc for c in v1)
+
+
+def test_james_no_page_is_lost():
+    pages = _james_pages()
+    out = regroup_by_verse(pages, "Upadesa_Undiyar.pdf")
+    seen = {int(m.group(1)) for c in out
+            for m in [re.search(r"Page No: (\d+)", c.content)] if m}
+    assert seen == set(range(1, 28)), sorted(set(range(1, 28)) - seen)
+
+
 if __name__ == "__main__":
     passed = failed = 0
     for name, fn in sorted(globals().items()):
