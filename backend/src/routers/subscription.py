@@ -184,6 +184,15 @@ async def polar_webhook(
     if metadata.get("type") == "addon_purchase":
         logger.info("Routing to PollorService (Addon Purchase)")
         return await PollorService.handle_webhook(session, payload)
+
+    # Credit packs route to their own handler, NOT through PollorService.
+    # Polar sends checkout.created AND order.created for one purchase, and the
+    # add-on handler credits both. The credit path is idempotent by database
+    # constraint instead.
+    if metadata.get("type") == "credit_pack":
+        from src.services.credit_payments import polar_credit_purchase
+        logger.info("Routing to credit_payments (credit pack)")
+        return await polar_credit_purchase(session, payload)
         
     # ---- ACTIVE / UPDATED SUBSCRIPTION / ORDER ----
     if event_type in ("subscription.created", "subscription.updated", "subscription.active", "order.created"):

@@ -24,7 +24,7 @@ from fastapi.openapi.utils import get_openapi
 
 
 from src import db, middlewares
-from src.db import dispose_background_engine
+from src.db import dispose_background_engine, get_db_session_fa
 from src.services import (
     admin as admin_svc,
     trials as trials_svc,
@@ -648,6 +648,19 @@ def get_app() -> FastAPI:
     app.add_api_route("/api/admin/trials/{grant_id}", trials_svc.revoke_trial_grant, methods=["DELETE"], tags=["admin"])
     # So a person on a trial can see that they are, and when it ends.
     app.add_api_route("/api/trial-status", trials_svc.my_trial_status, methods=["GET"], tags=["billing"])
+
+    # ── Credits: wallet, packs, purchase ────────────────────────────────────
+    from src.services import credit_payments as credit_pay_svc
+
+    app.add_api_route("/api/credits", credit_pay_svc.get_credits, methods=["GET"], tags=["credits"])
+    app.add_api_route("/api/credits/checkout", credit_pay_svc.create_checkout, methods=["POST"], tags=["credits"])
+    app.add_api_route("/api/credits/razorpay-verify", credit_pay_svc.verify_razorpay_payment, methods=["POST"], tags=["credits"])
+
+    @app.post("/api/credits/razorpay-webhook", tags=["credits"])
+    async def _credits_razorpay_webhook(request: Request, session=Depends(get_db_session_fa)):
+        # Registered inline because the handler needs the RAW body for
+        # signature verification before any parsing happens.
+        return await credit_pay_svc.razorpay_webhook(request, session)
     # Unauthenticated bootstrap — promotes a user to ADMIN via shared secret
     app.add_api_route("/api/admin/make-admin", admin_svc.make_admin, methods=["POST"], tags=["admin"])
     app.add_api_route("/api/admin/suggested-topics", admin_svc.list_suggested_topics, methods=["GET"], tags=["admin"])
