@@ -238,7 +238,10 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
       {/* Row 1 — logo + email */}
       <div
         style={{ borderBottom: `1px solid ${T.border}` }}
-        className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between"
+        // md:pr-40 reserves the top-right corner for the GTranslate pill,
+        // which is fixed to the viewport there; without it the email address
+        // runs underneath the pill on desktop.
+        className="max-w-7xl mx-auto px-6 md:pr-40 h-14 flex items-center justify-between"
       >
         <a href="https://www.arunachalasamudra.in" style={{ textDecoration: "none" }}>
           <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "1.3rem", letterSpacing: "-0.01em" }}>
