@@ -762,3 +762,184 @@ async def get_dynamic_topics(
     rows = result.fetchall()
     items = [{"label": r.label, "question": r.question, "tab": r.tab} for r in rows]
     return JSONResponse({"items": items})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Corpus integrity: audit and in-place re-index
+#
+# Indexing embeds chunk by chunk and skips failures so one bad chunk cannot
+# abort a whole book. The cost is that a document which extracts no text is
+# saved with status "completed" and ZERO chunks: it looks perfectly healthy in
+# the admin list and is invisible to search. An audit of the live corpus found
+# 30 of 50 documents in exactly that state, including the Collected Works.
+#
+# `audit_corpus` reports what is actually retrievable. `reindex_source_document`
+# rebuilds one document's chunks IN PLACE from the copy already in storage, so
+# fixing a document does not create a duplicate the way re-uploading does.
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def audit_corpus(
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """GET /api/admin/source-data/audit — what is actually in the corpus.
+
+    Status alone is not evidence: a document can read "completed" and hold
+    nothing. This counts real chunks per document.
+    """
+    rows = (await session.execute(
+        select(
+            DBSourceDocument.id,
+            DBSourceDocument.filename,
+            DBSourceDocument.status,
+            DBSourceDocument.active,
+            func.count(DocumentChunk.id).label("chunks"),
+        )
+        .outerjoin(DocumentChunk,
+                   DocumentChunk.source_document_id == DBSourceDocument.id)
+        .group_by(DBSourceDocument.id, DBSourceDocument.filename,
+                  DBSourceDocument.status, DBSourceDocument.active)
+        .order_by(func.count(DocumentChunk.id).asc())
+    )).all()
+
+    docs = [
+        {
+            "id": str(r.id),
+            "filename": r.filename,
+            "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+            "active": r.active,
+            "chunks": int(r.chunks or 0),
+        }
+        for r in rows
+    ]
+    empty = [d for d in docs if d["chunks"] == 0]
+    return {
+        "documents": len(docs),
+        "with_chunks": len(docs) - len(empty),
+        "empty": len(empty),
+        "total_chunks": sum(d["chunks"] for d in docs),
+        "empty_documents": empty,
+        "all": docs,
+    }
+
+
+async def reindex_source_document(
+    document_id: UUID,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_db_session_fa),
+    spb_client: Client = Depends(get_supabase_admin_client),
+):
+    """POST /api/admin/source-data/{id}/reindex — rebuild chunks in place.
+
+    Downloads the copy already in storage and re-runs extraction, so a document
+    can be repaired without re-uploading it and without creating a duplicate.
+    Existing chunks are replaced only if the new extraction produces some; a
+    failed re-extraction leaves the current chunks untouched.
+    """
+    doc = (await session.execute(
+        select(DBSourceDocument).where(DBSourceDocument.id == document_id)
+    )).scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        content = spb_client.storage.from_("source-files").download(doc.filename)
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Could not read '{doc.filename}' from storage: {e}",
+        )
+
+    background_tasks.add_task(
+        _reindex_background, document_id, doc.filename, content
+    )
+    return {
+        "success": True,
+        "message": f"Re-indexing '{doc.filename}' ({len(content) // 1024} KB) in the background.",
+    }
+
+
+async def _reindex_background(file_id: UUID, filename: str, content: bytes):
+    """Re-extract, re-embed and REPLACE a document's chunks."""
+    from sqlalchemy import delete as sql_delete
+
+    tu.logger.info(f"[REINDEX] Starting for {filename} ({file_id})")
+    try:
+        chunks = await extract_pdf_text(content)
+        tu.logger.info(f"[REINDEX] {filename}: extracted {len(chunks)} page chunks")
+
+        if not chunks:
+            # Almost always a scan with no text layer. Say so plainly instead of
+            # quietly leaving the document empty again.
+            tu.logger.error(
+                f"[REINDEX] {filename}: extraction produced NOTHING. The PDF "
+                f"most likely has no text layer (a scan) and needs OCR before "
+                f"it can be indexed. Existing chunks left untouched."
+            )
+            return
+
+        try:
+            from src.verse_index import regroup_by_verse
+            regrouped = regroup_by_verse(chunks, filename)
+            if regrouped:
+                tu.logger.info(
+                    f"[REINDEX] {filename}: verse-aware chunking, "
+                    f"{len(chunks)} pages -> {len(regrouped)} chunks"
+                )
+                chunks = regrouped
+        except Exception as e:
+            tu.logger.error(f"[REINDEX] {filename}: verse regrouping failed: {e}")
+
+        model = get_llm()
+        saved = failed = 0
+        async with get_background_session() as bg:
+            # Only clear the old chunks once we know we have replacements.
+            await bg.execute(
+                sql_delete(DocumentChunk).where(
+                    DocumentChunk.source_document_id == file_id
+                )
+            )
+            for chunk in chunks:
+                try:
+                    emb = await model.embedding_async(
+                        chunk.content, model="text-embedding-3-small"
+                    )
+                    bg.add(DocumentChunk(
+                        id=uuid4(),
+                        source_document_id=file_id,
+                        content=chunk.content,
+                        embedding=emb.embedding[0],
+                        location=chunk.loc,
+                        model_used="text-embedding-3-small",
+                    ))
+                    saved += 1
+                except Exception as e:
+                    failed += 1
+                    tu.logger.error(f"[REINDEX] {filename}: chunk embed failed: {e}")
+            await bg.commit()
+
+        tu.logger.info(
+            f"[REINDEX] {filename}: DONE, {saved} chunks saved, {failed} failed"
+        )
+    except Exception as e:
+        tu.logger.error(f"[REINDEX] {filename}: FAILED: {e}", exc_info=True)
+
+
+async def set_source_document_active(
+    document_id: UUID,
+    active: bool = Query(..., description="true to include in search, false to retire"),
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """PATCH /api/admin/source-data/{id}/active — include or retire a document.
+
+    Retrieval filters on `active`, so this removes a superseded or duplicate
+    document from search without destroying its chunks.
+    """
+    doc = (await session.execute(
+        select(DBSourceDocument).where(DBSourceDocument.id == document_id)
+    )).scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.active = active
+    await session.commit()
+    tu.logger.info(f"[SET_ACTIVE] {doc.filename} -> active={active}")
+    return {"success": True, "filename": doc.filename, "active": active}

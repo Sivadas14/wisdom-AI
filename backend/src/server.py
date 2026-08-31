@@ -636,6 +636,10 @@ def get_app() -> FastAPI:
     app.add_api_route("/api/admin/feedback", admin_svc.get_feedback, methods=["GET"], tags=["admin"])
     app.add_api_route("/api/admin/source-data/list", admin_svc.list_source_data, methods=["GET"], tags=["admin"])
     app.add_api_route("/api/admin/source-data/{document_id}", admin_svc.delete_source_document, methods=["DELETE"], tags=["admin"])
+    # Corpus integrity: audit what is really retrievable, repair in place, retire duplicates.
+    app.add_api_route("/api/admin/source-data/audit", admin_svc.audit_corpus, methods=["GET"], tags=["admin"])
+    app.add_api_route("/api/admin/source-data/{document_id}/reindex", admin_svc.reindex_source_document, methods=["POST"], tags=["admin"])
+    app.add_api_route("/api/admin/source-data/{document_id}/active", admin_svc.set_source_document_active, methods=["PATCH"], tags=["admin"])
     app.add_api_route("/api/admin/upload", admin_svc.upload_source_pdfs, methods=["POST"], tags=["admin"])
     # Unauthenticated bootstrap — promotes a user to ADMIN via shared secret
     app.add_api_route("/api/admin/make-admin", admin_svc.make_admin, methods=["POST"], tags=["admin"])
