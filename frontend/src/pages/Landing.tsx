@@ -238,22 +238,25 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
       {/* Row 1 — logo + email */}
       <div
         style={{ borderBottom: `1px solid ${T.border}` }}
-        // md:pr-40 reserves the top-right corner for the GTranslate pill,
-        // which is fixed to the viewport there; without it the email address
-        // runs underneath the pill on desktop.
-        className="max-w-7xl mx-auto px-6 md:pr-40 h-14 flex items-center justify-between"
+        className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between"
       >
         <a href="https://www.arunachalasamudra.in" style={{ textDecoration: "none" }}>
           <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "1.3rem", letterSpacing: "-0.01em" }}>
             Arunachala Samudra
           </span>
         </a>
-        <div className="hidden md:flex items-center gap-1.5" style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.82rem" }}>
-          <Mail className="w-3.5 h-3.5" />
-          <a href="mailto:info@arunachalasamudra.co.in" className="hover:opacity-70 transition-opacity">
-            info@arunachalasamudra.co.in
-          </a>
-        </div>
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-1.5" style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.82rem" }}>
+            <Mail className="w-3.5 h-3.5" />
+            <a href="mailto:info@arunachalasamudra.co.in" className="hover:opacity-70 transition-opacity">
+              info@arunachalasamudra.co.in
+            </a>
+          </div>
+          {/* The GTranslate pill mounts here as a NORMAL header child. It was
+              previously fixed to the viewport, where it escaped every
+              stacking context and painted over open modals; in flex flow it
+              can neither outrank a dialog nor overlap a sibling. */}
+            </div>
         {/* Mobile hamburger */}
         <button
           className="md:hidden p-2"
@@ -2354,7 +2357,6 @@ export default function Landing() {
       </Helmet>
       {showIntro && <IntroScreen onDone={handleIntroDone} />}
       {showOnboarding && <RamanaOnboardingModal onClose={handleOnboardingClose} freeChat={rootFreeChat === true} />}
-      <div className="gtranslate_wrapper" />
       <PublicHeader isAuthenticated={isAuthenticated} onNewToRamana={openOnboarding} />
       <main>
         <HeroSection isAuthenticated={isAuthenticated} onNewToRamana={openOnboarding} />

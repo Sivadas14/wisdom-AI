@@ -172,22 +172,19 @@
     scrollbar-color: #472b20 #f5f0ec;
   }
 }
-/* ── GTranslate floating widget: a slim pill INSIDE the header band ────────
-   float.js positions its switcher `fixed` at the viewport's top-right, and
-   by default renders a 110x45 white card with a 33px flag — far too heavy
-   for a 56px header, and it read as an element dropped ON the page rather
-   than part of it. Measured on the live site and compacted: 18px flag,
-   tight padding, the site's own cream and border so it belongs to the
-   header it sits in. Vertically centred in the 56px band. Its dropdown
-   still covers content while open — that is what menus do; the standing
-   pill must not. */
+/* ── GTranslate pill: a normal header element, never a floating layer ──────
+   float.js renders its switcher position:fixed at the viewport corner by
+   default. Measured live, that pill escaped every stacking context and
+   painted OVER open modals (a z-1000 full-screen overlay lost to the pill's
+   z-60), besides overlapping whatever scrolled beneath it. The wrapper now
+   sits inside each header's right-hand flex group, and the switcher is
+   forced into normal flow: it cannot outrank a dialog and cannot overlap a
+   sibling, because the layout engine places it like everything else.
+
+   Sized to the band: 18px flag, tight padding, the site's own cream and
+   border. The dropdown still overlays content while open — menus do. */
 .gt_float_switcher {
-  position: fixed !important;
-  top: 12px !important;
-  right: 12px !important;
-  left: auto !important;
-  bottom: auto !important;
-  z-index: 60 !important;
+  position: static !important;
   font-size: 12px !important;
   background: #F5F0EC !important;
   border: 1px solid #ECE5DF !important;
@@ -219,16 +216,25 @@
   transform: scale(0.7);
 }
 
-/* The open dropdown: keep its flags readable even though the pill is small. */
+/* The open language list drops below the pill. Anchor it to the pill and
+   keep the flags readable. */
+.gtranslate_wrapper {
+  position: relative;
+}
+
+.gt_float_switcher .gt_options {
+  position: absolute !important;
+  right: 0 !important;
+  top: calc(100% + 6px) !important;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #ECE5DF;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(71, 43, 32, 0.15);
+}
+
 .gt_float_switcher .gt_options img {
   width: 20px !important;
   height: 20px !important;
-}
-
-/* In the signed-in app on mobile, the header's right side holds the user
-   menu; shift the pill left of it so the two never stack. */
-@media (max-width: 767px) {
-  body.app-shell .gt_float_switcher {
-    right: 56px !important;
-  }
 }

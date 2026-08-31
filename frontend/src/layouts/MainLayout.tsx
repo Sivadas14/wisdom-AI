@@ -157,11 +157,13 @@ const MainLayout = ({ children }: MainLayoutProps) => {
                         for hardcoded English text — unlike the previous LanguageSwitcher
                         which only updated react-i18next state that no component reads. */}
                     <div className="flex items-center gap-2">
+                        {/* GTranslate pill as a normal header child — see
+                            Landing.tsx for why it must not be viewport-fixed:
+                            fixed, it painted over open modals. */}
+                        <div className="gtranslate_wrapper" />
                         <div className="md:hidden"><UserMenu /></div>
                     </div>
                 </header>
-                {/* GTranslate floating-widget wrapper — populated by the script in useEffect */}
-                <div className="gtranslate_wrapper" />
                 {/* Main Content Area */}
                 <main className="flex-1 h-full overflow-y-auto relative scroll-smooth">
                     {children}
