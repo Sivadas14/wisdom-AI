@@ -1158,44 +1158,62 @@ async def _embedding_search_raw(
 
         parsed = parse_verse_query(query)
         if parsed:
-            work_key, verse_no = parsed
+            work_key, verse_nos = parsed
             title = title_for(work_key)
-            # Locations read "Upadesa Saram · Verse 21 · p. 129", one row per
-            # page. The " · " terminator stops verse 2 matching verse 21.
-            pattern = f"{title} · Verse {verse_no} · %"
-            stmt = (
-                select(
-                    db.DocumentChunk.content,
-                    db.SourceDocument.filename,
-                    db.DocumentChunk.location,
-                )
-                .join(db.SourceDocument)
-                .where(db.SourceDocument.active == True)
-                .where(db.DocumentChunk.location.like(pattern))
-                .limit(40)
-            )
-            rows = list((await session.execute(stmt)).all())
 
-            # Page order matters: the verse itself comes first, then its
-            # commentary in sequence. Sort numerically, since "p. 9" would sort
-            # after "p. 129" as text. Cap the number of pages so a long
-            # commentary cannot crowd out everything else in the context.
+            # Page budget. Dividing a single verse's budget between several
+            # verses was the obvious move and the wrong one: three verses
+            # would get two pages each, which is not enough text to explain
+            # any of them properly, and the seeker asked for a DETAILED
+            # explanation of each. So the budget grows with the number of
+            # verses, up to a ceiling that keeps the prompt sane.
+            n = max(1, len(verse_nos))
+            total_pages = min(24, max(VERSE_PAGES_IN_CONTEXT, 4 * n))
+            per_verse = min(VERSE_PAGES_IN_CONTEXT, max(3, total_pages // n))
+
             def _pg(loc: str) -> int:
                 m = re.search(r"p\.\s*(\d+)", loc or "")
                 return int(m.group(1)) if m else 0
 
-            rows.sort(key=lambda r: _pg(r[2]))
-            verse_rows = [(r[0], r[1]) for r in rows[:VERSE_PAGES_IN_CONTEXT]]
-            if verse_rows:
+            found: list[int] = []
+            missing: list[int] = []
+            for verse_no in verse_nos:
+                # Locations read "Upadesa Saram · Verse 21 · p. 129", one row
+                # per page. The " · " terminator stops verse 2 matching 21.
+                pattern = f"{title} · Verse {verse_no} · %"
+                stmt = (
+                    select(
+                        db.DocumentChunk.content,
+                        db.SourceDocument.filename,
+                        db.DocumentChunk.location,
+                    )
+                    .join(db.SourceDocument)
+                    .where(db.SourceDocument.active == True)
+                    .where(db.DocumentChunk.location.like(pattern))
+                    .limit(40)
+                )
+                rows = list((await session.execute(stmt)).all())
+                # Page order matters: the verse itself comes first, then its
+                # commentary in sequence. Sort numerically, since "p. 9" would
+                # sort after "p. 129" as text.
+                rows.sort(key=lambda r: _pg(r[2]))
+                if rows:
+                    found.append(verse_no)
+                    verse_rows.extend((r[0], r[1]) for r in rows[:per_verse])
+                else:
+                    missing.append(verse_no)
+
+            if found:
                 tu.logger.info(
-                    f"[VERSE_LOOKUP] {title} verse {verse_no}: "
+                    f"[VERSE_LOOKUP] {title} verse(s) {found}: "
                     f"{len(verse_rows)} chunk(s) matched exactly"
+                    + (f"; NOT FOUND: {missing}" if missing else "")
                 )
             else:
                 tu.logger.info(
-                    f"[VERSE_LOOKUP] {title} verse {verse_no}: no verse-tagged "
-                    f"chunk. The work may not have been re-indexed since "
-                    f"verse-aware chunking was added."
+                    f"[VERSE_LOOKUP] {title} verse(s) {verse_nos}: no "
+                    f"verse-tagged chunk. The work may not have been "
+                    f"re-indexed since verse-aware chunking was added."
                 )
     except Exception as e:
         tu.logger.error(f"[VERSE_LOOKUP] failed: {e}")

@@ -250,18 +250,74 @@ def regroup_by_verse(chunks: list, source_name: str) -> Optional[list]:
 
 # ── Query side ───────────────────────────────────────────────────────────────
 
+# The keyword, then everything that could be a list or range of numbers after
+# it. Two things this has to get right that the first version did not:
+#
+#   1. The PLURAL. "verses 21, 22 and 23" did not match at all, because the
+#      pattern demanded "verse" followed immediately by digits, and the "s"
+#      broke it. A seeker asking about more than one verse naturally writes
+#      "verses", so the commonest multi-verse phrasing was the one form
+#      guaranteed to fail.
+#
+#   2. The WHOLE list. The old pattern captured one number with .search(), so
+#      "verses 21, 22 and 23" retrieved verse 21 and nothing else, and the
+#      answer then honestly reported that it did not have 22 and 23. It was
+#      not missing from the corpus; it was never asked for.
 _VERSE_IN_QUERY = re.compile(
-    r"\b(?:verse|sloka|shloka|sutra|v\.)\s*(?:no\.?\s*)?(\d{1,3})\b", re.I
+    r"\b(?:verses?|slokas?|shlokas?|sutras?|vv?\.)\s*(?:nos?\.?\s*)?"
+    r"(\d{1,3}(?:\s*(?:,|&|and|to|through|thru|-|\u2013|\u2014)\s*\d{1,3})*)",
+    re.I,
 )
-# "21st verse", "verse 21", "chapter 2 verse 21"
-_ORDINAL_IN_QUERY = re.compile(r"\b(\d{1,3})(?:st|nd|rd|th)\s+verse\b", re.I)
+# "21st verse", "the 3rd verse"
+_ORDINAL_IN_QUERY = re.compile(r"\b(\d{1,3})(?:st|nd|rd|th)\s+verses?\b", re.I)
+
+# Separators that mean "everything between these two", rather than "these two".
+_RANGE_SEP = re.compile(r"^(?:to|through|thru|-|\u2013|\u2014)$", re.I)
+
+# A cap on how many verses one question can pull in. Six verses of text and
+# commentary is already a long answer, and the retrieval budget is shared
+# between them: ask for forty and each would get too little context to be
+# explained properly. Better to answer six well.
+MAX_VERSES_PER_QUERY = 6
 
 
-def parse_verse_query(text: str) -> Optional[Tuple[str, int]]:
-    """Detect "verse N of <known work>" in a user question.
+def _expand_verse_list(raw: str, limit: int) -> list[int]:
+    """Turn "21, 22 and 23" or "21-23" into [21, 22, 23]."""
+    pieces = re.split(r"\s*(,|&|and|to|through|thru|-|\u2013|\u2014)\s*", raw, flags=re.I)
+    numbers: list[int] = []
+    pending_range = False
+    for piece in pieces:
+        token = piece.strip()
+        if not token:
+            continue
+        if token.isdigit():
+            n = int(token)
+            if pending_range and numbers:
+                # "21 to 23" — fill in everything between.
+                step = 1 if n >= numbers[-1] else -1
+                numbers.extend(range(numbers[-1] + step, n + step, step))
+            else:
+                numbers.append(n)
+            pending_range = False
+        else:
+            pending_range = bool(_RANGE_SEP.match(token))
 
-    Returns (work_key, verse_number), or None. Requires BOTH a verse number and
-    a recognised work, so "verse 21" alone stays an ordinary semantic search
+    # Keep the seeker's order, drop repeats, drop anything out of range.
+    seen: set[int] = set()
+    out: list[int] = []
+    for n in numbers:
+        if n in seen or not (1 <= n <= limit):
+            continue
+        seen.add(n)
+        out.append(n)
+    return out
+
+
+def parse_verse_query(text: str) -> Optional[Tuple[str, List[int]]]:
+    """Detect "verse(s) N of <known work>" in a question.
+
+    Returns (work_key, [verse numbers]) or None. Requires BOTH a number and a
+    recognised work, so "verse 21" alone stays an ordinary semantic search
     rather than guessing which text the seeker meant.
     """
     if not text:
@@ -275,16 +331,23 @@ def parse_verse_query(text: str) -> Optional[Tuple[str, int]]:
     if not work_key:
         return None
 
-    m = _VERSE_IN_QUERY.search(text) or _ORDINAL_IN_QUERY.search(text)
-    if not m:
-        return None
-
-    verse_no = int(m.group(1))
     work = next((w for w in WORKS if w.key == work_key), None)
-    if not work or not (1 <= verse_no <= work.expected_verses):
+    if not work:
         return None
 
-    return work_key, verse_no
+    verses: list[int] = []
+    for m in _VERSE_IN_QUERY.finditer(text):
+        for n in _expand_verse_list(m.group(1), work.expected_verses):
+            if n not in verses:
+                verses.append(n)
+    for m in _ORDINAL_IN_QUERY.finditer(text):
+        n = int(m.group(1))
+        if 1 <= n <= work.expected_verses and n not in verses:
+            verses.append(n)
+
+    if not verses:
+        return None
+    return work_key, verses[:MAX_VERSES_PER_QUERY]
 
 
 def title_for(work_key: str) -> str:

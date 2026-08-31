@@ -17,7 +17,7 @@ from dataclasses import dataclass
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.verse_index import (  # noqa: E402
-    identify_work, parse_verse_query, regroup_by_verse,
+    MAX_VERSES_PER_QUERY, identify_work, parse_verse_query, regroup_by_verse,
 )
 
 
@@ -137,13 +137,67 @@ def test_identify_work():
 
 def test_verse_queries_parse():
     cases = {
-        "Explain verse 21 of Upadesa Saram": ("upadesa-saram", 21),
-        "What does the 21st verse of Upadesa Saram mean?": ("upadesa-saram", 21),
-        "Upadesa Undiyar sloka 30": ("upadesa-saram", 30),
-        "verse 12 of Ulladu Narpadu": ("ulladu-narpadu", 12),
+        "Explain verse 21 of Upadesa Saram": ("upadesa-saram", [21]),
+        "What does the 21st verse of Upadesa Saram mean?": ("upadesa-saram", [21]),
+        "Upadesa Undiyar sloka 30": ("upadesa-saram", [30]),
+        "verse 12 of Ulladu Narpadu": ("ulladu-narpadu", [12]),
     }
     for q, exp in cases.items():
         assert parse_verse_query(q) == exp, q
+
+
+def test_a_question_about_several_verses_returns_them_all():
+    """The bug this exists to prevent.
+
+    "verse 21, 22 and 23" used to return verse 21 alone, because the number
+    was found with .search(). The answer then reported honestly that it did
+    not have 22 and 23 — which was true of the context, and false of the
+    corpus. It was never asked for them.
+    """
+    assert parse_verse_query("verse 21 , 22 and 23 of the upadesa saram") == (
+        "upadesa-saram", [21, 22, 23])
+
+
+def test_the_plural_form_is_understood():
+    """"verses 21, 22 and 23" matched NOTHING before: the pattern wanted
+    "verse" followed by digits, and the "s" broke it. The commonest way to
+    ask about several verses was the one form guaranteed to fail."""
+    for q in ["verses 21, 22 and 23 of Upadesa Saram",
+              "Upadesa Saram verses 21 and 22",
+              "explain slokas 4 and 5 of Upadesa Saram"]:
+        got = parse_verse_query(q)
+        assert got is not None, q
+        assert len(got[1]) >= 2, (q, got)
+
+
+def test_ranges_are_expanded():
+    for q in ["explain verses 21-23 of Upadesa Saram",
+              "verses 21 to 23 of Upadesa Saram",
+              "verses 21 through 23 of Upadesa Saram"]:
+        assert parse_verse_query(q) == ("upadesa-saram", [21, 22, 23]), q
+
+
+def test_a_huge_range_is_capped_rather_than_refused():
+    """"verses 1 through 30" must not put the whole work in one prompt, and
+    must not fail either. It is capped."""
+    got = parse_verse_query("verses 1 through 30 of Upadesa Saram")
+    assert got is not None
+    assert len(got[1]) == MAX_VERSES_PER_QUERY
+    assert got[1][0] == 1
+
+
+def test_out_of_range_numbers_are_dropped_not_fatal():
+    """Ulladu Narpadu has 40 verses; Upadesa Saram has 30."""
+    assert parse_verse_query("verses 12 and 40 of Ulladu Narpadu") == (
+        "ulladu-narpadu", [12, 40])
+    # 31 does not exist in Upadesa Saram, but 29 does — keep the good one.
+    assert parse_verse_query("verses 29 and 31 of Upadesa Saram") == (
+        "upadesa-saram", [29])
+
+
+def test_duplicates_collapse_and_order_is_the_seekers():
+    assert parse_verse_query("verses 23, 21 and 23 of Upadesa Saram") == (
+        "upadesa-saram", [23, 21])
 
 
 def test_verse_lookup_stays_conservative():
@@ -152,7 +206,7 @@ def test_verse_lookup_stays_conservative():
               "verse 21",                        # no work named
               "Tell me about Upadesa Saram",     # no verse number
               "verse 99 of Upadesa Saram",       # beyond 30
-              "verse 41 of Ulladu Narpadu"]:     # beyond 40
+              "verses 41 and 55 of Ulladu Narpadu"]:  # all beyond 40
         assert parse_verse_query(q) is None, q
 
 
