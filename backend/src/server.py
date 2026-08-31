@@ -656,6 +656,8 @@ def get_app() -> FastAPI:
     app.add_api_route("/api/credits", credit_pay_svc.get_credits, methods=["GET"], tags=["credits"])
     app.add_api_route("/api/credits/checkout", credit_pay_svc.create_checkout, methods=["POST"], tags=["credits"])
     app.add_api_route("/api/credits/razorpay-verify", credit_pay_svc.verify_razorpay_payment, methods=["POST"], tags=["credits"])
+    app.add_api_route("/api/admin/credits/grant", credit_pay_svc.admin_grant_credits, methods=["POST"], tags=["admin"])
+    app.add_api_route("/api/admin/credits/selftest", credit_pay_svc.admin_credits_selftest, methods=["POST"], tags=["admin"])
 
     @app.get("/api/public-config", tags=["config"])
     async def _public_config():

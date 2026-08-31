@@ -365,3 +365,119 @@ async def polar_credit_purchase(session: AsyncSession, payload: dict) -> dict:
         session, user_id, "polar", str(event_id),
         pack, pack.usd_cents, "USD",
     )
+
+
+# ── Admin: grant and self-test ───────────────────────────────────────────────
+
+async def admin_grant_credits(
+    payload: dict,
+    current_user: UserProfile = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """POST /api/admin/credits/grant — {email, credits, note}.
+
+    The operational lever: a support adjustment, a promotional gift, topping
+    up a tester. Written to the ledger as ADMIN_ADJUSTMENT with who did it,
+    because credits that appear without a paper trail are exactly what the
+    ledger exists to prevent.
+    """
+    from src.db import UserProfile as UP
+
+    email = str(payload.get("email", "")).strip().lower()
+    try:
+        amount = int(payload.get("credits", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="credits must be a number.")
+    if not email or amount == 0:
+        raise HTTPException(status_code=400, detail="email and a non-zero credits amount are required.")
+    if abs(amount) > 500:
+        raise HTTPException(status_code=400, detail="That is a lot of credits for one adjustment. Do it in steps if you mean it.")
+
+    target = (await session.execute(
+        select(UP).where(UP.email_id == email)
+    )).scalars().first()
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"No account with email {email}.")
+
+    note = f"{payload.get('note') or 'Admin adjustment'} (by {getattr(current_user, 'email_id', 'admin')})"
+    if amount > 0:
+        balance = await C.grant_credits(target.id, amount, C.KIND_ADMIN_ADJUSTMENT, session, note=note)
+    else:
+        # A negative adjustment goes through the same conditional debit so it
+        # can never push a balance below zero.
+        import uuid as _uuid
+        result = await C.debit_for_generation(target.id, -amount, _uuid.uuid4(), session, note=note)
+        if not result.ok:
+            raise HTTPException(status_code=400, detail=f"Balance is {result.balance}; cannot remove {-amount}.")
+        balance = result.balance
+    return {"success": True, "email": email, "balance": balance}
+
+
+async def admin_credits_selftest(
+    current_user: UserProfile = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """POST /api/admin/credits/selftest — prove the money on THIS database.
+
+    The unit tests prove the logic on SQLite, which serialises writers, so
+    they cannot prove the conditional UPDATE under real Postgres concurrency.
+    This runs the whole dangerous set against the calling admin's own wallet —
+    grant, concurrent double debit, over-spend, refund, double refund — and
+    reverses everything, reporting each expectation. Run it after any deploy
+    that touches the credit path; a failure here is a failure that would
+    otherwise be found by a paying seeker.
+    """
+    import asyncio as _asyncio
+    import uuid as _uuid
+
+    from src.db import get_background_session
+
+    uid = current_user.id
+    results = []
+
+    def check(name, ok, detail=""):
+        results.append({"check": name, "ok": bool(ok), "detail": str(detail)})
+
+    start_balance = await C.get_balance(uid, session)
+
+    # 1. Grant 3.
+    bal = await C.grant_credits(uid, 3, C.KIND_ADMIN_ADJUSTMENT, session, note="selftest grant")
+    check("grant_3", bal == start_balance + 3, f"balance {bal}")
+
+    # 2. TWO CONCURRENT debits of the same generation, each on its OWN session
+    #    — the real race, on the real database. Exactly one may charge.
+    gen = _uuid.uuid4()
+
+    async def _debit():
+        async with get_background_session() as s:
+            return await C.debit_for_generation(uid, 1, gen, s, note="selftest concurrent")
+
+    a, b = await _asyncio.gather(_debit(), _debit())
+    charged = (a.charged or 0) + (b.charged or 0)
+    check("concurrent_double_debit_charges_once", charged == 1,
+          f"charged {a.charged}+{b.charged}")
+
+    # 3. Over-spend: try to take far more than the balance holds.
+    big = await C.debit_for_generation(uid, 9999, _uuid.uuid4(), session, note="selftest overdraft")
+    check("overdraft_refused", not big.ok and big.reason == "INSUFFICIENT_CREDITS", big.reason)
+
+    # 4. Refund the concurrent debit; balance returns.
+    refunded = await C.refund_for_generation(gen, session, note="selftest refund")
+    check("refund_returns_credit", refunded is True)
+
+    # 5. Refund again; nothing moves.
+    again = await C.refund_for_generation(gen, session, note="selftest refund again")
+    check("double_refund_refused", again is False)
+
+    # 6. Reverse the grant, leaving the wallet exactly as found.
+    result = await C.debit_for_generation(uid, 3, _uuid.uuid4(), session, note="selftest cleanup")
+    end_balance = await C.get_balance(uid, session)
+    check("wallet_restored", end_balance == start_balance,
+          f"start {start_balance}, end {end_balance}")
+
+    # 7. Ledger and balance agree for every wallet in the system.
+    drift = await C.reconcile(session)
+    check("no_ledger_drift", drift == [], drift)
+
+    passed = sum(1 for r in results if r["ok"])
+    return {"passed": passed, "failed": len(results) - passed, "results": results}
