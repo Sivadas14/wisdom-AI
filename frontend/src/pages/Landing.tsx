@@ -241,23 +241,24 @@ function PublicHeader({ isAuthenticated, onNewToRamana }: { isAuthenticated: boo
         style={{ borderBottom: `1px solid ${T.border}` }}
         className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between"
       >
-        <a href="https://www.arunachalasamudra.in" style={{ textDecoration: "none" }}>
-          <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "1.3rem", letterSpacing: "-0.01em" }}>
-            Arunachala Samudra
-          </span>
-        </a>
-        <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center gap-1.5" style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.82rem" }}>
-            <Mail className="w-3.5 h-3.5" />
-            <a href="mailto:info@arunachalasamudra.co.in" className="hover:opacity-70 transition-opacity">
-              info@arunachalasamudra.co.in
-            </a>
-          </div>
-          {/* The GTranslate pill mounts here as a NORMAL header child. It was
-              previously fixed to the viewport, where it escaped every
-              stacking context and painted over open modals; in flex flow it
-              can neither outrank a dialog nor overlap a sibling. */}
+        <div className="flex items-center gap-3">
+          <a href="https://www.arunachalasamudra.in" style={{ textDecoration: "none" }}>
+            <span style={{ fontFamily: T.serif, color: T.brown, fontSize: "1.3rem", letterSpacing: "-0.01em" }}>
+              Arunachala Samudra
+            </span>
+          </a>
+          {/* The GTranslate pill sits right after the brand, not at the
+              header's right edge: on mobile the right edge belongs to the
+              hamburger button, and the pill was covering it completely. Here
+              it obstructs nothing at any width. As a flex child in normal
+              flow it also cannot outrank a dialog or overlap a sibling. */}
           <div className="gtranslate_wrapper" />
+        </div>
+        <div className="hidden md:flex items-center gap-1.5" style={{ fontFamily: T.sans, color: T.muted, fontSize: "0.82rem" }}>
+          <Mail className="w-3.5 h-3.5" />
+          <a href="mailto:info@arunachalasamudra.co.in" className="hover:opacity-70 transition-opacity">
+            info@arunachalasamudra.co.in
+          </a>
         </div>
         {/* Mobile hamburger */}
         <button

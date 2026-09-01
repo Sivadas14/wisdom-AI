@@ -224,7 +224,10 @@
 
 .gt_float_switcher .gt_options {
   position: absolute !important;
-  right: 0 !important;
+  /* Left-anchored: on the landing page the pill sits just after the brand,
+     so a right-aligned menu would run off a phone's left edge. */
+  left: 0 !important;
+  right: auto !important;
   top: calc(100% + 6px) !important;
   /* The pill is 83px wide and the dropdown inherited that width, cutting
      every language name to a sliver. A menu must be wide enough to read. */
@@ -258,4 +261,12 @@
 .gt_float_switcher .gt_options img {
   width: 20px !important;
   height: 20px !important;
+}
+
+
+/* In the signed-in app the pill still sits at the header's right, so its
+   menu anchors right instead — a left-anchored one would run off-screen. */
+body.app-shell .gt_float_switcher .gt_options {
+  right: 0 !important;
+  left: auto !important;
 }
