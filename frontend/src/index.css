@@ -183,6 +183,18 @@
 
    Sized to the band: 18px flag, tight padding, the site's own cream and
    border. The dropdown still overlays content while open — menus do. */
+/* float.js wraps the switcher in its own #gt_float_wrapper carrying an
+   inline style of position:fixed; top:20px; right:20px; z-index:999999 —
+   which is what actually pinned the pill to the viewport corner, over the
+   mobile hamburger, even after the switcher itself was made static. Inline
+   styles lose to !important, so this puts the whole widget back in flow. */
+#gt_float_wrapper {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+}
+
 .gt_float_switcher {
   position: static !important;
   font-size: 12px !important;
@@ -269,4 +281,22 @@
 body.app-shell .gt_float_switcher .gt_options {
   right: 0 !important;
   left: auto !important;
+}
+
+/* On a phone no anchoring works everywhere: the pill sits mid-header, so a
+   left-anchored 180px menu runs off the right edge (measured: right edge at
+   404px in a 375px viewport) and a right-anchored one can run off the left.
+   So on small screens the menu becomes a fixed sheet just under the header,
+   spanning the width — always fully on screen, and finger-sized. This rule
+   comes after the app-shell anchor override so it wins there too. */
+@media (max-width: 767px) {
+  .gt_float_switcher .gt_options,
+  body.app-shell .gt_float_switcher .gt_options {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    top: 64px !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
 }
