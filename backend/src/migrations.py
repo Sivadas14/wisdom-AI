@@ -233,6 +233,42 @@ async def _create_ramana_images_table(session: AsyncSession) -> None:
     _log("ramana_images table verified/created.")
 
 
+async def _create_referral_hits_table(session: AsyncSession) -> None:
+    """
+    Idempotently create the referral arrivals table.
+
+    One row per arrival carrying a ?from= tag — the AstroPal footer link is the
+    first of these. Recorded server-side as the page is served, so a visitor
+    who reads the landing page and leaves still counts: a bounce is a real
+    click, and a referral metric that only counts people who stayed answers a
+    different question than the one being asked.
+
+    `ip_hash` is SHA-256, never a raw address, matching what guest_sessions
+    already does. It exists so "1 curious person refreshing 20 times" and "20
+    people" can be told apart; it is not, and must not become, an identity.
+
+    Deliberately NOT unique on anything. Deduplication is a reporting decision
+    (COUNT vs COUNT DISTINCT), and a UNIQUE constraint here would throw that
+    choice away at write time, permanently.
+    """
+    await session.execute(text("""
+        CREATE TABLE IF NOT EXISTS referral_hits (
+            id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            source     VARCHAR(64) NOT NULL,
+            ip_hash    VARCHAR(64),
+            path       VARCHAR(512)
+        )
+    """))
+    # The only query shapes this table serves: "how many from source X since
+    # date D" and "how many distinct visitors". Both scan on created_at.
+    await session.execute(text("""
+        CREATE INDEX IF NOT EXISTS idx_referral_hits_source_created
+            ON referral_hits (source, created_at)
+    """))
+    await session.commit()
+
+
 async def _create_credit_tables(session: AsyncSession) -> None:
     """
     Idempotently create the credit wallet, ledger and purchase tables.
@@ -1085,6 +1121,7 @@ async def run_migrations(session_factory) -> None:
         await _safe_migration(session, "_create_daily_contemplations_table", _create_daily_contemplations_table)
         await _safe_migration(session, "_create_trial_grants_table", _create_trial_grants_table)
         await _safe_migration(session, "_create_credit_tables", _create_credit_tables)
+        await _safe_migration(session, "_create_referral_hits_table", _create_referral_hits_table)
         await _safe_migration(session, "_add_razorpay_columns", _add_razorpay_columns)
         await _safe_migration(session, "_add_content_generation_status", _add_content_generation_status)
         await _safe_migration(session, "_create_suggested_topics_table", _create_suggested_topics_table)

@@ -521,3 +521,30 @@ export interface DynamicTopic {
 export interface DynamicTopicsResponse {
     items: DynamicTopic[];
 }
+// ─── Usage statistics (admin) ────────────────────────────────────────────────
+// Mirrors admin.usage_stats. Two families of number deliberately kept apart:
+// questions (guest + signed-in) and conversations (signed-in only, because a
+// guest chat is never stored as a Conversation).
+
+export interface UsagePeriodCounts {
+    questions_guest: number;
+    questions_signed_in: number;
+    questions_total: number;
+    conversations_signed_in: number;
+}
+
+export interface ReferralCount {
+    source: string;
+    clicks: number;
+    visitors: number;
+}
+
+export type UsagePeriodKey = 'week_to_date' | 'month_to_date' | 'year_to_date';
+
+export interface UsageStats {
+    generated_at: string;
+    timezone_note: string;
+    period_starts: Record<UsagePeriodKey, string>;
+    periods: Record<UsagePeriodKey, UsagePeriodCounts>;
+    referrals: Record<UsagePeriodKey, ReferralCount[]>;
+}

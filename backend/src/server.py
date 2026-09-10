@@ -17,6 +17,8 @@ import asyncio
 from fastapi import FastAPI, Depends, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response, HTMLResponse
 from src.content_pages import get_published_page, render_content_page
+from starlette.background import BackgroundTask
+from src.services.referrals import record_referral_hit
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -640,6 +642,7 @@ def get_app() -> FastAPI:
     # Corpus integrity: audit what is really retrievable, repair in place, retire duplicates.
     app.add_api_route("/api/admin/source-data/audit", admin_svc.audit_corpus, methods=["GET"], tags=["admin"])
     app.add_api_route("/api/admin/economics", admin_svc.economics_report, methods=["GET"], tags=["admin"])
+    app.add_api_route("/api/admin/usage-stats", admin_svc.usage_stats, methods=["GET"], tags=["admin"])
     app.add_api_route("/api/admin/source-data/{document_id}/reindex", admin_svc.reindex_source_document, methods=["POST"], tags=["admin"])
     app.add_api_route("/api/admin/source-data/{document_id}/active", admin_svc.set_source_document_active, methods=["PATCH"], tags=["admin"])
     app.add_api_route("/api/admin/upload", admin_svc.upload_source_pdfs, methods=["POST"], tags=["admin"])
@@ -818,6 +821,36 @@ def get_app() -> FastAPI:
         if full_path.startswith("api/"):
             return JSONResponse(status_code=404, content={"error": "Not found"})
 
+        # ── Referral arrivals (?from=astropal) ───────────────────────────────
+        # Recorded here rather than from the browser on purpose. A client-side
+        # beacon misses the visitor who reads the page and leaves — and that
+        # visitor still clicked the link, which is the thing being counted.
+        # It is also the first thing an ad blocker drops.
+        #
+        # Three properties this must have, in order of importance:
+        #   1. It can never break the page. Any failure is swallowed; a
+        #      referral tally is not worth a white screen on the landing page.
+        #   2. It can never delay the page. The write is scheduled as a
+        #      background task, so the response does not wait on the database.
+        #   3. It must not count assets. Only extensionless paths (the SPA
+        #      routes a human lands on) qualify, so one visit is one row and
+        #      not one row per .js and .css the page pulls in.
+        _src = (request.query_params.get("from") or "").strip().lower()[:64]
+        if _src and (not full_path or "." not in full_path.split("/")[-1]):
+            try:
+                _bg = BackgroundTask(
+                    record_referral_hit,
+                    getattr(request.app.state, "db_session_factory", None),
+                    _src,
+                    request.client.host if request.client else None,
+                    request.headers.get("user-agent"),
+                    "/" + full_path,
+                )
+            except Exception:
+                _bg = None
+        else:
+            _bg = None
+
         # ── Server-rendered public content pages (migrated .in content) ──────
         # If a published page exists for this slug, return real SEO HTML so
         # crawlers and AI engines can read it. Everything else is unchanged.
@@ -857,6 +890,7 @@ def get_app() -> FastAPI:
                 _resp = HTMLResponse(
                     render_content_page(_page, lang=_lang, available_langs=["en"] + _approved),
                     headers={"Cache-Control": "private, max-age=300", "Vary": "Cookie"},
+                    background=_bg,
                 )
                 if request.query_params.get("lang"):
                     _resp.set_cookie("site_lang", _lang, max_age=31536000, samesite="lax")
@@ -876,6 +910,7 @@ def get_app() -> FastAPI:
                 return FileResponse(
                     file_path,
                     headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+                    background=_bg,
                 )
             return FileResponse(
                 file_path,
@@ -888,6 +923,7 @@ def get_app() -> FastAPI:
             return FileResponse(
                 index_file,
                 headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+                background=_bg,
             )
 
         return JSONResponse(status_code=404, content={"error": "Frontend not found"})

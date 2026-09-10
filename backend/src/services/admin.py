@@ -1092,3 +1092,118 @@ async def set_source_document_active(
     await session.commit()
     tu.logger.info(f"[SET_ACTIVE] {doc.filename} -> active={active}")
     return {"success": True, "filename": doc.filename, "active": active}
+
+
+# ============================================================================
+# Usage statistics — what is actually happening on the site
+# ============================================================================
+
+async def usage_stats(
+    session: AsyncSession = Depends(get_db_session_fa),
+):
+    """GET /api/admin/usage-stats — chats and referrals, by period.
+
+    WHY UTC CALENDAR DAYS, and not IST as the founder's own clock would want:
+    guest questions are the larger half of the picture now that Wisdom is
+    free, and guest_sessions stores only `session_date`, a 'YYYY-MM-DD' string
+    written from utcnow(). That bucketing cannot be undone after the fact — the
+    exact instant of a guest question was never kept. Signed-in messages DO
+    carry a real timestamp, so they could be bucketed by IST. Doing so would
+    make 'this week' mean two different windows for the two halves of the same
+    total, and the total would then be a number that describes no actual period
+    of time. So both halves use UTC days, and the dashboard says so.
+    The practical cost is the 5h30m before 05:30 IST on a boundary day.
+
+    Two families of number, per the founder's request for both side by side:
+
+      questions   — every question put to Bhagavan, guest + signed-in. Guests
+                    cannot be counted any other way: a guest chat is never
+                    stored as a Conversation (conversations.user_id is a
+                    required FK), only as a message tally on guest_sessions.
+
+      conversations — threads started. Signed-in only, necessarily, for the
+                    reason above. Shown beside the questions so the two are
+                    never mistaken for each other.
+    """
+    import datetime as _dt
+    from sqlalchemy import text
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+    today = now.date()
+    starts = {
+        "week_to_date":  today - _dt.timedelta(days=today.weekday()),  # Monday
+        "month_to_date": today.replace(day=1),
+        "year_to_date":  today.replace(month=1, day=1),
+    }
+
+    async def _counts(start_date: _dt.date) -> dict:
+        start_ts = _dt.datetime.combine(
+            start_date, _dt.time.min, tzinfo=_dt.timezone.utc
+        )
+        start_str = start_date.isoformat()
+
+        # Guest questions. COALESCE because SUM over no rows is NULL, and a
+        # quiet week would otherwise render as 'null' on the dashboard rather
+        # than as the zero it actually is.
+        guest_q = (await session.execute(
+            text(
+                "SELECT COALESCE(SUM(message_count), 0) FROM guest_sessions "
+                "WHERE session_date >= :d"
+            ),
+            {"d": start_str},
+        )).scalar() or 0
+
+        # Signed-in questions. role is a Postgres enum persisted by NAME, so
+        # it must be compared as text — the same trap that made the economics
+        # report return 500 when it was written as role = 'user'.
+        user_q = (await session.execute(
+            text(
+                "SELECT COUNT(*) FROM messages "
+                "WHERE UPPER(role::text) = 'USER' AND created_at >= :t"
+            ),
+            {"t": start_ts},
+        )).scalar() or 0
+
+        # Conversations started. Counted as started even if later deleted:
+        # the question 'how much was the site used' is not retroactively
+        # changed by someone tidying their history afterwards.
+        convos = (await session.execute(
+            text("SELECT COUNT(*) FROM conversations WHERE created_at >= :t"),
+            {"t": start_ts},
+        )).scalar() or 0
+
+        return {
+            "questions_guest": int(guest_q),
+            "questions_signed_in": int(user_q),
+            "questions_total": int(guest_q) + int(user_q),
+            "conversations_signed_in": int(convos),
+        }
+
+    async def _referrals(start_date: _dt.date) -> list[dict]:
+        start_ts = _dt.datetime.combine(
+            start_date, _dt.time.min, tzinfo=_dt.timezone.utc
+        )
+        rows = (await session.execute(
+            text(
+                "SELECT source, COUNT(*) AS clicks, "
+                "       COUNT(DISTINCT ip_hash) AS visitors "
+                "FROM referral_hits WHERE created_at >= :t "
+                "GROUP BY source ORDER BY clicks DESC"
+            ),
+            {"t": start_ts},
+        )).all()
+        return [
+            {"source": r[0], "clicks": int(r[1]), "visitors": int(r[2])}
+            for r in rows
+        ]
+
+    periods = {name: await _counts(d) for name, d in starts.items()}
+    referrals = {name: await _referrals(d) for name, d in starts.items()}
+
+    return {
+        "generated_at": now.isoformat(),
+        "timezone_note": "Periods are UTC calendar days; weeks start Monday.",
+        "period_starts": {k: v.isoformat() for k, v in starts.items()},
+        "periods": periods,
+        "referrals": referrals,
+    }

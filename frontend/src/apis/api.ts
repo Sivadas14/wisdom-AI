@@ -40,6 +40,7 @@ import {
     SuggestedTopicsResponse,
     DynamicTopic,
     DynamicTopicsResponse,
+    UsageStats,
 } from './wire';
 
 
@@ -680,6 +681,13 @@ export const dashboardAPI = {
     },
     getUsersAtLimit: async (): Promise<{ users_at_limit: number; total_free_users: number; pct: number; chat_limit: number }> => {
         const response = await apiClient.get('/dashboard/users_at_limit');
+        return response.data;
+    },
+    // Chats and referrals by period. Lives under /admin rather than /dashboard
+    // because it reads guest_sessions and referral_hits, which no ordinary
+    // user should be able to query.
+    getUsageStats: async (): Promise<UsageStats> => {
+        const response = await apiClient.get('/admin/usage-stats');
         return response.data;
     },
     getSignupsTrend: async (days = 30): Promise<{ date: string; signups: number }[]> => {

@@ -13,7 +13,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { dashboardAPI } from '@/apis/api';
-import { DashboardCount, PlanDistributionItem, RecentUserItem } from '@/apis/wire';
+import { DashboardCount, PlanDistributionItem, RecentUserItem, UsageStats, UsagePeriodKey } from '@/apis/wire';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +66,101 @@ const getPlanColor = (plan?: string): string => {
   }
 };
 
+// ─── Usage panel ──────────────────────────────────────────────────────────────
+
+const PERIOD_LABELS: { key: UsagePeriodKey; label: string }[] = [
+  { key: 'week_to_date',  label: 'This week' },
+  { key: 'month_to_date', label: 'Month to date' },
+  { key: 'year_to_date',  label: 'Year to date' },
+];
+
+const UsagePanel: React.FC<{ stats: UsageStats | null }> = ({ stats }) => {
+  if (!stats) {
+    return <p className="text-gray-500 text-center py-6 text-sm">Usage statistics unavailable</p>;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-gray-500 border-b">
+              <th className="py-2 pr-4 font-medium">Period</th>
+              <th className="py-2 px-3 font-medium text-right">Questions asked</th>
+              <th className="py-2 px-3 font-medium text-right">· guests</th>
+              <th className="py-2 px-3 font-medium text-right">· signed in</th>
+              <th className="py-2 pl-3 font-medium text-right">Conversations started</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PERIOD_LABELS.map(({ key, label }) => {
+              const p = stats.periods[key];
+              if (!p) return null;
+              return (
+                <tr key={key} className="border-b last:border-0">
+                  <td className="py-2.5 pr-4">
+                    <span className="font-medium text-gray-900">{label}</span>
+                    <span className="block text-xs text-gray-400">
+                      from {stats.period_starts[key]}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-semibold text-gray-900">
+                    {p.questions_total.toLocaleString()}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-gray-600">
+                    {p.questions_guest.toLocaleString()}
+                  </td>
+                  <td className="py-2.5 px-3 text-right text-gray-600">
+                    {p.questions_signed_in.toLocaleString()}
+                  </td>
+                  <td className="py-2.5 pl-3 text-right text-gray-600">
+                    {p.conversations_signed_in.toLocaleString()}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Referrals. Absence is a real answer here, so an empty state says
+          "nobody has arrived yet" rather than showing nothing at all — a
+          blank space reads as a broken panel, not as a zero. */}
+      <div>
+        <h3 className="text-sm font-medium text-gray-900 mb-2">Referrals in</h3>
+        {PERIOD_LABELS.map(({ key, label }) => {
+          const rows = stats.referrals[key] || [];
+          return (
+            <div key={key} className="flex items-baseline gap-3 py-1 text-sm">
+              <span className="text-gray-500 w-32 shrink-0">{label}</span>
+              {rows.length === 0 ? (
+                <span className="text-gray-400">none yet</span>
+              ) : (
+                <span className="text-gray-700">
+                  {rows.map(r => (
+                    <span key={r.source} className="mr-4">
+                      <span className="font-medium">{r.source}</span>{' '}
+                      {r.clicks.toLocaleString()} click{r.clicks === 1 ? '' : 's'}
+                      <span className="text-gray-400">
+                        {' '}· {r.visitors.toLocaleString()} visitor{r.visitors === 1 ? '' : 's'}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs text-gray-400 border-t pt-3">
+        {stats.timezone_note} Guest questions are counted from daily session
+        tallies, which is why they cannot be split by conversation.
+      </p>
+    </div>
+  );
+};
+
 // ─── Mini bar chart ───────────────────────────────────────────────────────────
 
 const SignupsTrendChart: React.FC<{ data: SignupDay[] }> = ({ data }) => {
@@ -112,6 +207,7 @@ const Dashboard: React.FC = () => {
   const [recentTransactions, setRecentTransactions] = useState<RecentTx[]>([]);
   const [usersAtLimit, setUsersAtLimit] = useState<UsersAtLimit | null>(null);
   const [signupsTrend, setSignupsTrend] = useState<SignupDay[]>([]);
+  const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -121,13 +217,16 @@ const Dashboard: React.FC = () => {
       setRefreshing(true);
       setError(null);
 
-      const [countRes, planRes, usersRes, txRes, limitRes, trendRes] = await Promise.all([
+      const [countRes, planRes, usersRes, txRes, limitRes, trendRes, usageRes] = await Promise.all([
         dashboardAPI.getCount(),
         dashboardAPI.getPlanDistribution(),
         dashboardAPI.getRecentUsers(10, 7),
         dashboardAPI.getRecentTransactions(10, 7).catch(() => []),
         dashboardAPI.getUsersAtLimit().catch(() => null),
         dashboardAPI.getSignupsTrend(30).catch(() => []),
+        // Tolerated failure: a brand-new deploy may not have the table yet, and
+        // the rest of the dashboard is still worth showing if this one 500s.
+        dashboardAPI.getUsageStats().catch(() => null),
       ]);
 
       setCount(countRes);
@@ -136,6 +235,7 @@ const Dashboard: React.FC = () => {
       setRecentTransactions(txRes || []);
       setUsersAtLimit(limitRes);
       setSignupsTrend(trendRes || []);
+      setUsageStats(usageRes);
     } catch (err) {
       console.error('Failed to load dashboard data', err);
       setError('Failed to load dashboard data. Please try again.');
@@ -255,6 +355,18 @@ const Dashboard: React.FC = () => {
         </Card>
 
       </div>
+
+      {/* Chats & referrals */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold text-gray-900">
+            Chats &amp; referrals
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <UsagePanel stats={usageStats} />
+        </CardContent>
+      </Card>
 
       {/* Trend + Plan Distribution */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

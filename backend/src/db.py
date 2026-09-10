@@ -1300,6 +1300,25 @@ class RamanaImage(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="true")
 
 
+class ReferralHit(Base):
+    """One arrival carrying a ?from= tag, e.g. the AstroPal footer link.
+
+    Written server-side as the page is served (see catch_all in server.py), so
+    a visitor who lands and immediately leaves is still counted — a bounce is
+    a real click, and it is the click we are trying to measure.
+
+    ip_hash is SHA-256, never a raw address, matching GuestSession. Its only
+    purpose is separating "one person refreshing" from "many people".
+    """
+    __tablename__ = "referral_hits"
+
+    id: Mapped[pkey_uuid]
+    created_at: Mapped[default_timestamp]
+    source: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    ip_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
 class GuestSession(Base):
     """Tracks guest (unauthenticated) chat usage for rate limiting.
 
