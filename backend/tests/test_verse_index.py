@@ -295,3 +295,62 @@ if __name__ == "__main__":
                 failed += 1
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)
+
+
+# ---------------------------------------------------------------------------
+# Spelling of the work name — THE INCIDENT (2026-11-18)
+# ---------------------------------------------------------------------------
+# "what is the 21st verse of the upadesam saram" returned None because the
+# alias demanded "upadesa" directly followed by "saram". The question fell to
+# semantic search and the answer said verse 21 was unavailable. Every spelling
+# below is one a seeker plausibly types; each must reach the verse lookup.
+
+import pytest  # noqa: E402
+from src.verse_index import parse_verse_query  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "what is the 21st verse of the upadesam saram",   # the actual question
+        "what is the 21st verse of the upadesa saram",
+        "Explain verse 21 of Upadeśa Sāram",               # diacritics
+        "UPADESA SARAM verse 21",
+        "upadesha saram verse 21",
+        "upadesasaram verse 21",
+        "Upadesa Saaram verse 21",
+        "Upadesa-Saram, verse 21",
+        "Upadesa Undiyar verse 21",
+        "Upadesa Unthiyar verse 21",
+        "Upadesa Undhiyar verse 21",
+        "upadesh saar verse 21",
+        "upadesa sara verse 21",
+    ],
+)
+def test_upadesa_saram_spellings_reach_the_lookup(question):
+    assert parse_verse_query(question) == ("upadesa-saram", [21])
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Ulladu Narpadu verse 21",
+        "uladu narpadhu verse 21",
+        "Forty Verses verse 21",
+    ],
+)
+def test_ulladu_narpadu_spellings_reach_the_lookup(question):
+    assert parse_verse_query(question) == ("ulladu-narpadu", [21])
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "verse 21",                               # no work named: stay semantic
+        "what does Ramana say about upadesa",     # the word alone, no verse
+        "upadesa saram",                          # the work, but no verse number
+        "explain upadesam saram please",
+    ],
+)
+def test_loose_spelling_does_not_invent_a_lookup(question):
+    assert parse_verse_query(question) is None

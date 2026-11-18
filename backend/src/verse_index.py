@@ -77,11 +77,43 @@ WORKS: tuple[Work, ...] = (
     ),
 )
 
-# Aliases people actually type, mapped to a work key.
+# Aliases people actually type, mapped to a work key. Matched against the query
+# AFTER _fold() has lowercased it and stripped diacritics, so "Upadeśa Sāram"
+# arrives here as "upadesa saram".
+#
+# THE INCIDENT (2026-11-18). A seeker asked "what is the 21st verse of the
+# upadesam saram". The old alias was r"upadesa\s*(saram|saara|undiyar)": the
+# extra "m" in "upadesam" broke it, parse_verse_query returned None, the
+# question fell through to plain semantic search, and the answer said verse 21
+# was not available while listing nine other verses it had found. The corpus
+# was complete; the lookup never ran. The same pattern also rejected the
+# scholarly "Upadeśa Sāram", "Upadesha Saram", "Upadesa Unthiyar" and the
+# Hindi "Upadesh Saar". A spelling is not a reason to fail a seeker, so these
+# are deliberately loose: s/sh, optional trailing a/am/m, one or two a's in
+# saram, and the Tamil undiyar/unthiyar/undhiyar forms.
 _QUERY_ALIASES: tuple[tuple[re.Pattern, str], ...] = (
-    (re.compile(r"upadesa\s*(saram|saara|undiyar)", re.I), "upadesa-saram"),
-    (re.compile(r"(ulladu\s*narpadu|forty\s*verses|40\s*verses)", re.I), "ulladu-narpadu"),
+    (
+        re.compile(
+            r"upade(?:s|sh)(?:am|a|m)?\s*[-_]?\s*"
+            r"(?:s{1,2}a{1,2}r(?:am|a)?\b|u(?:n|nd|nt|ndh|nth)i?y?a{1,2}r)",
+        ),
+        "upadesa-saram",
+    ),
+    (
+        re.compile(
+            r"(?:ull?adh?u\s*[-_]?\s*narp(?:a|e)dh?u|forty\s*verses|40\s*verses)",
+        ),
+        "ulladu-narpadu",
+    ),
 )
+
+
+def _fold(text: str) -> str:
+    """Lowercase and strip diacritics: "Upadeśa Sāram" -> "upadesa saram"."""
+    import unicodedata
+
+    decomposed = unicodedata.normalize("NFKD", text or "")
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).lower()
 
 # Roughly the embedding model's ceiling, with headroom. A verse plus its
 # commentary can run to twenty pages (Upadesa Saram verse 10 carries the whole
@@ -322,6 +354,7 @@ def parse_verse_query(text: str) -> Optional[Tuple[str, List[int]]]:
     """
     if not text:
         return None
+    text = _fold(text)
 
     work_key = None
     for pat, key in _QUERY_ALIASES:
