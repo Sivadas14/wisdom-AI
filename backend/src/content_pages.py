@@ -31,7 +31,13 @@ def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, 
     meta_desc = (page.get("meta_description") or "").strip()
     canonical_path = page.get("canonical_path") or f"/{page['slug']}"
     canonical_url = f"{base_url}{canonical_path}"
-    og_image = page.get("og_image") or f"{base_url}/og-default.png"
+    # og:image must be an absolute URL: Facebook, WhatsApp and LinkedIn ignore
+    # a bare path, so a page whose hero image is "/images/..." shared with no
+    # preview image (found 2026-11-18 on /saints/paul-brunton). The fallback
+    # used to be /og-default.png, which never existed on either domain.
+    og_image = (page.get("og_image") or "").strip() or "/images/og-image.png"
+    if og_image.startswith("/") and not og_image.startswith("//"):
+        og_image = f"{base_url}{og_image}"
     md = page.get("metadata") or {}
     hero_image = md.get("hero_image")
     subtitle = md.get("subtitle")
