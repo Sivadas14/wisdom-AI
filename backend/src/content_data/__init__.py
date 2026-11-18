@@ -66,7 +66,7 @@ def json_to_row(j):
         "title": j["title"],
         "body": j.get("body_html") or "",
         "meta_description": j.get("meta_description") or "",
-        "og_image": j.get("hero_image") or "https://www.arunachalasamudra.com/og-default.png",
+        "og_image": j.get("hero_image") or "https://www.arunachalasamudra.co.in/images/og-image.png",
         "canonical_path": canonical,
         "schema_json": j.get("schema_json"),
         "metadata": metadata,

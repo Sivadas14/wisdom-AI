@@ -16,7 +16,7 @@ import html as html_lib
 import json
 from typing import Any, Optional
 
-PRIMARY_BASE_URL = "https://www.arunachalasamudra.com"
+PRIMARY_BASE_URL = "https://www.arunachalasamudra.co.in"
 
 
 def render_content_page(page: dict[str, Any], base_url: str = PRIMARY_BASE_URL, lang: str = "en", available_langs: list | None = None) -> str:

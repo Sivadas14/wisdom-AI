@@ -706,7 +706,6 @@ def get_app() -> FastAPI:
             "Disallow: /reset-password",
             "Disallow: /api/",
             "",
-            "Sitemap: https://www.arunachalasamudra.com/sitemap.xml",
             "Sitemap: https://www.arunachalasamudra.co.in/sitemap.xml",
         ])
         return Response(content=content, media_type="text/plain")
@@ -748,7 +747,7 @@ def get_app() -> FastAPI:
             pass
 
         urls = []
-        base = "https://www.arunachalasamudra.com"
+        base = "https://www.arunachalasamudra.co.in"
         for path, changefreq, priority in static_pages:
             loc = f"{base}/{path}" if path else base
             urls.append(

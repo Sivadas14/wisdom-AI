@@ -6,7 +6,7 @@
 
   <!-- Homepage / AI Wisdom Chat -->
   <url>
-    <loc>https://www.arunachalasamudra.com</loc>
+    <loc>https://www.arunachalasamudra.co.in</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
@@ -14,13 +14,13 @@
 
   <!-- Auth pages -->
   <url>
-    <loc>https://www.arunachalasamudra.com/signin</loc>
+    <loc>https://www.arunachalasamudra.co.in/signin</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://www.arunachalasamudra.com/register</loc>
+    <loc>https://www.arunachalasamudra.co.in/register</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
@@ -28,13 +28,13 @@
 
   <!-- Legal -->
   <url>
-    <loc>https://www.arunachalasamudra.com/privacy</loc>
+    <loc>https://www.arunachalasamudra.co.in/privacy</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
-    <loc>https://www.arunachalasamudra.com/terms</loc>
+    <loc>https://www.arunachalasamudra.co.in/terms</loc>
     <lastmod>2026-06-03</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
